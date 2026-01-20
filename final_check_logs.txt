@@ -1,0 +1,46 @@
+--------- beginning of main
+01-19 20:27:58.691 17044 17044 I erl.webdavtoon: Late-enabling -Xcheck:jni
+01-19 20:27:58.712 17044 17044 I erl.webdavtoon: Using CollectorTypeCC GC.
+01-19 20:27:58.724 17044 17044 D nativeloader: Load libframework-connectivity-tiramisu-jni.so using APEX ns com_android_tethering for caller /apex/com.android.tethering/javalib/framework-connectivity-t.jar: ok
+01-19 20:27:58.751 17044 17044 D CompatChangeReporter: Compat change id reported: 242716250; UID 10549; state: ENABLED
+01-19 20:27:58.918 17044 17044 D nativeloader: Configuring clns-9 for other apk /data/app/~~N2m6NN-MpUykrFSeg3mbKA==/erl.webdavtoon-990fIeiuydpfUzQG8B_EqA==/base.apk. target_sdk_version=34, uses_libraries=, library_path=/data/app/~~N2m6NN-MpUykrFSeg3mbKA==/erl.webdavtoon-990fIeiuydpfUzQG8B_EqA==/lib/arm64, permitted_path=/data:/mnt/expand:/data/user/0/erl.webdavtoon
+01-19 20:27:58.928 17044 17044 I erl.webdavtoon: AssetManager2(0xb40000768004b778) locale list changing from [] to [zh-Hans-SG]
+01-19 20:27:58.933 17044 17044 V GraphicsEnvironment: Currently set values for:
+01-19 20:27:58.933 17044 17044 V GraphicsEnvironment:   angle_gl_driver_selection_pkgs=[com.android.angle, com.linecorp.b612.android, com.campmobile.snow, com.google.android.apps.tachyon]
+01-19 20:27:58.933 17044 17044 V GraphicsEnvironment:   angle_gl_driver_selection_values=[angle, native, native, native]
+01-19 20:27:58.933 17044 17044 V GraphicsEnvironment: erl.webdavtoon is not listed in per-application setting
+01-19 20:27:58.934 17044 17044 V GraphicsEnvironment: ANGLE allowlist from config: 
+01-19 20:27:58.934 17044 17044 V GraphicsEnvironment: erl.webdavtoon is not listed in ANGLE allowlist or settings, returning default
+01-19 20:27:58.934 17044 17044 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+01-19 20:27:58.971 17044 17044 I WebDAVToon: Application started
+01-19 20:27:58.973 17044 17044 I WebDAVToon: Log level set to: 4 (INFO)
+--------- beginning of system
+01-19 20:27:58.977 17044 17136 I DisplayManager: Choreographer implicitly registered for the refresh rate.
+01-19 20:27:58.980 17044 17136 I AdrenoGLES-0: QUALCOMM build                   : b213cd5627, I42f35bf1e0
+01-19 20:27:58.980 17044 17136 I AdrenoGLES-0: Build Date                       : 06/11/23
+01-19 20:27:58.980 17044 17136 I AdrenoGLES-0: OpenGL ES Shader Compiler Version: EV031.32.02.17
+01-19 20:27:58.980 17044 17136 I AdrenoGLES-0: Local Branch                     : 
+01-19 20:27:58.980 17044 17136 I AdrenoGLES-0: Remote Branch                    : 
+01-19 20:27:58.980 17044 17136 I AdrenoGLES-0: Remote Branch                    : 
+01-19 20:27:58.980 17044 17136 I AdrenoGLES-0: Reconstruct Branch               : 
+01-19 20:27:58.980 17044 17136 I AdrenoGLES-0: Build Config                     : S P 10.0.7 AArch64
+01-19 20:27:58.980 17044 17136 I AdrenoGLES-0: Driver Path                      : /vendor/lib64/egl/libGLESv2_adreno.so
+01-19 20:27:58.985 17044 17044 I erl.webdavtoon: AssetManager2(0xb400007680042178) locale list changing from [] to [zh-Hans-SG]
+01-19 20:27:58.986 17044 17136 I AdrenoGLES-0: PFP: 0x016dd093, ME: 0x00000000
+01-19 20:27:59.003 17044 17044 D AppCompatDelegate: Checking for metadata for AppLocalesMetadataHolderService : Service not found
+01-19 20:27:59.008 17044 17044 I erl.webdavtoon: AssetManager2(0xb400007680046638) locale list changing from [] to [zh-Hans-SG]
+01-19 20:27:59.012 17044 17044 E ashmem  : Pinning is deprecated since Android Q. Please use trim or other methods.
+01-19 20:27:59.053 17044 17044 I erl.webdavtoon: hiddenapi: Accessing hidden method Landroid/view/View;->computeFitSystemWindows(Landroid/graphics/Rect;Landroid/graphics/Rect;)Z (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/appcompat/widget/ViewUtils; (domain=app) using reflection: allowed
+01-19 20:27:59.077 17044 17044 D DesktopModeFlags: Toggle override initialized to: OVERRIDE_UNSET
+01-19 20:27:59.081 17044 17044 I erl.webdavtoon: hiddenapi: Accessing hidden method Landroid/view/ViewGroup;->makeOptionalFitsSystemWindows()V (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/appcompat/widget/ViewUtils; (domain=app) using reflection: allowed
+01-19 20:27:59.103 17044 17044 I ContentCaptureHelper: Setting logging level to OFF
+01-19 20:27:59.163 17044 17145 I Gralloc4: Adding additional valid usage bits: 0x8202000
+01-19 20:27:59.217 17044 17044 D InsetsController: hide(ime(), fromIme=false)
+01-19 20:27:59.218 17044 17044 I ImeTracker: erl.webdavtoon:4f0ea030: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+01-19 20:27:59.685 17044 17063 I erl.webdavtoon: Compiler allocated 5125KB to compile void android.view.ViewRootImpl.performTraversals()
+01-19 20:27:59.733 17044 17044 D FolderViewActivity: Loaded 75 local folders
+01-19 20:27:59.734 17044 17044 D FolderViewActivity: Total folders to display: 75
+01-19 20:28:00.142 17044 17044 D FolderViewActivity: Loaded 75 local folders
+01-19 20:28:00.142 17044 17044 D FolderViewActivity: Total folders to display: 75
+01-19 20:28:00.142 17044 17044 I Choreographer: Skipped 45 frames!  The application may be doing too much work on its main thread.
+01-19 20:28:00.427 17044 17044 I Choreographer: Skipped 34 frames!  The application may be doing too much work on its main thread.

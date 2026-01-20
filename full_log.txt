@@ -1,0 +1,500 @@
+01-19 20:48:20.949 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800b2018) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:20.951 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800a7758) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:20.952 24559 24559 I erl.webdavtoon: AssetManager2(0xb400007680045058) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:20.954 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680092c18) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:20.956 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800a03b8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:20.956 24559 24559 V GraphicsEnvironment: Currently set values for:
+01-19 20:48:20.956 24559 24559 V GraphicsEnvironment:   angle_gl_driver_selection_pkgs=[com.android.angle, com.linecorp.b612.android, com.campmobile.snow, com.google.android.apps.tachyon]
+01-19 20:48:20.956 24559 24559 V GraphicsEnvironment:   angle_gl_driver_selection_values=[angle, native, native, native]
+01-19 20:48:20.956 24559 24559 V GraphicsEnvironment: erl.webdavtoon is not listed in per-application setting
+01-19 20:48:20.957 24559 24559 V GraphicsEnvironment: ANGLE allowlist from config: 
+01-19 20:48:20.957 24559 24559 V GraphicsEnvironment: erl.webdavtoon is not listed in ANGLE allowlist or settings, returning default
+01-19 20:48:20.957 24559 24559 V GraphicsEnvironment: Neither updatable production driver nor prerelease driver is supported.
+01-19 20:48:20.957 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768008a8d8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:20.959 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800928f8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:20.960 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800a09f8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:20.961 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768009edd8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:20.963 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768009d4d8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:20.965 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800a5b38) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:20.966 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800a7438) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:20.967 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768008a298) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:20.968 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768007d138) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:20.970 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768007ce18) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:20.972 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680086738) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:20.973 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800a38d8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:20.975 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680099c98) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:20.976 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680097a38) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:20.978 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800af778) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:20.980 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680088038) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:20.981 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680080c98) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:20.983 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680090058) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:20.985 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680096a98) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:20.986 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768008ed98) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.800  1357  2831 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 6. Are binder threads started and available?)
+01-19 20:48:21.801  1549  6112 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 17. Are binder threads started and available?)
+01-19 20:48:21.801  2473  2473 I Choreographer: Skipped 33 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:21.805  1921  2286 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 32. Are binder threads started and available?)
+01-19 20:48:21.808 24559 24559 W erl.webdavtoon: Verification of java.util.Comparator kotlin.comparisons.ComparisonsKt__ComparisonsKt.thenBy(java.util.Comparator, kotlin.jvm.functions.Function1) took 293.070ms (64.83 bytecodes/s) (0B arena alloc)
+01-19 20:48:21.809   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:21.809 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680094518) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.811 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680096db8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.813 24559 24559 I WebDAVToon: Application started
+01-19 20:48:21.814 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680096138) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.815 24559 24559 I WebDAVToon: Log level set to: 4 (INFO)
+01-19 20:48:21.816 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800986b8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.817 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800989d8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.819 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680084b18) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.821  1921  2318 D BackgroundInstallControlService: Package event received: 0
+01-19 20:48:21.821  1921  2318 D BackgroundInstallControlService: Package event received: 0
+01-19 20:48:21.822 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680044d38) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.822 24559 24559 I Choreographer: Skipped 38 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:21.823 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768007f9d8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.824 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680075a78) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.826 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768009cb78) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.827 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768007c198) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.829 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768009a918) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.831 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680094838) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.831 24559 24595 I DisplayManager: Choreographer implicitly registered for the refresh rate.
+01-19 20:48:21.831  1921  2061 V DisplayManagerService: FrozenStateChangeCallback not supported for pid 24559
+01-19 20:48:21.832 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800a2618) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.833 24559 24595 I AdrenoGLES-0: QUALCOMM build                   : b213cd5627, I42f35bf1e0
+01-19 20:48:21.833 24559 24595 I AdrenoGLES-0: Build Date                       : 06/11/23
+01-19 20:48:21.833 24559 24595 I AdrenoGLES-0: OpenGL ES Shader Compiler Version: EV031.32.02.17
+01-19 20:48:21.833 24559 24595 I AdrenoGLES-0: Local Branch                     : 
+01-19 20:48:21.833 24559 24595 I AdrenoGLES-0: Remote Branch                    : 
+01-19 20:48:21.833 24559 24595 I AdrenoGLES-0: Remote Branch                    : 
+01-19 20:48:21.833 24559 24595 I AdrenoGLES-0: Reconstruct Branch               : 
+01-19 20:48:21.833 24559 24595 I AdrenoGLES-0: Build Config                     : S P 10.0.7 AArch64
+01-19 20:48:21.833 24559 24595 I AdrenoGLES-0: Driver Path                      : /vendor/lib64/egl/libGLESv2_adreno.so
+01-19 20:48:21.833 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680081c38) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.835 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680097718) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.836 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768009a2d8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.838 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800a0d18) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.840 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800954b8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.840 24559 24595 I AdrenoGLES-0: PFP: 0x016dd093, ME: 0x00000000
+01-19 20:48:21.841 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680088358) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.844 24559 24559 I erl.webdavtoon: AssetManager2(0xb40000768004a198) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.844 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680093ed8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.848 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680094e78) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.849 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768008e438) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.850 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768008f6f8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.851 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768009e798) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.852 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768009e158) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.855 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680085dd8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.857 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800a1678) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.859 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768007c7d8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.860 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800a2938) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.861 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680088fd8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.864 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768009c538) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.864 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768009ac38) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.866 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768008d7b8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.867 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768008fd38) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.869 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800ae7d8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.871 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680083858) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.873 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680089c58) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.874 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800adb58) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.876 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800a6178) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.876 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800b16b8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.878 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768009b598) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.879 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768008cb38) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.880 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680099978) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.884 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680085158) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.886 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768007b838) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.888 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680088998) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.889 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800b0a38) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.891 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768009bef8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.892 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800475d8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.894 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800aeaf8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.895 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800a3bf8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.896 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800a5818) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.900 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768007be78) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.901 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680093258) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.904 24559 24559 D AppCompatDelegate: Checking for metadata for AppLocalesMetadataHolderService : Service not found
+01-19 20:48:21.905 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800a6df8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.907 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800b0a38) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.908 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800a06d8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.910 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800491f8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.911 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800a5e58) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.912 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800a9ff8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.913 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800ae4b8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.916 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800a8a18) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.917 24559 24559 I erl.webdavtoon: AssetManager2(0xb400007680045698) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.917 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768009fa58) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:21.920 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768008e118) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.197  2473  2473 I Choreographer: Skipped 32 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:22.206   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:22.210 24559 24559 E ashmem  : Pinning is deprecated since Android Q. Please use trim or other methods.
+01-19 20:48:22.210 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800a9058) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.215 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768007c7d8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.216 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800a8d38) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.218 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800b0718) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.219 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680085ab8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.221 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768009f0f8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.224 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800afa98) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.226 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680083b78) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.228 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800acbb8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.230 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768008ea78) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.232 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680086a58) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.234 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800ade78) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.235 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768008c818) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.235 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768009d1b8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.236 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768009ce98) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.238 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800ab2b8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.240 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800879f8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.244 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768008ddf8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.246 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680090ff8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.251 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768007e0d8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.252 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800847f8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.254 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768007caf8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.255 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800a1038) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.256 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680091c78) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.258 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800873b8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.259 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800b1398) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.261 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768008b558) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.264 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800973f8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.267 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680086418) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.268 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800876d8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.269 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800892f8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.271 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800844d8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.272 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768007e3f8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.273 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680091f98) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.274 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800909b8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.276 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800a4878) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.277 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680088cb8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.280 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800b2018) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.281 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800a7758) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.282 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800b19d8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.284 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680092c18) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.285 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800ab8f8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.286 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800928f8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.290 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800a5b38) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.291 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768009b278) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.292 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768008a298) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.293 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680088678) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.296 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800a86f8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.297 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768007d138) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.298 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800af458) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.299 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800a38d8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.300 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680099c98) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.301 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680097a38) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.303 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680088038) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.306 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680076a18) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.308 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680090058) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.311 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800a51d8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.313 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768008ed98) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.701  1921  1955 W ActivityTaskManager: Activity top resumed state loss timeout for ActivityRecord{95255015 u0 erl.webdavtoon/.FolderViewActivity t61}
+01-19 20:48:22.704  1921  1955 W ActivityTaskManager: Activity pause timeout for ActivityRecord{95255015 u0 erl.webdavtoon/.FolderViewActivity t61}
+01-19 20:48:22.707  1921  2318 D BackgroundInstallControlService: Package event received: 0
+01-19 20:48:22.708 24559 24559 W erl.webdavtoon: Verification of void androidx.appcompat.widget.AppCompatTextView.<init>(android.content.Context, android.util.AttributeSet, int) took 229.199ms (279.23 bytecodes/s) (0B arena alloc)
+01-19 20:48:22.708 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680094518) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.709   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:22.710 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800a7118) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.712 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680096db8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.713 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680096458) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.714 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800a1998) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.716 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680096138) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.717 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800986b8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.718 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680095e18) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.719 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680099338) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.720 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680044d38) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.721 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680089f78) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.723 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800815f8) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.724 18562 18658 I .apps.wellbeing: AssetManager2(0xb400007680075a78) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.724 24559 24559 I erl.webdavtoon: hiddenapi: Accessing hidden method Landroid/view/View;->computeFitSystemWindows(Landroid/graphics/Rect;Landroid/graphics/Rect;)Z (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/appcompat/widget/ViewUtils; (domain=app) using reflection: allowed
+01-19 20:48:22.725 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768009cb78) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.729 18562 18658 I .apps.wellbeing: AssetManager2(0xb40000768007c198) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.732 18562 18658 I .apps.wellbeing: AssetManager2(0xb4000076800a2618) locale list changing from [] to [zh-Hans-SG]
+01-19 20:48:22.801 24559 24559 D DesktopModeFlags: Toggle override initialized to: OVERRIDE_UNSET
+01-19 20:48:22.816 24559 24559 I erl.webdavtoon: hiddenapi: Accessing hidden method Landroid/view/ViewGroup;->makeOptionalFitsSystemWindows()V (runtime_flags=0, domain=platform, api=unsupported) from Landroidx/appcompat/widget/ViewUtils; (domain=app) using reflection: allowed
+01-19 20:48:23.225  1357  2831 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 6. Are binder threads started and available?)
+01-19 20:48:23.226  1549  6112 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 17. Are binder threads started and available?)
+01-19 20:48:23.226  2473  2473 I Choreographer: Skipped 32 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:23.230  1921  2286 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 32. Are binder threads started and available?)
+01-19 20:48:23.232  1921  1921 W Looper  : Slow delivery took 267ms main app=system_server main=true group=FOREGROUND h=android.os.Handler c=ServiceConnector@392(Intent { act=android.service.contentcapture.ContentProtectionService xflg=0x4 cmp=com.google.android.odad/com.google.android.apps.miphone.odad.contentprotection.ContentProtectionService }, user: 0)[Unbinding...] m=0
+01-19 20:48:23.233 19858 19858 I ContentProtectionServic: CP service destroyed
+01-19 20:48:23.233   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:23.233 24559 24559 W erl.webdavtoon: Verification of boolean androidx.recyclerview.widget.RecyclerView$Adapter.canRestoreState() took 276.558ms (122.94 bytecodes/s) (0B arena alloc)
+01-19 20:48:23.234  1921  1921 I RemoteContentProtectionService: Connection status for: ComponentInfo{com.google.android.odad/com.google.android.apps.miphone.odad.contentprotection.ContentProtectionService} changed to: disconnected
+01-19 20:48:23.234  1921  1921 W Looper  : Drained
+01-19 20:48:23.290 24559 24559 I ContentCaptureHelper: Setting logging level to OFF
+01-19 20:48:25.061   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:25.065  1921  1956 I Choreographer: Skipped 31 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:25.079  1364  1782 W HWComposer: Ignoring duplicate VSYNC event from HWC for display 4630947194340276609 (t=3748505594000)
+01-19 20:48:25.079  1364  1782 W HWComposer: Ignoring duplicate VSYNC event from HWC for display 4630947194340276609 (t=3748505594000)
+01-19 20:48:25.106  1921  2318 D BackgroundInstallControlService: Package event received: 0
+01-19 20:48:25.112  1364  1782 W HWComposer: Ignoring duplicate VSYNC event from HWC for display 4630947194340276609 (t=3748538877000)
+01-19 20:48:25.117  2473  2513 W WindowOnBackDispatcher: sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$ExternalSyntheticLambda13@73f51da
+01-19 20:48:25.146  1364  1782 W HWComposer: Ignoring duplicate VSYNC event from HWC for display 4630947194340276609 (t=3748572160000)
+01-19 20:48:25.146  1364  1782 W HWComposer: Ignoring duplicate VSYNC event from HWC for display 4630947194340276609 (t=3748572160000)
+01-19 20:48:25.146  1364  1782 W HWComposer: Ignoring duplicate VSYNC event from HWC for display 4630947194340276609 (t=3748572160000)
+01-19 20:48:25.788  1364  1782 W HWComposer: Ignoring duplicate VSYNC event from HWC for display 4630947194340276609 (t=3748605355000)
+01-19 20:48:25.788  1364  1782 W HWComposer: Ignoring duplicate VSYNC event from HWC for display 4630947194340276609 (t=3748605355000)
+01-19 20:48:25.788  1364  1782 W HWComposer: Ignoring duplicate VSYNC event from HWC for display 4630947194340276609 (t=3748605355000)
+01-19 20:48:25.789  2473  2473 I Choreographer: Skipped 38 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:25.805   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:25.817  1921  2061 W ProcessStats: Tracking association SourceState{b8923a9 erl.webdavtoon/10549 Top #13335} whose proc state 1 is better than process ProcessState{6754ded com.google.android.gms.persistent/10443 pkg=com.google.android.gms} proc state 4 (5 skipped)
+01-19 20:48:25.820  2999  4582 I FontLog : (REDACTED) Received query %s, URI %s
+01-19 20:48:25.820  2999  4582 I FontLog : (REDACTED) Query [%s] resolved to %s
+01-19 20:48:25.823  2999  4582 I FontLog : (REDACTED) Fetch %s end status %s
+01-19 20:48:25.829  2999  4582 I FontLog : (REDACTED) Pulling font file for id = %d, cache size = %d
+01-19 20:48:25.838  2999  4582 I FontLog : (REDACTED) Pulling font file for id = %d, cache size = %d
+01-19 20:48:26.286  2473  2473 I Choreographer: Skipped 34 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:26.286  1357  2831 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 6. Are binder threads started and available?)
+01-19 20:48:26.287  1549  6112 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 17. Are binder threads started and available?)
+01-19 20:48:26.291  1921  2286 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 32. Are binder threads started and available?)
+01-19 20:48:26.297   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:26.818  2473  2473 I Choreographer: Skipped 32 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:26.824   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:27.318  2473  2473 I Choreographer: Skipped 31 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:27.328   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:27.947  1357  2831 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 6. Are binder threads started and available?)
+01-19 20:48:27.947  2473  2473 I Choreographer: Skipped 33 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:27.948  1549  6112 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 17. Are binder threads started and available?)
+01-19 20:48:27.953  1921  2286 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 32. Are binder threads started and available?)
+01-19 20:48:27.960   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:28.557  2473  2473 I Choreographer: Skipped 31 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:28.558   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:29.181  2473  2473 I Choreographer: Skipped 34 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:29.188   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:31.203  1357  2831 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 6. Are binder threads started and available?)
+01-19 20:48:31.203  1549  6112 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 17. Are binder threads started and available?)
+01-19 20:48:31.205  2473  2473 I Choreographer: Skipped 32 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:31.207  1921  2286 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 32. Are binder threads started and available?)
+01-19 20:48:31.210   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:31.939  2473  2473 I Choreographer: Skipped 34 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:31.955  1921  2188 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+01-19 20:48:31.958  1921  2188 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+01-19 20:48:31.958  1921  2188 D InetDiagMessage: Destroyed live tcp sockets for uids={10549} in 8ms
+01-19 20:48:31.959  1921  2188 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+01-19 20:48:31.961  1921  2188 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+01-19 20:48:31.961  1921  2188 D InetDiagMessage: Destroyed live tcp sockets for uids={20549} in 3ms
+01-19 20:48:31.961   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:31.986  1921  1973 W ProcessCpuTracker: Failed to stat(/proc/24687): android.system.ErrnoException: stat failed: ENOENT (No such file or directory)
+01-19 20:48:31.986  1921  1973 W ProcessCpuTracker: Skipping unknown process pid 24687
+01-19 20:48:31.986  1921  1973 W ProcessCpuTracker: Failed to stat(/proc/24688): android.system.ErrnoException: stat failed: ENOENT (No such file or directory)
+01-19 20:48:31.986  1921  1973 W ProcessCpuTracker: Skipping unknown process pid 24688
+01-19 20:48:31.986  1921  1973 W ProcessCpuTracker: Failed to stat(/proc/24689): android.system.ErrnoException: stat failed: ENOENT (No such file or directory)
+01-19 20:48:31.986  1921  1973 W ProcessCpuTracker: Skipping unknown process pid 24689
+01-19 20:48:31.986  1921  1973 W ProcessCpuTracker: Failed to stat(/proc/24690): android.system.ErrnoException: stat failed: ENOENT (No such file or directory)
+01-19 20:48:31.986  1921  1973 W ProcessCpuTracker: Skipping unknown process pid 24690
+01-19 20:48:31.987  1921  1973 W ProcessCpuTracker: Failed to stat(/proc/24691): android.system.ErrnoException: stat failed: ENOENT (No such file or directory)
+01-19 20:48:31.987  1921  1973 W ProcessCpuTracker: Skipping unknown process pid 24691
+01-19 20:48:31.987  1921  1973 W ProcessCpuTracker: Failed to stat(/proc/24692): android.system.ErrnoException: stat failed: ENOENT (No such file or directory)
+01-19 20:48:31.987  1921  1973 W ProcessCpuTracker: Skipping unknown process pid 24692
+01-19 20:48:31.987  1921  1973 W ProcessCpuTracker: Failed to stat(/proc/24693): android.system.ErrnoException: stat failed: ENOENT (No such file or directory)
+01-19 20:48:31.987  1921  1973 W ProcessCpuTracker: Skipping unknown process pid 24693
+01-19 20:48:32.540  2473  2473 I Choreographer: Skipped 30 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:32.546   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:32.593 24559 24708 D ProfileInstaller: Installing profile for erl.webdavtoon
+01-19 20:48:33.762  1357  2831 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 6. Are binder threads started and available?)
+01-19 20:48:33.763  1549  6112 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 17. Are binder threads started and available?)
+01-19 20:48:33.770  1921  2286 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 32. Are binder threads started and available?)
+01-19 20:48:33.770   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:34.197  2473  2473 I Choreographer: Skipped 35 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:34.211   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:34.695  2473  2473 I Choreographer: Skipped 32 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:34.703   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:34.775 24559 24570 I erl.webdavtoon: Compiler allocated 5125KB to compile void android.view.ViewRootImpl.performTraversals()
+01-19 20:48:35.090  1357  2831 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 6. Are binder threads started and available?)
+01-19 20:48:35.091  1549  6112 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 17. Are binder threads started and available?)
+01-19 20:48:35.091  2473  2473 I Choreographer: Skipped 30 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:35.095  1921  2286 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 32. Are binder threads started and available?)
+01-19 20:48:35.099   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:36.420  2473  2473 I Choreographer: Skipped 30 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:36.427   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:37.151  2473  2473 I Choreographer: Skipped 32 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:37.159   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:37.246 24559 24559 D FolderViewActivity: Loaded 75 local folders
+01-19 20:48:37.582  2473  2473 I Choreographer: Skipped 31 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:37.582  1549  6112 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 17. Are binder threads started and available?)
+01-19 20:48:37.583  1357  2831 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 6. Are binder threads started and available?)
+01-19 20:48:37.590 24559 24559 W erl.webdavtoon: Verification of java.util.List kotlin.text.StringsKt__StringsKt.split(java.lang.CharSequence, java.lang.String[], boolean, int) took 272.264ms (356.27 bytecodes/s) (0B arena alloc)
+01-19 20:48:37.591  1921  2286 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 32. Are binder threads started and available?)
+01-19 20:48:37.592   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:37.619 24559 24559 D FolderViewActivity: Loaded 75 local folders
+01-19 20:48:37.623 24559 24621 D SettingsManager: Raw URL: 192.168.31.179/NSFW, Port: 5005, Protocol: http
+01-19 20:48:37.623 24559 24622 D SettingsManager: Raw URL: 192.168.31.179/NSFW, Port: 5005, Protocol: http
+01-19 20:48:37.623 24559 24622 D SettingsManager: Final URL: http://192.168.31.179:5005/NSFW
+01-19 20:48:37.623 24559 24621 D SettingsManager: Final URL: http://192.168.31.179:5005/NSFW
+01-19 20:48:37.623 24559 24622 D WebDavClient: Requesting PROPFIND: http://192.168.31.179:5005/NSFW/
+01-19 20:48:37.623 24559 24621 D WebDavClient: Requesting PROPFIND: http://192.168.31.179:5005/NSFW/
+01-19 20:48:38.279  2473  2473 I Choreographer: Skipped 31 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:38.287   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:40.840  2473  2473 I Choreographer: Skipped 33 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:40.848   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:41.868  1549  6112 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 17. Are binder threads started and available?)
+01-19 20:48:41.872  1921  2286 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 32. Are binder threads started and available?)
+01-19 20:48:41.872  1357  2831 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 6. Are binder threads started and available?)
+01-19 20:48:41.873  2473  2473 I Choreographer: Skipped 34 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:41.876   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:43.199  2473  2473 I Choreographer: Skipped 33 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:43.203   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:43.829  2473  2473 I Choreographer: Skipped 36 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:43.839   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:44.327  1357  2831 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 6. Are binder threads started and available?)
+01-19 20:48:44.328  1549  6112 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 17. Are binder threads started and available?)
+01-19 20:48:44.329  2473  2473 I Choreographer: Skipped 33 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:44.332  1921  2286 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 32. Are binder threads started and available?)
+01-19 20:48:44.336  1921  2188 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+01-19 20:48:44.336   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:44.337  1921  2188 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+01-19 20:48:44.337  1921  2188 D InetDiagMessage: Destroyed live tcp sockets for uids={10440} in 3ms
+01-19 20:48:44.339  1921  2188 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+01-19 20:48:44.340  1921  2188 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+01-19 20:48:44.340  1921  2188 D InetDiagMessage: Destroyed live tcp sockets for uids={20440} in 3ms
+01-19 20:48:44.729  2473  2473 I Choreographer: Skipped 32 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:44.737   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:46.067   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:46.070  2473  2473 I Choreographer: Skipped 34 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:46.685  1357  2831 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 6. Are binder threads started and available?)
+01-19 20:48:46.685  2473  2473 I Choreographer: Skipped 38 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:46.685  1549  6112 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 17. Are binder threads started and available?)
+01-19 20:48:46.693  1921  2286 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 32. Are binder threads started and available?)
+01-19 20:48:46.693   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:47.889  2473  2473 I Choreographer: Skipped 31 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:47.890   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:48.415  2473  2473 I Choreographer: Skipped 33 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:48.424   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:48.912  1357  2831 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 6. Are binder threads started and available?)
+01-19 20:48:48.912  1549  6112 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 17. Are binder threads started and available?)
+01-19 20:48:48.913  2473  2473 I Choreographer: Skipped 31 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:48.916  1921  2286 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 32. Are binder threads started and available?)
+01-19 20:48:48.919   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:50.077  2473  2473 I Choreographer: Skipped 33 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:50.085   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:50.776  2473  2473 I Choreographer: Skipped 33 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:50.784   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:50.788  2999  2999 D BoundBrokerSvc: onUnbind: Intent { act=com.google.android.gms.scheduler.ACTION_PROXY_SCHEDULE_SINGLE_USER dat=chimera-action:/... xflg=0x4 cmp=com.google.android.gms/.chimera.PersistentSingleUserInternalApiService }
+01-19 20:48:50.788 17721 17721 D BoundBrokerSvc: onUnbind: Intent { act=com.google.android.gms.feedback.internal.IFeedbackService dat=chimera-action:/... xflg=0x4 cmp=com.google.android.gms/.chimera.GmsBoundBrokerService }
+01-19 20:48:51.271  1357  2831 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 6. Are binder threads started and available?)
+01-19 20:48:51.272  1549  6112 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 17. Are binder threads started and available?)
+01-19 20:48:51.276  1921  2286 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 32. Are binder threads started and available?)
+01-19 20:48:51.279  2473  2473 I Choreographer: Skipped 31 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:51.279   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:53.730  2473  2473 I Choreographer: Skipped 32 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:53.737   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:54.131  2473  2473 I Choreographer: Skipped 30 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:54.142   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:54.561  1357  2831 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 6. Are binder threads started and available?)
+01-19 20:48:54.561  1549  6112 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 17. Are binder threads started and available?)
+01-19 20:48:54.562  2473  2473 I Choreographer: Skipped 31 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:54.565  1921  2286 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 32. Are binder threads started and available?)
+01-19 20:48:54.569   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:54.959  2473  2473 I Choreographer: Skipped 31 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:54.966   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:55.891  2473  2473 I Choreographer: Skipped 34 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:55.898   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:55.899 19335 19366 I Finsky  : [74] AIM: AppInfoManager-Perf > Destroying AppInfoManager ...
+01-19 20:48:56.821  1357  2831 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 6. Are binder threads started and available?)
+01-19 20:48:56.823  2473  2473 I Choreographer: Skipped 34 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:56.823  1549  6112 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 17. Are binder threads started and available?)
+01-19 20:48:56.827  1921  2286 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 32. Are binder threads started and available?)
+01-19 20:48:56.829   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:58.051  2473  2473 I Choreographer: Skipped 35 frames!  The application may be doing too much work on its main thread.
+01-19 20:48:58.059   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:48:58.643  1357  2831 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 6. Are binder threads started and available?)
+01-19 20:48:58.645  1549  6112 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 17. Are binder threads started and available?)
+01-19 20:48:58.648  1921  2286 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 32. Are binder threads started and available?)
+01-19 20:48:59.643  1357  2831 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 6. Are binder threads started and available?)
+01-19 20:48:59.646  1549  6112 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 17. Are binder threads started and available?)
+01-19 20:48:59.649  1921  2286 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 32. Are binder threads started and available?)
+01-19 20:49:00.711  2473  2473 I Choreographer: Skipped 31 frames!  The application may be doing too much work on its main thread.
+01-19 20:49:00.717   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:49:00.780  1357  2831 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 6. Are binder threads started and available?)
+01-19 20:49:00.783  1549  6112 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 17. Are binder threads started and available?)
+01-19 20:49:00.786  1921  2286 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 32. Are binder threads started and available?)
+01-19 20:49:01.209  2473  2473 I Choreographer: Skipped 33 frames!  The application may be doing too much work on its main thread.
+01-19 20:49:01.217   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:49:02.838  2473  2473 I Choreographer: Skipped 31 frames!  The application may be doing too much work on its main thread.
+01-19 20:49:02.842   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:49:03.471  2473  2473 I Choreographer: Skipped 32 frames!  The application may be doing too much work on its main thread.
+01-19 20:49:03.475  1921  2286 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 32. Are binder threads started and available?)
+01-19 20:49:03.478  1357  2831 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 6. Are binder threads started and available?)
+01-19 20:49:03.478  1549  6112 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 17. Are binder threads started and available?)
+01-19 20:49:03.479   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:49:03.867  2473  2473 I Choreographer: Skipped 31 frames!  The application may be doing too much work on its main thread.
+01-19 20:49:03.874   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:49:05.231  2473  2473 I Choreographer: Skipped 35 frames!  The application may be doing too much work on its main thread.
+01-19 20:49:05.239   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:49:05.829  1357  2831 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 6. Are binder threads started and available?)
+01-19 20:49:05.829  1549  6112 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 17. Are binder threads started and available?)
+01-19 20:49:05.834  1921  2286 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 32. Are binder threads started and available?)
+01-19 20:49:05.835  2473  2473 I Choreographer: Skipped 34 frames!  The application may be doing too much work on its main thread.
+01-19 20:49:05.838   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:49:07.059  2473  2473 I Choreographer: Skipped 33 frames!  The application may be doing too much work on its main thread.
+01-19 20:49:07.063   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:49:08.985  2473  2473 I Choreographer: Skipped 30 frames!  The application may be doing too much work on its main thread.
+01-19 20:49:08.994   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:49:09.913  1357  2831 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 6. Are binder threads started and available?)
+01-19 20:49:09.914  1549  6112 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 17. Are binder threads started and available?)
+01-19 20:49:09.917  2473  2473 I Choreographer: Skipped 33 frames!  The application may be doing too much work on its main thread.
+01-19 20:49:09.922  1921  2286 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 32. Are binder threads started and available?)
+01-19 20:49:09.923   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:49:10.413  2473  2473 I Choreographer: Skipped 30 frames!  The application may be doing too much work on its main thread.
+01-19 20:49:10.419   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:49:10.847  2473  2473 I Choreographer: Skipped 33 frames!  The application may be doing too much work on its main thread.
+01-19 20:49:10.856   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:49:11.875  1357  2831 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 6. Are binder threads started and available?)
+01-19 20:49:11.876  2473  2473 I Choreographer: Skipped 34 frames!  The application may be doing too much work on its main thread.
+01-19 20:49:11.876  1549  6112 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 17. Are binder threads started and available?)
+01-19 20:49:11.880  1921  2286 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 32. Are binder threads started and available?)
+01-19 20:49:11.884   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:49:12.274  2473  2473 I Choreographer: Skipped 34 frames!  The application may be doing too much work on its main thread.
+01-19 20:49:12.773  2473  2473 I Choreographer: Skipped 31 frames!  The application may be doing too much work on its main thread.
+01-19 20:49:12.781   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:49:13.202  2473  2473 I Choreographer: Skipped 33 frames!  The application may be doing too much work on its main thread.
+01-19 20:49:13.202  1549  6112 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 17. Are binder threads started and available?)
+01-19 20:49:13.203  1357  2831 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 6. Are binder threads started and available?)
+01-19 20:49:13.207  1921  2286 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 32. Are binder threads started and available?)
+01-19 20:49:13.210   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:49:13.910   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:49:13.911  2473  2473 I Choreographer: Skipped 33 frames!  The application may be doing too much work on its main thread.
+01-19 20:49:14.334  2473  2473 I Choreographer: Skipped 33 frames!  The application may be doing too much work on its main thread.
+01-19 20:49:14.342   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:49:15.030  1357  2831 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 6. Are binder threads started and available?)
+01-19 20:49:15.031  1549  6112 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 17. Are binder threads started and available?)
+01-19 20:49:15.034  1921  2286 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 32. Are binder threads started and available?)
+01-19 20:49:15.035  2473  2473 I Choreographer: Skipped 32 frames!  The application may be doing too much work on its main thread.
+01-19 20:49:15.038   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:49:16.263  2473  2473 I Choreographer: Skipped 32 frames!  The application may be doing too much work on its main thread.
+01-19 20:49:16.275   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:49:16.276  2673  2673 D QtiCarrierConfigHelper: WARNING, no carrier configs on phone Id: 0
+01-19 20:49:16.276  2673  2673 D QtiCarrierConfigHelper: WARNING, no carrier configs on phone Id: 1
+01-19 20:49:16.277  1921  1921 D LoadedApk: Receiver not registered: com.android.server.UiModeManagerService$8@8961eb5
+01-19 20:49:16.284  1921  2318 D BackgroundInstallControlService: Package event received: 0
+01-19 20:49:16.287 19700 19700 D BatteryUsageBroadcastReceiver: onReceive:android.intent.action.BATTERY_LEVEL_CHANGED
+01-19 20:49:16.295 19700 19700 D BatteryUsageBroadcastReceiver: fetch data because of event: ACTION_BATTERY_LEVEL_CHANGED
+01-19 20:49:17.890  1364  1782 W HWComposer: Ignoring duplicate VSYNC event from HWC for display 4630947194340276609 (t=3773882519000)
+01-19 20:49:17.891  1364  1782 W HWComposer: Ignoring duplicate VSYNC event from HWC for display 4630947194340276609 (t=3773882519000)
+01-19 20:49:17.891  2473  2473 I Choreographer: Skipped 35 frames!  The application may be doing too much work on its main thread.
+01-19 20:49:17.896   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:49:17.914  1364  1782 W HWComposer: Ignoring duplicate VSYNC event from HWC for display 4630947194340276609 (t=3774200624000)
+01-19 20:49:17.947  1364  1782 W HWComposer: Ignoring duplicate VSYNC event from HWC for display 4630947194340276609 (t=3774233826000)
+01-19 20:49:19.020  1357  2831 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 6. Are binder threads started and available?)
+01-19 20:49:19.020  1549  6112 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 17. Are binder threads started and available?)
+01-19 20:49:19.021  2473  2473 I Choreographer: Skipped 31 frames!  The application may be doing too much work on its main thread.
+01-19 20:49:19.024  1921  2286 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 32. Are binder threads started and available?)
+01-19 20:49:19.027   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:49:19.553  2473  2473 I Choreographer: Skipped 32 frames!  The application may be doing too much work on its main thread.
+01-19 20:49:19.562   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:49:20.385  2473  2473 I Choreographer: Skipped 34 frames!  The application may be doing too much work on its main thread.
+01-19 20:49:20.393   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:49:22.111  1357  2831 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 6. Are binder threads started and available?)
+01-19 20:49:22.111  2473  2473 I Choreographer: Skipped 33 frames!  The application may be doing too much work on its main thread.
+01-19 20:49:22.112  1549  6112 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 17. Are binder threads started and available?)
+01-19 20:49:22.116  1921  2286 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 32. Are binder threads started and available?)
+01-19 20:49:22.121   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:49:22.510  2473  2473 I Choreographer: Skipped 33 frames!  The application may be doing too much work on its main thread.
+01-19 20:49:22.517   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:49:23.051  2473  2473 I Choreographer: Skipped 37 frames!  The application may be doing too much work on its main thread.
+01-19 20:49:23.053   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:49:23.129  1357  2831 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 6. Are binder threads started and available?)
+01-19 20:49:23.130  1549  6112 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 17. Are binder threads started and available?)
+01-19 20:49:23.134  1921  2286 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 32. Are binder threads started and available?)
+01-19 20:49:23.774  2473  2473 I Choreographer: Skipped 32 frames!  The application may be doing too much work on its main thread.
+01-19 20:49:23.783   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:49:24.243   777  8468 I android.system.suspend-service: Unknown/empty wakeup reason. Re-opening wakeup_reason file.
+01-19 20:49:24.605  1357  2831 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 6. Are binder threads started and available?)
+01-19 20:49:24.605  1549  6112 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 17. Are binder threads started and available?)
+01-19 20:49:24.612  1921  2286 W ServiceManagerCppClient: Waited one second for stats (is service started? Number of threads started in the threadpool: 32. Are binder threads started and available?)
+01-19 20:49:24.613  2473  2473 I Choreographer: Skipped 31 frames!  The application may be doing too much work on its main thread.
