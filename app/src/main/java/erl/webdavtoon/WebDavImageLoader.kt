@@ -66,7 +66,7 @@ object WebDavImageLoader {
                 android.util.Base64.NO_WRAP
             )
             GlideUrl(
-                encodeWebDavUrl(imageUri.toString()),
+                FileUtils.encodeWebDavUrl(imageUri.toString()),
                 LazyHeaders.Builder().addHeader("Authorization", auth).build()
             )
         } else {
@@ -144,61 +144,17 @@ object WebDavImageLoader {
         }
     }
 
-    fun clearCache(context: Context, photo: Photo) {
-        val settings = SettingsManager(context)
-        val username = settings.getWebDavUsername()
-        val password = settings.getWebDavPassword()
-
-        val model: Any = if (!photo.isLocal && username.isNotEmpty() && password.isNotEmpty()) {
-            val auth = "Basic " + android.util.Base64.encodeToString(
-                "$username:$password".toByteArray(),
-                android.util.Base64.NO_WRAP
-            )
-            GlideUrl(
-                encodeWebDavUrl(photo.imageUri.toString()),
-                LazyHeaders.Builder().addHeader("Authorization", auth).build()
-            )
-        } else {
-            photo.imageUri
-        }
-
+    /**
+     * 清除图片的 Glide 缓存
+     */
+    fun clearCache(context: Context) {
         // 异步清除磁盘缓存，同步清除内存缓存
-        GlobalScope.launch(Dispatchers.Main) {
+        @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
+        kotlinx.coroutines.GlobalScope.launch(Dispatchers.Main) {
             Glide.get(context).clearMemory()
             withContext(Dispatchers.IO) {
-                // Glide 没有直接按 Key 删除单个缓存的公开 API (除非使用特定的 DiskCache)
-                // 但我们可以通过提交一个删除任务来间接实现，或者通知 Glide 资源已失效
-                // 对于简单实现，我们至少清除内存缓存，并依赖下一次加载时的失效机制
-                // 或者如果用户要求严格清除，通常需要访问 DiskCache 接口
+                Glide.get(context).clearDiskCache()
             }
-        }
-    }
-
-    private fun encodeWebDavUrl(url: String): String {
-        return try {
-            val schemeEnd = url.indexOf("://")
-            if (schemeEnd == -1) return Uri.encode(url, ":/@#?&=")
-
-            val pathStart = url.indexOf('/', schemeEnd + 3)
-            if (pathStart == -1) return url
-
-            val baseUrl = url.substring(0, pathStart)
-            val rawPath = url.substring(pathStart)
-            val encodedPath = rawPath.split('/').joinToString("/") { segment ->
-                if (segment.isEmpty()) return@joinToString ""
-                val safeSegment = segment.replace("+", "%2B")
-                val decoded = runCatching { URLDecoder.decode(safeSegment, "UTF-8") }.getOrDefault(segment)
-                URLEncoder.encode(decoded, "UTF-8")
-                    .replace("+", "%20")
-                    .replace("%2E", ".")
-                    .replace("%2D", "-")
-                    .replace("%5F", "_")
-                    .replace("%7E", "~")
-            }
-            "$baseUrl$encodedPath"
-        } catch (e: Exception) {
-            android.util.Log.e("WebDavImageLoader", "URL encoding failed", e)
-            url
         }
     }
 }

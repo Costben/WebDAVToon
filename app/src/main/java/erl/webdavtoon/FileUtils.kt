@@ -11,17 +11,51 @@ import android.provider.MediaStore
 import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import android.net.Uri
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLDecoder
+import java.net.URLEncoder
 
 object FileUtils {
     private const val TAG = "FileUtils"
     private const val WEBTOON_FOLDER = "Webtoon"
     private const val DOWNLOAD_FOLDER = "Download/Webtoon"
+
+    /**
+     * 对 WebDAV URL 进行编码，处理路径中的特殊字符（如 #）
+     */
+    fun encodeWebDavUrl(url: String): String {
+        return try {
+            val schemeEnd = url.indexOf("://")
+            if (schemeEnd == -1) return Uri.encode(url, ":/@#?&=")
+
+            val pathStart = url.indexOf('/', schemeEnd + 3)
+            if (pathStart == -1) return url
+
+            val baseUrl = url.substring(0, pathStart)
+            val rawPath = url.substring(pathStart)
+            val encodedPath = rawPath.split('/').joinToString("/") { segment ->
+                if (segment.isEmpty()) return@joinToString ""
+                val safeSegment = segment.replace("+", "%2B")
+                val decoded = runCatching { URLDecoder.decode(safeSegment, "UTF-8") }.getOrDefault(segment)
+                URLEncoder.encode(decoded, "UTF-8")
+                    .replace("+", "%20")
+                    .replace("%2E", ".")
+                    .replace("%2D", "-")
+                    .replace("%5F", "_")
+                    .replace("%7E", "~")
+            }
+            "$baseUrl$encodedPath"
+        } catch (e: Exception) {
+            Log.e(TAG, "URL encoding failed", e)
+            url
+        }
+    }
     
     /**
      * 下载图片到本地
@@ -33,7 +67,8 @@ object FileUtils {
                 context.contentResolver.openInputStream(photo.imageUri) ?: throw IOException("无法打开本地图片")
             } else {
                 // WebDAV图片：通过网络请求获取
-                val url = URL(photo.imageUri.toString())
+                val encodedUrl = encodeWebDavUrl(photo.imageUri.toString())
+                val url = URL(encodedUrl)
                 val connection = url.openConnection() as HttpURLConnection
                 connection.connectTimeout = 30000
                 connection.readTimeout = 30000

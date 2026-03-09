@@ -425,9 +425,11 @@ class MainActivity : AppCompatActivity() {
                         var count = 0
                         selectedPhotos.forEach { photo ->
                             if (repository.deletePhoto(photo)) {
-                                WebDavImageLoader.clearCache(this@MainActivity, photo)
                                 count++
                             }
+                        }
+                        if (count > 0) {
+                            WebDavImageLoader.clearCache(this@MainActivity)
                         }
                         count
                     }

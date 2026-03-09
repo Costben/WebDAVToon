@@ -166,8 +166,6 @@ class RustWebDavPhotoRepository(
     }
 
     override suspend fun deletePhoto(photo: Photo): Boolean = withContext(Dispatchers.IO) {
-        val repo = rustRepo ?: return@withContext false
-        
         // Try calling the rust repo first if we managed to update the FFI
         // Otherwise, fallback to direct OkHttp delete request
         try {
@@ -182,8 +180,9 @@ class RustWebDavPhotoRepository(
             }
 
             val credentials = okhttp3.Credentials.basic(username, password)
+            val encodedUrl = FileUtils.encodeWebDavUrl(photo.imageUri.toString())
             val request = okhttp3.Request.Builder()
-                .url(photo.imageUri.toString())
+                .url(encodedUrl)
                 .delete()
                 .addHeader("Authorization", credentials)
                 .build()
@@ -218,8 +217,9 @@ class RustWebDavPhotoRepository(
             }
 
             val credentials = okhttp3.Credentials.basic(username, password)
+            val encodedUrl = FileUtils.encodeWebDavUrl(fullUrl)
             val request = okhttp3.Request.Builder()
-                .url(fullUrl)
+                .url(encodedUrl)
                 .delete()
                 .addHeader("Authorization", credentials)
                 .build()

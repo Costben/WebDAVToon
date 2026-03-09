@@ -306,13 +306,18 @@ class PhotoViewActivity : AppCompatActivity() {
                 val settingsManager = SettingsManager(this)
                 lifecycleScope.launch {
                     var allSuccess = true
+                    var anySuccess = false
                     selectedPhotos.forEach { photo ->
                         val success = FileUtils.deleteImage(this@PhotoViewActivity, photo, settingsManager)
                         if (success) {
-                            WebDavImageLoader.clearCache(this@PhotoViewActivity, photo)
+                            anySuccess = true
                         } else {
                             allSuccess = false
                         }
+                    }
+
+                    if (anySuccess) {
+                        WebDavImageLoader.clearCache(this@PhotoViewActivity)
                     }
 
                     if (allSuccess) {
@@ -763,7 +768,7 @@ class PhotoViewActivity : AppCompatActivity() {
                     val success = FileUtils.deleteImage(this@PhotoViewActivity, photo, settingsManager)
                     
                     if (success) {
-                        WebDavImageLoader.clearCache(this@PhotoViewActivity, photo)
+                        WebDavImageLoader.clearCache(this@PhotoViewActivity)
                         Toast.makeText(this@PhotoViewActivity, getString(R.string.delete_success), Toast.LENGTH_SHORT).show()
                         // 从列表中移除图片并更新UI
                         val newPhotos = photos.toMutableList()
