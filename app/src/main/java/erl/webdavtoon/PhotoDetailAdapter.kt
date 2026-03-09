@@ -9,28 +9,67 @@ import erl.webdavtoon.databinding.ItemPhotoDetailBinding
 /**
  * 图片详情适配器：使用 PhotoView 库实现流畅的缩放体验
  */
-class PhotoDetailAdapter(private val onLongPress: () -> Unit) : RecyclerView.Adapter<PhotoDetailAdapter.PhotoDetailViewHolder>() {
+class PhotoDetailAdapter(
+    private val onLongPress: (Int) -> Unit,
+    private val onClick: (Int) -> Unit
+) : RecyclerView.Adapter<PhotoDetailAdapter.PhotoDetailViewHolder>() {
 
     private var photos: List<Photo> = emptyList()
+    private var selectionMode = false
+    private val selectedIds = mutableSetOf<String>()
 
     fun setPhotos(newPhotos: List<Photo>) {
         photos = newPhotos
         notifyDataSetChanged()
     }
 
+    fun setSelectionMode(enabled: Boolean) {
+        selectionMode = enabled
+        if (!enabled) selectedIds.clear()
+        notifyDataSetChanged()
+    }
+
+    fun isSelectionMode() = selectionMode
+
+    fun toggleSelection(position: Int) {
+        if (position !in photos.indices) return
+        val id = photos[position].id
+        if (selectedIds.contains(id)) {
+            selectedIds.remove(id)
+        } else {
+            selectedIds.add(id)
+        }
+        notifyItemChanged(position)
+    }
+
+    fun getSelectedPhotos(): List<Photo> {
+        return photos.filter { selectedIds.contains(it.id) }
+    }
+
+    fun getSelectedCount() = selectedIds.size
+
+    fun clearSelection() {
+        selectedIds.clear()
+        notifyDataSetChanged()
+    }
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PhotoDetailViewHolder {
         val binding = ItemPhotoDetailBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-        return PhotoDetailViewHolder(binding, onLongPress)
+        return PhotoDetailViewHolder(binding, onLongPress, onClick)
     }
 
     override fun onBindViewHolder(holder: PhotoDetailViewHolder, position: Int) {
         val photo = photos[position]
-        holder.bind(photo)
+        holder.bind(photo, selectionMode, selectedIds.contains(photo.id))
     }
 
     override fun getItemCount(): Int = photos.size
 
-    class PhotoDetailViewHolder(private val binding: ItemPhotoDetailBinding, private val onLongPress: () -> Unit) : RecyclerView.ViewHolder(binding.root) {
+    class PhotoDetailViewHolder(
+        private val binding: ItemPhotoDetailBinding,
+        private val onLongPress: (Int) -> Unit,
+        private val onClick: (Int) -> Unit
+    ) : RecyclerView.ViewHolder(binding.root) {
         
         init {
             // 配置 PhotoView
@@ -44,7 +83,8 @@ class PhotoDetailAdapter(private val onLongPress: () -> Unit) : RecyclerView.Ada
                 setOnDoubleTapListener(object : android.view.GestureDetector.OnDoubleTapListener {
                     override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
                         // 单击仍然交给 PhotoView 的其他监听器或外部处理
-                        return false
+                        onClick(bindingAdapterPosition)
+                        return true
                     }
 
                     override fun onDoubleTap(e: MotionEvent): Boolean {
@@ -73,13 +113,13 @@ class PhotoDetailAdapter(private val onLongPress: () -> Unit) : RecyclerView.Ada
                 
                 // 设置长按监听
                 setOnLongClickListener {
-                    onLongPress()
+                    onLongPress(bindingAdapterPosition)
                     true
                 }
             }
         }
 
-        fun bind(photo: Photo) {
+        fun bind(photo: Photo, isSelectionMode: Boolean, isSelected: Boolean) {
             // 3. 每次重新绑定数据时重置缩放比例，确保页面切换后恢复 1x
             binding.imageView.setScale(1.0f, false)
             
@@ -97,6 +137,15 @@ class PhotoDetailAdapter(private val onLongPress: () -> Unit) : RecyclerView.Ada
                     binding.imageView,
                     limitSize = false
                 )
+            }
+
+            // 更新多选 UI
+            if (isSelectionMode) {
+                binding.selectionOverlay.visibility = if (isSelected) android.view.View.VISIBLE else android.view.View.GONE
+                binding.checkIcon.visibility = if (isSelected) android.view.View.VISIBLE else android.view.View.GONE
+            } else {
+                binding.selectionOverlay.visibility = android.view.View.GONE
+                binding.checkIcon.visibility = android.view.View.GONE
             }
         }
     }

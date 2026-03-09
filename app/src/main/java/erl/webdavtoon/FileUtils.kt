@@ -107,16 +107,20 @@ object FileUtils {
     /**
      * 删除图片
      */
-    fun deleteImage(context: Context, photo: Photo): Boolean {
+    suspend fun deleteImage(context: Context, photo: Photo, settingsManager: SettingsManager? = null): Boolean {
         return try {
             if (photo.isLocal) {
                 // 本地图片：通过ContentResolver删除
                 context.contentResolver.delete(photo.imageUri, null, null) > 0
             } else {
                 // WebDAV图片：需要通过WebDAV客户端删除
-                // 这里需要实现WebDAV删除逻辑
-                Log.w(TAG, "WebDAV图片删除功能待实现")
-                false
+                if (settingsManager == null) {
+                    Log.e(TAG, "WebDAV图片删除需要SettingsManager")
+                    return false
+                }
+                
+                val repository = RustWebDavPhotoRepository(settingsManager)
+                repository.deletePhoto(photo)
             }
         } catch (e: Exception) {
             Log.e(TAG, "删除图片失败: ${e.message}", e)

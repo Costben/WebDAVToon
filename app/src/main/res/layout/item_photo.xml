@@ -5,7 +5,9 @@
     android:layout_height="wrap_content"
     android:layout_margin="4dp"
     app:cardCornerRadius="8dp"
-    app:cardElevation="2dp">
+    app:cardElevation="2dp"
+    app:strokeWidth="0dp"
+    app:strokeColor="?attr/colorPrimary">
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
@@ -30,6 +32,28 @@
             android:textColor="@android:color/white"
             android:textSize="12sp"
             app:layout_constraintBottom_toBottomOf="@id/imageView" />
+
+        <View
+            android:id="@+id/selectionOverlay"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:background="#40000000"
+            android:visibility="gone"
+            app:layout_constraintTop_toTopOf="@id/imageView"
+            app:layout_constraintBottom_toBottomOf="@id/imageView"
+            app:layout_constraintStart_toStartOf="@id/imageView"
+            app:layout_constraintEnd_toEndOf="@id/imageView" />
+
+        <ImageView
+            android:id="@+id/checkIcon"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_margin="8dp"
+            android:src="@drawable/ic_check_circle"
+            android:visibility="gone"
+            app:tint="?attr/colorPrimary"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintEnd_toEndOf="parent" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 

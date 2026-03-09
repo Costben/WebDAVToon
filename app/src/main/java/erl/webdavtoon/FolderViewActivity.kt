@@ -1,6 +1,7 @@
 package erl.webdavtoon
 
 import android.Manifest
+import android.net.Uri
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -18,16 +19,17 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import erl.webdavtoon.databinding.ActivityFolderViewBinding
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
-/**
- * 文件夹浏览 Activity (启动页)
- */
 class FolderViewActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityFolderViewBinding
     private lateinit var settingsManager: SettingsManager
     private lateinit var adapter: FolderAdapter
+    private var currentAllFolders: List<Folder> = emptyList()
+    private var currentSearchKeyword: String = ""
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -35,7 +37,7 @@ class FolderViewActivity : AppCompatActivity() {
         if (isGranted) {
             loadFolders()
         } else {
-            Toast.makeText(this, "需要存储权限以查看本地相册", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, getString(R.string.storage_permission_required), Toast.LENGTH_LONG).show()
         }
     }
 
@@ -43,48 +45,59 @@ class FolderViewActivity : AppCompatActivity() {
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == RESULT_OK) {
-            // 设置已更改，刷新文件夹列表
             loadFolders()
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        ThemeHelper.applyTheme(this)
         super.onCreate(savedInstanceState)
-        
-        // 启用沉浸式，让导航栏自然悬浮在app之上
+
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        // 设置导航栏背景透明
         window.navigationBarColor = android.graphics.Color.TRANSPARENT
-        // 设置导航栏内容浅色/深色模式
         WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightNavigationBars = true
-        
+
         binding = ActivityFolderViewBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
         settingsManager = SettingsManager(this)
         LogManager.initialize(this)
 
-        // 处理系统栏间距
-        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { v, insets ->
+        if (WebDAVToonApplication.rustRepository == null) {
+            Toast.makeText(this, getString(R.string.rust_core_not_initialized), Toast.LENGTH_LONG).show()
+        }
+
+        LibraryState.update("webdav", "")
+
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             binding.appBarLayout.setPadding(0, systemBars.top, 0, 0)
             binding.recyclerView.setPadding(
                 binding.recyclerView.paddingLeft,
                 binding.recyclerView.paddingTop,
                 binding.recyclerView.paddingRight,
-                systemBars.bottom + 16 // 增加额外的padding，确保不被导航栏遮挡
+                systemBars.bottom + 16
             )
             insets
         }
 
         setupUI()
+        observeState()
         checkPermissionsAndLoad()
     }
 
-    override fun onResume() {
-        super.onResume()
-        // Removed redundant loadFolders() call here, 
-        // because onCreate() already calls checkPermissionsAndLoad()
+    private fun observeState() {
+        lifecycleScope.launch {
+            FolderState.state.collect { state ->
+                binding.toolbarProgressBar.visibility = if (state.isLoading) View.VISIBLE else View.GONE
+                binding.progressBar.visibility = View.GONE
+                binding.swipeRefreshLayout.isRefreshing = false
+                if (state.error != null) {
+                    Toast.makeText(this@FolderViewActivity, state.error, Toast.LENGTH_SHORT).show()
+                }
+                adapter.setFolders(state.folders)
+            }
+        }
     }
 
     private fun hasStoragePermission(): Boolean {
@@ -97,18 +110,101 @@ class FolderViewActivity : AppCompatActivity() {
     }
 
     private fun checkPermissionsAndLoad() {
+        val isRemoteEnabled = settingsManager.isWebDavEnabled()
+
+        if (isRemoteEnabled) {
+            loadFolders()
+            return
+        }
+
         val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             Manifest.permission.READ_MEDIA_IMAGES
         } else {
             Manifest.permission.READ_EXTERNAL_STORAGE
         }
 
-        when {
-            hasStoragePermission() -> {
-                loadFolders()
+        if (hasStoragePermission()) {
+            loadFolders()
+        } else {
+            requestPermissionLauncher.launch(permission)
+        }
+    }
+
+    private fun onFolderClick(folder: Folder) {
+        val isInternalPhotos = folder.path.startsWith("virtual://internal_photos")
+        val realPath = if (isInternalPhotos) folder.path.substringAfter("path=") else folder.path
+
+        if (folder.path == "virtual://local_all") {
+            val intent = Intent(this, MainActivity::class.java).apply {
+                putExtra("EXTRA_FOLDER_PATH", "")
+                putExtra("EXTRA_IS_WEBDAV", false)
+                putExtra("EXTRA_RECURSIVE", true)
             }
-            else -> {
-                requestPermissionLauncher.launch(permission)
+            startActivity(intent)
+            return
+        }
+
+        if (folder.path == "virtual://local_root") {
+            val intent = Intent(this, SubFolderActivity::class.java).apply {
+                putExtra("EXTRA_FOLDER_PATH", "")
+                putExtra("EXTRA_IS_WEBDAV", false)
+            }
+            startActivity(intent)
+            return
+        }
+
+        if (isInternalPhotos || !folder.hasSubFolders) {
+            val intent = Intent(this, MainActivity::class.java).apply {
+                putExtra("EXTRA_FOLDER_PATH", realPath)
+                putExtra("EXTRA_IS_WEBDAV", !folder.isLocal)
+                putExtra("EXTRA_RECURSIVE", false)
+            }
+            startActivity(intent)
+            return
+        }
+
+        // If folder.hasSubFolders is true, pre-check content to avoid white flash
+        binding.toolbarProgressBar.visibility = View.VISIBLE
+        lifecycleScope.launch {
+            try {
+                val repository: PhotoRepository = if (!folder.isLocal) {
+                    RustWebDavPhotoRepository(settingsManager)
+                } else {
+                    LocalPhotoRepository(this@FolderViewActivity)
+                }
+
+                val subFolders = withContext(Dispatchers.IO) {
+                    repository.getFolders(realPath, false).filterNot { f ->
+                        !f.isLocal && (f.name.startsWith(".") || f.path.trim('/').split('/').any { it.startsWith(".") })
+                    }
+                }
+
+                if (subFolders.isEmpty()) {
+                    // No visible subfolders found, go directly to MainActivity
+                    val intent = Intent(this@FolderViewActivity, MainActivity::class.java).apply {
+                        putExtra("EXTRA_FOLDER_PATH", realPath)
+                        putExtra("EXTRA_IS_WEBDAV", !folder.isLocal)
+                        putExtra("EXTRA_RECURSIVE", false)
+                    }
+                    startActivity(intent)
+                } else {
+                    // Subfolders (or mixed content virtual folder) exist, go to SubFolderActivity
+                    val intent = Intent(this@FolderViewActivity, SubFolderActivity::class.java).apply {
+                        putExtra("EXTRA_FOLDER_PATH", realPath)
+                        putExtra("EXTRA_IS_WEBDAV", !folder.isLocal)
+                    }
+                    startActivity(intent)
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("FolderViewActivity", "Folder pre-check failed", e)
+                // Fallback: try entering SubFolderActivity anyway
+                val intent = Intent(this@FolderViewActivity, SubFolderActivity::class.java).apply {
+                    putExtra("EXTRA_FOLDER_PATH", realPath)
+                    putExtra("EXTRA_IS_WEBDAV", !folder.isLocal)
+                }
+                startActivity(intent)
+            } finally {
+                binding.progressBar.visibility = View.GONE
             }
         }
     }
@@ -116,32 +212,25 @@ class FolderViewActivity : AppCompatActivity() {
     private fun setupUI() {
         setSupportActionBar(binding.toolbar)
 
-        adapter = FolderAdapter { folder ->
-            if (folder.path == "virtual://local_all" || folder.hasSubFolders) {
-                // 如果是虚拟文件夹或者有子文件夹，进入子文件夹浏览界面
-                val intent = if (folder.path == "virtual://local_all") {
-                    Intent(this, SubFolderActivity::class.java).apply {
-                        putExtra("EXTRA_FOLDER_PATH", "")
-                        putExtra("EXTRA_IS_WEBDAV", false)
-                    }
+        adapter = FolderAdapter(
+            onFolderClick = { folder ->
+                onFolderClick(folder)
+            },
+            onSelectionChanged = { count ->
+                val isSelectionMode = count > 0
+                binding.swipeRefreshLayout.isEnabled = !isSelectionMode
+                if (isSelectionMode) {
+                    supportActionBar?.title = getString(R.string.selected_count, count)
                 } else {
-                    Intent(this, SubFolderActivity::class.java).apply {
-                        putExtra("EXTRA_FOLDER_PATH", folder.path)
-                        putExtra("EXTRA_IS_WEBDAV", !folder.isLocal)
-                    }
+                    supportActionBar?.title = getString(R.string.app_name)
                 }
-                startActivity(intent)
-            } else {
-                // 如果没有下一级文件夹，直接进入瀑布流预览
-                val intent = Intent(this, MainActivity::class.java).apply {
-                    putExtra("EXTRA_FOLDER_PATH", folder.path)
-                    putExtra("EXTRA_IS_WEBDAV", !folder.isLocal)
-                }
-                startActivity(intent)
+                invalidateOptionsMenu()
             }
+        )
+
+        binding.recyclerView.layoutManager = GridLayoutManager(this, settingsManager.getGridColumns()).apply {
+            isItemPrefetchEnabled = false
         }
-        
-        binding.recyclerView.layoutManager = GridLayoutManager(this, 2)
         binding.recyclerView.adapter = adapter
 
         binding.swipeRefreshLayout.setOnRefreshListener {
@@ -149,96 +238,215 @@ class FolderViewActivity : AppCompatActivity() {
         }
 
         binding.settingsFab.setOnClickListener {
+            val isWebDav = settingsManager.isWebDavEnabled()
+            val path = if (isWebDav) "/" else ""
             val intent = Intent(this, MainActivity::class.java).apply {
-                putExtra("EXTRA_FOLDER_PATH", "")
-                putExtra("EXTRA_IS_WEBDAV", settingsManager.isWebDavEnabled())
+                putExtra("EXTRA_FOLDER_PATH", path)
+                putExtra("EXTRA_IS_WEBDAV", isWebDav)
                 putExtra("EXTRA_RECURSIVE", true)
             }
             startActivity(intent)
         }
-        binding.settingsFab.setImageResource(android.R.drawable.ic_menu_gallery)
-        binding.settingsFab.visibility = View.VISIBLE
+        
+        DrawerHelper.setupDrawer(
+            this,
+            binding.drawerLayout,
+            binding.toolbar,
+            binding.drawerContent.root,
+            settingsLauncher
+        )
+    }
+
+    override fun onBackPressed() {
+        if (adapter.isSelectionMode) {
+            adapter.exitSelectionMode()
+        } else {
+            super.onBackPressed()
+        }
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.main_menu, menu)
+
+        val searchItem = menu.findItem(R.id.action_search)
+        val searchView = searchItem?.actionView as? androidx.appcompat.widget.SearchView
+        searchView?.queryHint = getString(R.string.search_folders)
+        searchView?.setOnQueryTextListener(object : androidx.appcompat.widget.SearchView.OnQueryTextListener {
+            override fun onQueryTextSubmit(query: String?): Boolean {
+                currentSearchKeyword = query.orEmpty().trim()
+                applyFilterAndSort()
+                searchView.clearFocus()
+                return true
+            }
+
+            override fun onQueryTextChange(newText: String?): Boolean {
+                currentSearchKeyword = newText.orEmpty().trim()
+                applyFilterAndSort()
+                return true
+            }
+        })
+
         return true
+    }
+
+    override fun onPrepareOptionsMenu(menu: Menu): Boolean {
+        val isSelectionMode = adapter.isSelectionMode
+        val deleteItem = menu.findItem(R.id.action_delete)
+        deleteItem?.isVisible = isSelectionMode
+        if (isSelectionMode) {
+            deleteItem?.icon?.let { icon ->
+                androidx.core.graphics.drawable.DrawableCompat.setTint(icon, android.graphics.Color.RED)
+            }
+        }
+        menu.findItem(R.id.action_search)?.isVisible = !isSelectionMode
+        menu.findItem(R.id.action_settings)?.isVisible = !isSelectionMode
+        menu.findItem(R.id.action_grid_columns)?.isVisible = !isSelectionMode
+        menu.findItem(R.id.action_sort_order)?.isVisible = !isSelectionMode
+        return super.onPrepareOptionsMenu(menu)
+    }
+
+    private fun applyFilterAndSort() {
+        val filtered = if (currentSearchKeyword.isEmpty()) {
+            currentAllFolders
+        } else {
+            currentAllFolders.filter {
+                it.name.contains(currentSearchKeyword, ignoreCase = true)
+            }
+        }
+
+        val sortedFolders = when (settingsManager.getSortOrder()) {
+            SettingsManager.SORT_NAME_ASC -> filtered.sortedBy { it.name }
+            SettingsManager.SORT_NAME_DESC -> filtered.sortedByDescending { it.name }
+            SettingsManager.SORT_DATE_DESC -> filtered.sortedByDescending { it.dateModified }
+            SettingsManager.SORT_DATE_ASC -> filtered.sortedBy { it.dateModified }
+            else -> filtered
+        }
+
+        FolderState.setResult(sortedFolders)
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
+            R.id.action_delete -> {
+                deleteSelectedFolders()
+                true
+            }
             R.id.action_settings -> {
                 settingsLauncher.launch(Intent(this, SettingsActivity::class.java))
                 true
             }
+            R.id.action_col_1 -> updateGridColumns(1)
+            R.id.action_col_2 -> updateGridColumns(2)
+            R.id.action_col_3 -> updateGridColumns(3)
+            R.id.action_col_4 -> updateGridColumns(4)
+            R.id.action_sort_name_asc -> updateSortOrder(0)
+            R.id.action_sort_name_desc -> updateSortOrder(1)
+            R.id.action_sort_date_desc -> updateSortOrder(2)
+            R.id.action_sort_date_asc -> updateSortOrder(3)
             else -> super.onOptionsItemSelected(item)
         }
     }
 
-    private fun loadFolders(forceRefresh: Boolean = false) {
-        if (!binding.swipeRefreshLayout.isRefreshing) {
-            binding.progressBar.visibility = View.VISIBLE
-        }
-        
-        lifecycleScope.launch {
-            val allFolders = mutableListOf<Folder>()
-            val isWebDavEnabled = settingsManager.isWebDavEnabled()
-            
-            // 1. 首先尝试加载 WebDAV 文件夹，并立即更新 UI
-            if (isWebDavEnabled) {
-                try {
-                    val webDavRepo = WebDavPhotoRepository(this@FolderViewActivity, WebDavClient(settingsManager), settingsManager)
-                    val webDavFolders = webDavRepo.getFolders("", forceRefresh)
-                    android.util.Log.d("FolderViewActivity", "Loaded ${webDavFolders.size} WebDAV folders")
-                    allFolders.addAll(webDavFolders)
-                    
-                    // 立即显示 WebDAV 文件夹
-                    adapter.setFolders(allFolders.toList())
-                } catch (e: Exception) {
-                    android.util.Log.e("FolderViewActivity", "WebDAV folders load failed: ${e.message}", e)
-                }
-            }
+    private fun deleteSelectedFolders() {
+        val selectedFolders = adapter.getSelectedFolders()
+        if (selectedFolders.isEmpty()) return
 
-            // 2. 然后在后台加载本地照片信息
-            try {
-                val localRepo = LocalPhotoRepository(this@FolderViewActivity)
-                if (isWebDavEnabled) {
-                    // 如果启用了 WebDAV，将本地照片收纳到一个虚拟文件夹
-                    // 异步获取本地文件夹信息以更新计数和缩略图
-                    val localFolders = localRepo.getFolders("", forceRefresh)
-                    if (localFolders.isNotEmpty()) {
-                        val totalPhotos = localFolders.sumOf { it.photoCount }
-                        val allPreviews = localFolders.flatMap { it.previewUris }.take(4)
-                        val localVirtualFolder = Folder(
-                            path = "virtual://local_all",
-                            name = "本地照片",
-                            isLocal = true,
-                            photoCount = totalPhotos,
-                            previewUris = allPreviews,
-                            hasSubFolders = true
-                        )
-                        allFolders.add(localVirtualFolder)
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle(R.string.confirm_delete)
+            .setMessage(getString(R.string.delete_folders_message, selectedFolders.size))
+            .setPositiveButton(R.string.delete) { _, _ ->
+                lifecycleScope.launch {
+                    binding.toolbarProgressBar.visibility = View.VISIBLE
+                    var count = 0
+                    selectedFolders.forEach { folder ->
+                        val repository: PhotoRepository = if (!folder.isLocal) {
+                            RustWebDavPhotoRepository(settingsManager)
+                        } else {
+                            LocalPhotoRepository(this@FolderViewActivity)
+                        }
+                        
+                        if (repository.deleteFolder(folder)) {
+                            // Try to clear memory cache to avoid showing stale data
+                            lifecycleScope.launch(Dispatchers.Main) {
+                                com.bumptech.glide.Glide.get(this@FolderViewActivity).clearMemory()
+                            }
+                            count++
+                        }
                     }
-                } else {
-                    // 未启用 WebDAV 时，显示所有本地文件夹
-                    val localFolders = localRepo.getFolders("", forceRefresh)
-                    allFolders.addAll(localFolders)
+                    binding.toolbarProgressBar.visibility = View.GONE
+                    Toast.makeText(this@FolderViewActivity, getString(R.string.deleted_folders_count, count), Toast.LENGTH_SHORT).show()
+                    adapter.exitSelectionMode()
+                    loadFolders(forceRefresh = true)
                 }
-            } catch (e: Exception) {
-                android.util.Log.e("FolderViewActivity", "Local folders load failed: ${e.message}", e)
             }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
 
-            // 3. 最终更新 UI
-            android.util.Log.d("FolderViewActivity", "Final folders to display: ${allFolders.size}")
-            adapter.setFolders(allFolders.toList())
-            binding.progressBar.visibility = View.GONE
-            binding.swipeRefreshLayout.isRefreshing = false
-            
-            // 检查 RecyclerView 状态
-            binding.recyclerView.post {
-                android.util.Log.d("FolderViewActivity", "RecyclerView has ${binding.recyclerView.childCount} children visible")
-                android.util.Log.d("FolderViewActivity", "Adapter item count: ${adapter.itemCount}")
+    private fun updateGridColumns(columns: Int): Boolean {
+        settingsManager.setGridColumns(columns)
+        (binding.recyclerView.layoutManager as? GridLayoutManager)?.spanCount = columns
+        // If we want to refresh grid spacing or other UI elements that depend on column count, we might need to recreate adapter or something,
+        // but GridLayoutManager handles span count change dynamically.
+        return true
+    }
+
+    private fun updateSortOrder(order: Int): Boolean {
+        settingsManager.setSortOrder(order)
+        applyFilterAndSort()
+        return true
+    }
+
+    private fun loadFolders(forceRefresh: Boolean = false) {
+        FolderState.setLoading()
+
+        lifecycleScope.launch {
+            try {
+                val allFolders = withContext(Dispatchers.IO) {
+                    val folders = mutableListOf<Folder>()
+                    val isRemoteEnabled = settingsManager.isWebDavEnabled()
+
+                    if (isRemoteEnabled) {
+                        val remoteRepo = RustWebDavPhotoRepository(settingsManager)
+                        val remoteRoot = "/"
+                        val remoteFolders = remoteRepo.getFolders(remoteRoot, forceRefresh).filterNot { f ->
+                            f.name.startsWith(".") || f.path.trim('/').split('/').any { it.startsWith(".") }
+                        }
+                        folders.addAll(remoteFolders)
+                    }
+
+                    try {
+                        val localRepo = LocalPhotoRepository(this@FolderViewActivity)
+                        val localFolders = localRepo.getFolders("", forceRefresh)
+
+                        if (localFolders.isNotEmpty()) {
+                            val totalPhotos = localFolders.sumOf { it.photoCount }
+                            val allPreviews = localFolders.flatMap { it.previewUris }.take(4)
+                            folders.add(
+                                Folder(
+                                    path = "virtual://local_root",
+                                    name = getString(R.string.local_photos),
+                                    isLocal = true,
+                                    photoCount = totalPhotos,
+                                    previewUris = allPreviews,
+                                    hasSubFolders = true
+                                )
+                            )
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.e("FolderViewActivity", "Local folders load failed: ${e.message}", e)
+                    }
+                    folders.toList()
+                }
+
+                currentAllFolders = allFolders
+                applyFilterAndSort()
+            } catch (e: Exception) {
+                android.util.Log.e("FolderViewActivity", "Remote folders load failed: ${e.message}", e)
+                FolderState.setError(e.message ?: "Folder load failed")
             }
         }
     }
 }
+
+

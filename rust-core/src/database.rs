@@ -1,0 +1,190 @@
+use crate::models::{Folder, Photo, SortOrder};
+use rusqlite::{params, Connection, Result};
+use std::path::Path;
+
+pub struct Database {
+    conn: Connection,
+}
+
+impl Database {
+    pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let conn = Connection::open(path)?;
+        let db = Self { conn };
+        db.init()?;
+        Ok(db)
+    }
+
+    fn init(&self) -> Result<()> {
+        // 创建 photos 表
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS photos (
+                id TEXT PRIMARY KEY,
+                parent_path TEXT NOT NULL,
+                title TEXT NOT NULL,
+                uri TEXT NOT NULL,
+                is_local INTEGER NOT NULL,
+                size INTEGER NOT NULL,
+                date_modified INTEGER NOT NULL,
+                last_synced INTEGER NOT NULL
+            )",
+            [],
+        )?;
+
+        // 创建 folders 表
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS folders (
+                path TEXT PRIMARY KEY,
+                parent_path TEXT NOT NULL,
+                name TEXT NOT NULL,
+                is_local INTEGER NOT NULL,
+                has_sub_folders INTEGER NOT NULL,
+                preview_uris TEXT, -- JSON array
+                last_synced INTEGER NOT NULL
+            )",
+            [],
+        )?;
+        
+        // 创建索引
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_photos_parent ON photos(parent_path)",
+            [],
+        )?;
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_folders_parent ON folders(parent_path)",
+            [],
+        )?;
+
+        Ok(())
+    }
+
+    pub fn save_photos(&mut self, parent_path: &str, photos: &[Photo]) -> Result<()> {
+        let tx = self.conn.transaction()?;
+        
+        // 清除旧数据 (简单策略：全量覆盖该目录)
+        tx.execute("DELETE FROM photos WHERE parent_path = ?", [parent_path])?;
+        
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        {
+            let mut stmt = tx.prepare(
+                "INSERT INTO photos (id, parent_path, title, uri, is_local, size, date_modified, last_synced)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+            )?;
+
+            for photo in photos {
+                stmt.execute(params![
+                    photo.id,
+                    parent_path,
+                    photo.title,
+                    photo.uri,
+                    photo.is_local as i32,
+                    photo.size as i64,
+                    photo.date_modified as i64,
+                    now as i64
+                ])?;
+            }
+        }
+        
+        tx.commit()
+    }
+
+    pub fn get_photos(&self, parent_path: &str, sort_order: SortOrder) -> Result<Vec<Photo>> {
+        let order_clause = match sort_order {
+            SortOrder::NameAsc => "title ASC",
+            SortOrder::NameDesc => "title DESC",
+            SortOrder::DateDesc => "date_modified DESC",
+        };
+        
+        let mut stmt = self.conn.prepare(&format!(
+            "SELECT id, title, uri, is_local, size, date_modified FROM photos WHERE parent_path = ? ORDER BY {}",
+            order_clause
+        ))?;
+        
+        let photo_iter = stmt.query_map([parent_path], |row| {
+            Ok(Photo {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                uri: row.get(2)?,
+                is_local: row.get::<_, i32>(3)? != 0,
+                size: row.get::<_, i64>(4)? as u64,
+                date_modified: row.get::<_, i64>(5)? as u64,
+            })
+        })?;
+
+        let mut photos = Vec::new();
+        for photo in photo_iter {
+            photos.push(photo?);
+        }
+        Ok(photos)
+    }
+
+    pub fn delete_photo(&mut self, id: &str) -> Result<()> {
+        self.conn.execute("DELETE FROM photos WHERE id = ?", [id])?;
+        Ok(())
+    }
+
+    pub fn save_folders(&mut self, parent_path: &str, folders: &[Folder]) -> Result<()> {
+        let tx = self.conn.transaction()?;
+        
+        // 清除旧数据
+        tx.execute("DELETE FROM folders WHERE parent_path = ?", [parent_path])?;
+        
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        {
+            let mut stmt = tx.prepare(
+                "INSERT INTO folders (path, parent_path, name, is_local, has_sub_folders, preview_uris, last_synced)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)"
+            )?;
+
+            for folder in folders {
+                let previews_json = serde_json::to_string(&folder.preview_uris).unwrap_or_default();
+                stmt.execute(params![
+                    folder.path,
+                    parent_path,
+                    folder.name,
+                    folder.is_local as i32,
+                    folder.has_sub_folders as i32,
+                    previews_json,
+                    now as i64
+                ])?;
+            }
+        }
+        
+        tx.commit()
+    }
+
+    pub fn get_folders(&self, parent_path: &str) -> Result<Vec<Folder>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT path, name, is_local, has_sub_folders, preview_uris 
+             FROM folders 
+             WHERE parent_path = ? 
+             ORDER BY name ASC"
+        )?;
+
+        let rows = stmt.query_map([parent_path], |row| {
+            let previews_json: String = row.get(4)?;
+            let preview_uris: Vec<String> = serde_json::from_str(&previews_json).unwrap_or_default();
+
+            Ok(Folder {
+                path: row.get(0)?,
+                name: row.get(1)?,
+                is_local: row.get::<_, i32>(2)? != 0,
+                has_sub_folders: row.get::<_, i32>(3)? != 0,
+                preview_uris,
+            })
+        })?;
+
+        let mut folders = Vec::new();
+        for row in rows {
+            folders.push(row?);
+        }
+        Ok(folders)
+    }
+}

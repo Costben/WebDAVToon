@@ -1,66 +1,90 @@
 package erl.webdavtoon
 
 import android.app.Application
+import android.content.Context
 import android.util.Base64
+import android.util.Log
 import com.bumptech.glide.Glide
 import com.bumptech.glide.GlideBuilder
 import com.bumptech.glide.load.engine.cache.InternalCacheDiskCacheFactory
-import com.bumptech.glide.load.engine.cache.LruResourceCache
 import com.bumptech.glide.module.AppGlideModule
-import okhttp3.*
-import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.ConnectionPool
+import okhttp3.OkHttpClient
+import okhttp3.Response
 import java.util.concurrent.TimeUnit
 
-/**
- * Application 类，用于全局配置
- */
 class WebDAVToonApplication : Application() {
     override fun onCreate() {
         super.onCreate()
-        
-        // 初始化日志管理器
+
+        appContext = applicationContext
         LogManager.initialize(this)
-        
-        // 读取并设置日志级别
+
+        try {
+            try {
+                System.loadLibrary("rust_core")
+                LogManager.log("System.loadLibrary(\"rust_core\") succeeded", Log.INFO)
+            } catch (t: Throwable) {
+                LogManager.log("System.loadLibrary(\"rust_core\") failed: ${t.message}", Log.WARN)
+            }
+
+            try {
+                val libraryPath = applicationInfo.nativeLibraryDir
+                System.setProperty("jna.library.path", libraryPath)
+                LogManager.log("Set jna.library.path to: $libraryPath", Log.INFO)
+            } catch (t: Throwable) {
+                LogManager.log("Failed to set jna.library.path: ${t.message}", Log.WARN)
+            }
+
+            uniffi.rust_core.initLogger()
+            val greeting = uniffi.rust_core.helloFromRust("Android")
+            LogManager.log("Rust Core initialized: $greeting", Log.INFO)
+
+            val dbPath = getDatabasePath("rust_core.db").absolutePath
+            rustRepository = uniffi.rust_core.RustRepository(dbPath)
+            rustInitError = null
+            LogManager.log("RustRepository initialized with db: $dbPath", Log.INFO)
+            Log.i("WebDAVToon", "RustRepository initialized with db: $dbPath")
+        } catch (t: Throwable) {
+            rustInitError = t.message ?: t.javaClass.simpleName
+            LogManager.log("Failed to initialize Rust Core: ${t.message}", Log.ERROR)
+            Log.e("WebDAVToon", "Rust Core Init Failed", t)
+        }
+
         val settingsManager = SettingsManager(this)
         val logLevel = settingsManager.getLogLevel()
         LogManager.setMinLogLevel(logLevel)
-        
-        // 记录应用启动
-        LogManager.log("Application started", android.util.Log.INFO)
-        LogManager.log("Log level set to: ${logLevel} (${getLogLevelName(logLevel)})", android.util.Log.INFO)
+
+        LogManager.log("Application started", Log.INFO)
+        LogManager.log("Log level set to: $logLevel (${getLogLevelName(logLevel)})", Log.INFO)
     }
-    
-    /**
-     * 获取日志级别名称
-     */
+
     private fun getLogLevelName(level: Int): String {
         return when (level) {
-            android.util.Log.VERBOSE -> "VERBOSE"
-            android.util.Log.DEBUG -> "DEBUG"
-            android.util.Log.INFO -> "INFO"
-            android.util.Log.WARN -> "WARN"
-            android.util.Log.ERROR -> "ERROR"
+            Log.VERBOSE -> "VERBOSE"
+            Log.DEBUG -> "DEBUG"
+            Log.INFO -> "INFO"
+            Log.WARN -> "WARN"
+            Log.ERROR -> "ERROR"
             else -> "UNKNOWN"
         }
     }
-    
+
     override fun onTerminate() {
-        // 应用终止时关闭日志管理器
         LogManager.shutdown()
         super.onTerminate()
     }
+
+    companion object {
+        var rustRepository: uniffi.rust_core.RustRepository? = null
+        var rustInitError: String? = null
+        lateinit var appContext: Context
+    }
 }
 
-/**
- * Glide 模块，配置 WebDAV 认证和缓存策略
- */
 @com.bumptech.glide.annotation.GlideModule
 class MyGlideModule : AppGlideModule() {
-    
-    /**
-     * 计算响应链中的响应数量（用于限制重试次数）
-     */
+
     private fun responseCount(response: Response): Int {
         var result = 1
         var current = response.priorResponse
@@ -70,39 +94,31 @@ class MyGlideModule : AppGlideModule() {
         }
         return result
     }
-    override fun applyOptions(context: android.content.Context, builder: GlideBuilder) {
-        // 配置内存缓存大小（增加到200MB，支持更多webtoon图片缓存，充分利用内网带宽）
-        val memoryCacheSizeBytes = 200 * 1024 * 1024L
-        builder.setMemoryCache(LruResourceCache(memoryCacheSizeBytes))
-        
-        // 配置磁盘缓存大小（增加到2GB，充分利用内网带宽缓存更多图片和缩略图）
+
+    override fun applyOptions(context: Context, builder: GlideBuilder) {
         val diskCacheSizeBytes = 2L * 1024 * 1024 * 1024L
         builder.setDiskCache(InternalCacheDiskCacheFactory(context, diskCacheSizeBytes))
-        
-        // 注意：线程池配置已移除，因为 GlideExecutor 的 API 在不同版本中可能不同
-        // 并发加载限制将通过 OkHttpClient 的连接池和 Dispatcher 来实现
+
+        val sourceExecutor = com.bumptech.glide.load.engine.executor.GlideExecutor.newSourceBuilder()
+            .setThreadCount(20)
+            .setName("source-executor")
+            .setUncaughtThrowableStrategy(com.bumptech.glide.load.engine.executor.GlideExecutor.UncaughtThrowableStrategy.LOG)
+            .build()
+        builder.setSourceExecutor(sourceExecutor)
     }
-    
-    override fun registerComponents(context: android.content.Context, glide: Glide, registry: com.bumptech.glide.Registry) {
-        android.util.Log.d("MyGlideModule", "registerComponents called")
-        
-        // 获取 WebDAV 认证信息
+
+    override fun registerComponents(context: Context, glide: Glide, registry: com.bumptech.glide.Registry) {
+        Log.d("MyGlideModule", "registerComponents called")
+
         val settingsManager = SettingsManager(context)
-        
-        // 始终注册 OkHttp 集成，以便支持动态切换和认证
-        android.util.Log.d("MyGlideModule", "Registering dynamic OkHttp integration for WebDAV")
-        
-        // WebDAV 专用配置：低并发，避免服务器过载
-        val connectionPool = okhttp3.ConnectionPool(
-            maxIdleConnections = 5,
-            keepAliveDuration = 5,
-            timeUnit = TimeUnit.MINUTES
-        )
-        
-        val dispatcher = okhttp3.Dispatcher()
-        dispatcher.maxRequests = 5
-        dispatcher.maxRequestsPerHost = 3
-        
+        Log.d("MyGlideModule", "Registering dynamic OkHttp integration for WebDAV")
+
+        val connectionPool = ConnectionPool(20, 5, TimeUnit.MINUTES)
+        val dispatcher = okhttp3.Dispatcher().apply {
+            maxRequests = 32
+            maxRequestsPerHost = 20
+        }
+
         val okHttpClient = OkHttpClient.Builder()
             .connectionPool(connectionPool)
             .dispatcher(dispatcher)
@@ -111,32 +127,26 @@ class MyGlideModule : AppGlideModule() {
             .writeTimeout(30, TimeUnit.SECONDS)
             .addInterceptor { chain ->
                 val originalRequest = chain.request()
-                
-                // 动态检查是否启用 WebDAV 并获取当前槽位的凭据
+
                 if (settingsManager.isWebDavEnabled()) {
                     val username = settingsManager.getWebDavUsername()
-                    val password = if (settingsManager.isWebDavRememberPassword()) {
-                        settingsManager.getWebDavPassword()
-                    } else {
-                        ""
-                    }
-                    
+                    val password = if (settingsManager.isWebDavRememberPassword()) settingsManager.getWebDavPassword() else ""
+
                     if (username.isNotEmpty() && password.isNotEmpty()) {
                         val credentials = "$username:$password"
                         val base64 = Base64.encode(credentials.toByteArray(), Base64.NO_WRAP)
                         val credential = "Basic ${String(base64)}"
-                        
+
                         val authenticatedRequest = originalRequest.newBuilder()
                             .header("Authorization", credential)
                             .build()
                         return@addInterceptor chain.proceed(authenticatedRequest)
                     }
                 }
-                
+
                 chain.proceed(originalRequest)
             }
-            .authenticator { route, response ->
-                // 如果收到 401 错误，且启用了 WebDAV，重试认证
+            .authenticator { _, response ->
                 if (response.code == 401 && responseCount(response) < 3 && settingsManager.isWebDavEnabled()) {
                     val username = settingsManager.getWebDavUsername()
                     val password = settingsManager.getWebDavPassword()
@@ -152,19 +162,15 @@ class MyGlideModule : AppGlideModule() {
                 null
             }
             .build()
-        
-        // 注册 OkHttp 集成
+
         registry.replace(
             com.bumptech.glide.load.model.GlideUrl::class.java,
             java.io.InputStream::class.java,
             com.bumptech.glide.integration.okhttp3.OkHttpUrlLoader.Factory(okHttpClient)
         )
-        
-        android.util.Log.d("MyGlideModule", "Dynamic OkHttp integration registered successfully")
-    }
-    
-    override fun isManifestParsingEnabled(): Boolean {
-        return false
-    }
-}
 
+        Log.d("MyGlideModule", "Dynamic OkHttp integration registered successfully")
+    }
+
+    override fun isManifestParsingEnabled(): Boolean = false
+}

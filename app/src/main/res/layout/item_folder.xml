@@ -88,6 +88,30 @@
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toTopOf="parent" />
 
+            <!-- 选中遮罩 -->
+            <View
+                android:id="@+id/selectionOverlay"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:background="#40000000"
+                android:visibility="gone"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toEndOf="parent" />
+
+            <!-- 选中图标 -->
+            <ImageView
+                android:id="@+id/checkIcon"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_margin="8dp"
+                android:src="@drawable/ic_check_circle"
+                android:visibility="gone"
+                app:tint="?attr/colorPrimary"
+                app:layout_constraintTop_toTopOf="parent"
+                app:layout_constraintEnd_toEndOf="parent" />
+
         </androidx.constraintlayout.widget.ConstraintLayout>
 
         <TextView

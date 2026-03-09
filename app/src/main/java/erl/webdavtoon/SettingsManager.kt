@@ -1,20 +1,34 @@
 package erl.webdavtoon
 
 import android.content.Context
+import android.net.Uri
 import android.util.Log
+import com.google.gson.*
+import com.google.gson.reflect.TypeToken
+import java.lang.reflect.Type
 
-/**
- * 设置管理类
- */
 class SettingsManager(context: Context) {
     private val prefs = context.getSharedPreferences("webdavtoon_prefs", Context.MODE_PRIVATE)
+    
+    private val gson = GsonBuilder()
+        .registerTypeAdapter(Uri::class.java, UriAdapter())
+        .create()
+
+    private class UriAdapter : JsonSerializer<Uri>, JsonDeserializer<Uri> {
+        override fun serialize(src: Uri, typeOfSrc: Type, context: JsonSerializationContext): JsonElement {
+            return JsonPrimitive(src.toString())
+        }
+
+        override fun deserialize(json: JsonElement, typeOfT: Type, context: JsonDeserializationContext): Uri {
+            return Uri.parse(json.asString)
+        }
+    }
 
     companion object {
         const val KEY_GRID_COLUMNS = "grid_columns"
         const val KEY_LOG_LEVEL = "log_level"
         const val KEY_CURRENT_SLOT = "current_slot"
-        
-        // Slot-specific keys
+
         const val KEY_WEBDAV_ENABLED = "webdav_enabled"
         const val KEY_WEBDAV_PROTOCOL = "webdav_protocol"
         const val KEY_WEBDAV_URL = "webdav_url"
@@ -23,127 +37,187 @@ class SettingsManager(context: Context) {
         const val KEY_WEBDAV_PASSWORD = "webdav_password"
         const val KEY_WEBDAV_REMEMBER_PASSWORD = "webdav_remember_password"
         const val KEY_WEBDAV_ALIAS = "webdav_alias"
-        const val KEY_SORT_ORDER = "sort_order" // 0: A-Z, 1: Z-A, 2: Newest First
-        
-        // Favorite photos
+
+        const val KEY_SORT_ORDER = "sort_order"
+        const val KEY_PHOTO_GRID_COLUMNS = "photo_grid_columns"
+        const val KEY_PHOTO_SORT_ORDER = "photo_sort_order"
         const val KEY_FAVORITE_PHOTOS = "favorite_photos"
+        const val KEY_THEME_ID = "theme_id"
+        const val KEY_LANGUAGE = "language"
+
+        const val SORT_NAME_ASC = 0
+        const val SORT_NAME_DESC = 1
+        const val SORT_DATE_DESC = 2
+        const val SORT_DATE_ASC = 3
     }
 
-    // Global settings
+    private fun getSlotKey(key: String): String = "slot${getCurrentSlot()}_$key"
+    private fun getSpecificSlotKey(slot: Int, key: String): String = "slot${slot}_$key"
+
     fun getGridColumns(): Int = prefs.getInt(KEY_GRID_COLUMNS, 2)
     fun setGridColumns(count: Int) = prefs.edit().putInt(KEY_GRID_COLUMNS, count).apply()
+
+    fun getPhotoGridColumns(): Int = prefs.getInt(KEY_PHOTO_GRID_COLUMNS, 2)
+    fun setPhotoGridColumns(count: Int) = prefs.edit().putInt(KEY_PHOTO_GRID_COLUMNS, count).apply()
 
     fun getSortOrder(): Int = prefs.getInt(KEY_SORT_ORDER, 2)
     fun setSortOrder(order: Int) = prefs.edit().putInt(KEY_SORT_ORDER, order).apply()
 
+    fun getPhotoSortOrder(): Int = prefs.getInt(KEY_PHOTO_SORT_ORDER, 2)
+    fun setPhotoSortOrder(order: Int) = prefs.edit().putInt(KEY_PHOTO_SORT_ORDER, order).apply()
+
     fun getLogLevel(): Int = prefs.getInt(KEY_LOG_LEVEL, Log.INFO)
     fun setLogLevel(level: Int) = prefs.edit().putInt(KEY_LOG_LEVEL, level).apply()
+
+    fun getThemeId(): Int = prefs.getInt(KEY_THEME_ID, 0)
+    fun setThemeId(id: Int) = prefs.edit().putInt(KEY_THEME_ID, id).apply()
+
+    fun getLanguage(): String = prefs.getString(KEY_LANGUAGE, "default") ?: "default"
+    fun setLanguage(lang: String) = prefs.edit().putString(KEY_LANGUAGE, lang).apply()
 
     fun getCurrentSlot(): Int = prefs.getInt(KEY_CURRENT_SLOT, 0)
     fun setCurrentSlot(slot: Int) = prefs.edit().putInt(KEY_CURRENT_SLOT, slot).apply()
 
-    // Slot-specific settings
-    private fun getSlotKey(key: String): String = "slot${getCurrentSlot()}_$key"
-    private fun getSpecificSlotKey(slot: Int, key: String): String = "slot${slot}_$key"
+    // Deprecated legacy switch: app runs in webdav-only mode.
+    fun getServerType(): String = "webdav"
+    fun setServerType(type: String) {
+        // no-op, kept for backward compatibility
+    }
 
-    fun getWebDavAlias(slot: Int = getCurrentSlot()): String = prefs.getString(getSpecificSlotKey(slot, KEY_WEBDAV_ALIAS), "") ?: ""
-    fun setWebDavAlias(alias: String, slot: Int = getCurrentSlot()) = prefs.edit().putString(getSpecificSlotKey(slot, KEY_WEBDAV_ALIAS), alias).apply()
-
-    fun isWebDavEnabled(): Boolean = prefs.getBoolean(getSlotKey(KEY_WEBDAV_ENABLED), false)
-    fun setWebDavEnabled(enabled: Boolean) = prefs.edit().putBoolean(getSlotKey(KEY_WEBDAV_ENABLED), enabled).apply()
-
-    fun getWebDavProtocol(): String = prefs.getString(getSlotKey(KEY_WEBDAV_PROTOCOL), "https") ?: "https"
-    fun setWebDavProtocol(protocol: String) = prefs.edit().putString(getSlotKey(KEY_WEBDAV_PROTOCOL), protocol).apply()
-
-    fun getWebDavUrl(): String = prefs.getString(getSlotKey(KEY_WEBDAV_URL), "") ?: ""
-    fun setWebDavUrl(url: String) = prefs.edit().putString(getSlotKey(KEY_WEBDAV_URL), url).apply()
-
-    fun getWebDavPort(): Int = prefs.getInt(getSlotKey(KEY_WEBDAV_PORT), if (getWebDavProtocol() == "https") 443 else 80)
-    fun setWebDavPort(port: Int) = prefs.edit().putInt(getSlotKey(KEY_WEBDAV_PORT), port).apply()
-
-    fun getWebDavUsername(): String = prefs.getString(getSlotKey(KEY_WEBDAV_USERNAME), "") ?: ""
-    fun setWebDavUsername(username: String) = prefs.edit().putString(getSlotKey(KEY_WEBDAV_USERNAME), username).apply()
-
-    fun getWebDavPassword(): String = prefs.getString(getSlotKey(KEY_WEBDAV_PASSWORD), "") ?: ""
-    fun setWebDavPassword(password: String) = prefs.edit().putString(getSlotKey(KEY_WEBDAV_PASSWORD), password).apply()
-
-    fun isWebDavRememberPassword(): Boolean = prefs.getBoolean(getSlotKey(KEY_WEBDAV_REMEMBER_PASSWORD), true)
-    fun setWebDavRememberPassword(remember: Boolean) = prefs.edit().putBoolean(getSlotKey(KEY_WEBDAV_REMEMBER_PASSWORD), remember).apply()
-
-    /**
-     * 构建完整的 WebDAV 基础 URL
-     */
-    fun getFullWebDavUrl(): String {
-        val protocol = getWebDavProtocol()
-        val rawUrl = getWebDavUrl().removePrefix("http://").removePrefix("https://").trimEnd('/')
-        val port = getWebDavPort()
+    fun deleteSlot(slot: Int) {
+        val editor = prefs.edit()
+        editor.remove(getSpecificSlotKey(slot, KEY_WEBDAV_ENABLED))
+        editor.remove(getSpecificSlotKey(slot, KEY_WEBDAV_PROTOCOL))
+        editor.remove(getSpecificSlotKey(slot, KEY_WEBDAV_URL))
+        editor.remove(getSpecificSlotKey(slot, KEY_WEBDAV_PORT))
+        editor.remove(getSpecificSlotKey(slot, KEY_WEBDAV_USERNAME))
+        editor.remove(getSpecificSlotKey(slot, KEY_WEBDAV_PASSWORD))
+        editor.remove(getSpecificSlotKey(slot, KEY_WEBDAV_REMEMBER_PASSWORD))
+        editor.remove(getSpecificSlotKey(slot, KEY_WEBDAV_ALIAS))
+        editor.apply()
         
-        // 尝试解析 url 中的主机和路径
+        // If current slot is deleted, switch to another valid slot or 0
+        if (getCurrentSlot() == slot) {
+            val all = getAllSlots()
+            val next = all.firstOrNull { it != slot } ?: 0
+            setCurrentSlot(next)
+        }
+    }
+
+    fun getAllSlots(): List<Int> {
+        val slots = mutableListOf<Int>()
+        // We scan slots 0 to 9 for simplicity, or we could store a list of active slots.
+        // For now, let's assume if an alias or URL exists, the slot is valid.
+        for (i in 0..9) {
+            if (getWebDavUrl(i).isNotEmpty() || getWebDavAlias(i).isNotEmpty()) {
+                slots.add(i)
+            }
+        }
+        if (slots.isEmpty()) slots.add(0) // Ensure at least default slot
+        return slots
+    }
+
+    fun getWebDavUrl(slot: Int = getCurrentSlot()): String = prefs.getString(getSpecificSlotKey(slot, KEY_WEBDAV_URL), "") ?: ""
+    fun setWebDavUrl(url: String, slot: Int = getCurrentSlot()) = prefs.edit().putString(getSpecificSlotKey(slot, KEY_WEBDAV_URL), url).apply()
+
+    fun getWebDavProtocol(slot: Int = getCurrentSlot()): String = prefs.getString(getSpecificSlotKey(slot, KEY_WEBDAV_PROTOCOL), "https") ?: "https"
+    fun setWebDavProtocol(protocol: String, slot: Int = getCurrentSlot()) = prefs.edit().putString(getSpecificSlotKey(slot, KEY_WEBDAV_PROTOCOL), protocol).apply()
+
+    fun getWebDavPort(slot: Int = getCurrentSlot()): Int = prefs.getInt(getSpecificSlotKey(slot, KEY_WEBDAV_PORT), if (getWebDavProtocol(slot) == "https") 443 else 80)
+    fun setWebDavPort(port: Int, slot: Int = getCurrentSlot()) = prefs.edit().putInt(getSpecificSlotKey(slot, KEY_WEBDAV_PORT), port).apply()
+
+    fun getWebDavUsername(slot: Int = getCurrentSlot()): String = prefs.getString(getSpecificSlotKey(slot, KEY_WEBDAV_USERNAME), "") ?: ""
+    fun setWebDavUsername(username: String, slot: Int = getCurrentSlot()) = prefs.edit().putString(getSpecificSlotKey(slot, KEY_WEBDAV_USERNAME), username).apply()
+
+    fun getWebDavPassword(slot: Int = getCurrentSlot()): String = prefs.getString(getSpecificSlotKey(slot, KEY_WEBDAV_PASSWORD), "") ?: ""
+    fun setWebDavPassword(password: String, slot: Int = getCurrentSlot()) = prefs.edit().putString(getSpecificSlotKey(slot, KEY_WEBDAV_PASSWORD), password).apply()
+
+    fun isWebDavRememberPassword(slot: Int = getCurrentSlot()): Boolean = prefs.getBoolean(getSpecificSlotKey(slot, KEY_WEBDAV_REMEMBER_PASSWORD), true)
+    fun setWebDavRememberPassword(remember: Boolean, slot: Int = getCurrentSlot()) = prefs.edit().putBoolean(getSpecificSlotKey(slot, KEY_WEBDAV_REMEMBER_PASSWORD), remember).apply()
+
+    fun getWebDavAlias(slot: Int = getCurrentSlot()): String =
+        prefs.getString(getSpecificSlotKey(slot, KEY_WEBDAV_ALIAS), "") ?: ""
+
+    fun setWebDavAlias(alias: String, slot: Int = getCurrentSlot()) =
+        prefs.edit().putString(getSpecificSlotKey(slot, KEY_WEBDAV_ALIAS), alias).apply()
+
+    fun isWebDavEnabled(slot: Int = getCurrentSlot()): Boolean = prefs.getBoolean(getSpecificSlotKey(slot, KEY_WEBDAV_ENABLED), false)
+    fun setWebDavEnabled(enabled: Boolean, slot: Int = getCurrentSlot()) = prefs.edit().putBoolean(getSpecificSlotKey(slot, KEY_WEBDAV_ENABLED), enabled).apply()
+
+    fun getFullWebDavUrl(slot: Int = getCurrentSlot()): String {
+        val protocol = getWebDavProtocol(slot)
+        var rawUrl = getWebDavUrl(slot).replace("http://", "").replace("https://", "")
+        if (rawUrl.endsWith('/')) rawUrl = rawUrl.dropLast(1)
+
         val firstSlash = rawUrl.indexOf('/')
-        var host = if (firstSlash != -1) rawUrl.substring(0, firstSlash) else rawUrl
-        val path = if (firstSlash != -1) rawUrl.substring(firstSlash) else ""
-        
-        // 如果主机名中包含端口号，优先使用它
-        val portColon = host.lastIndexOf(':')
-        var finalPort = port
-        if (portColon != -1) {
-            val portStr = host.substring(portColon + 1)
-            val p = portStr.toIntOrNull()
-            if (p != null) {
-                finalPort = p
-                host = host.substring(0, portColon)
+        val hostPart = if (firstSlash != -1) rawUrl.substring(0, firstSlash) else rawUrl
+        val pathPart = if (firstSlash != -1) rawUrl.substring(firstSlash) else ""
+
+        var host = hostPart
+        var finalPort = getWebDavPort(slot)
+
+        if (host.contains(':')) {
+            val parts = host.split(':')
+            if (parts.size == 2) {
+                host = parts[0]
+                parts[1].toIntOrNull()?.let { finalPort = it }
             }
         }
-        
-        val builder = okhttp3.HttpUrl.Builder()
-            .scheme(protocol)
-            .host(host)
-            .port(finalPort)
-        
-        if (path.isNotEmpty()) {
-            val segments = path.trim('/').split('/')
-            for (segment in segments) {
-                if (segment.isNotEmpty()) {
-                    builder.addPathSegment(segment)
-                }
-            }
+
+        val fullUrl = if (finalPort == 80 || finalPort == 443) {
+            "$protocol://$host$pathPart"
+        } else {
+            "$protocol://$host:$finalPort$pathPart"
         }
-        
-        val finalUrl = builder.build().toString().trimEnd('/')
-        android.util.Log.d("SettingsManager", "Built URL: $finalUrl")
-        return finalUrl
+
+        Log.d("SettingsManager", "Built URL: $fullUrl")
+        return fullUrl
     }
-    
-    /**
-     * 收藏功能相关方法
-     */
-    fun isPhotoFavorite(photoId: String): Boolean {
-        val favorites = getFavoritePhotos()
-        return favorites.contains(photoId)
+
+    fun isPhotoFavorite(photoId: String): Boolean = getFavoritePhotosMap().containsKey(photoId)
+
+    fun addFavoritePhoto(photo: Photo) {
+        val favorites = getFavoritePhotosMap().toMutableMap()
+        favorites[photo.id] = gson.toJson(photo)
+        saveFavoritePhotosMap(favorites)
     }
-    
-    fun addFavoritePhoto(photoId: String) {
-        val favorites = getFavoritePhotos().toMutableSet()
-        favorites.add(photoId)
-        saveFavoritePhotos(favorites)
-    }
-    
+
     fun removeFavoritePhoto(photoId: String) {
-        val favorites = getFavoritePhotos().toMutableSet()
+        val favorites = getFavoritePhotosMap().toMutableMap()
         favorites.remove(photoId)
-        saveFavoritePhotos(favorites)
+        saveFavoritePhotosMap(favorites)
     }
-    
-    fun getFavoritePhotos(): Set<String> {
-        val favoritesString = prefs.getString(KEY_FAVORITE_PHOTOS, "") ?: ""
-        if (favoritesString.isEmpty()) {
-            return emptySet()
+
+    fun getFavoritePhotos(): List<Photo> {
+        val map = getFavoritePhotosMap()
+        val photos = mutableListOf<Photo>()
+        for (json in map.values) {
+            try {
+                val photo = gson.fromJson(json, Photo::class.java)
+                if (photo != null) {
+                    photos.add(photo)
+                }
+            } catch (e: Exception) {
+                Log.e("SettingsManager", "Error parsing favorite photo: $json", e)
+            }
         }
-        return favoritesString.split(',').toSet()
+        return photos
     }
-    
-    private fun saveFavoritePhotos(favorites: Set<String>) {
-        val favoritesString = favorites.joinToString(",")
-        prefs.edit().putString(KEY_FAVORITE_PHOTOS, favoritesString).apply()
+
+    private fun getFavoritePhotosMap(): Map<String, String> {
+        val favoritesString = prefs.getString(KEY_FAVORITE_PHOTOS, "") ?: ""
+        if (favoritesString.isEmpty()) return emptyMap()
+        return try {
+            val type = object : TypeToken<Map<String, String>>() {}.type
+            val result: Map<String, String> = gson.fromJson(favoritesString, type)
+            result
+        } catch (e: Exception) {
+            Log.e("SettingsManager", "Error parsing favorite photos map: $favoritesString", e)
+            emptyMap()
+        }
+    }
+
+    private fun saveFavoritePhotosMap(favorites: Map<String, String>) {
+        prefs.edit().putString(KEY_FAVORITE_PHOTOS, gson.toJson(favorites)).apply()
     }
 }

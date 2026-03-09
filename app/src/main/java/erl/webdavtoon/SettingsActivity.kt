@@ -1,313 +1,384 @@
 package erl.webdavtoon
 
 import android.os.Bundle
+import android.view.View
+import android.widget.ArrayAdapter
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.app.AlertDialog
-import android.view.ViewGroup
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
-import erl.webdavtoon.databinding.ActivitySettingsBinding
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import erl.webdavtoon.databinding.ActivitySettingsMd3Binding
+import erl.webdavtoon.databinding.DialogServerConfigWebdavBinding
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
-/**
- * 设置界面
- */
+import com.google.android.material.color.DynamicColors
+
 class SettingsActivity : AppCompatActivity() {
 
-    private lateinit var binding: ActivitySettingsBinding
+    private lateinit var binding: ActivitySettingsMd3Binding
     private lateinit var settingsManager: SettingsManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        ThemeHelper.applyTheme(this)
         super.onCreate(savedInstanceState)
-        
-        // 启用沉浸式，让导航栏自然悬浮在app之上
-        WindowCompat.setDecorFitsSystemWindows(window, false)
-        // 设置导航栏背景透明
+
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
         window.navigationBarColor = android.graphics.Color.TRANSPARENT
-        // 设置导航栏内容浅色/深色模式
-        WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightNavigationBars = true
-        
-        binding = ActivitySettingsBinding.inflate(layoutInflater)
+        androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightNavigationBars = true
+
+        binding = ActivitySettingsMd3Binding.inflate(layoutInflater)
         setContentView(binding.root)
 
         settingsManager = SettingsManager(this)
-        setupUI()
-        
-        // 设置系统栏间距
-        setupWindowInsetsListener()
-    }
-    
-    /**
-     * 设置系统栏间距监听器
-     */
-    private fun setupWindowInsetsListener() {
-        // 获取初始的底部边距（来自 XML 的 16dp）
-        val initialBottomMargin = (binding.saveButton.layoutParams as? ViewGroup.MarginLayoutParams)?.bottomMargin ?: 0
+        settingsManager.setServerType("webdav")
 
-        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { v, insets ->
-            val systemBars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
-            // 设置标题栏顶部间距
-            binding.appBarLayout.setPadding(0, systemBars.top, 0, 0)
-            
-            // 设置保存按钮的底部边距，避开导航栏
-            // 注意：这里不再修改 padding，而是修改 margin，以保留按钮内部的 padding 样式
-            val params = binding.saveButton.layoutParams as ViewGroup.MarginLayoutParams
-            params.bottomMargin = initialBottomMargin + systemBars.bottom
-            binding.saveButton.layoutParams = params
-            
-            insets
+        setupToolbar()
+        setupItems()
+        refreshUi()
+
+        if (intent.getBooleanExtra("EXTRA_SHOW_ADD_SERVER", false)) {
+            // Find next empty slot or just append
+            val slots = settingsManager.getAllSlots()
+            val nextSlot = (slots.maxOrNull() ?: -1) + 1
+            settingsManager.setCurrentSlot(nextSlot)
+            showWebDavConfigDialog()
         }
     }
 
-    private fun setupUI() {
+    private fun setupToolbar() {
         setSupportActionBar(binding.toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
-        binding.toolbar.setNavigationOnClickListener { onBackPressedDispatcher.onBackPressed() }
+        binding.toolbar.setNavigationOnClickListener { finish() }
+    }
 
-        // 初始化槽位选择
-        val currentSlot = settingsManager.getCurrentSlot()
-        when (currentSlot) {
-            0 -> binding.slot0.isChecked = true
-            1 -> binding.slot1.isChecked = true
-            2 -> binding.slot2.isChecked = true
-        }
+    private fun setupItems() {
+        binding.accountSection.setOnClickListener { showWebDavConfigDialog() }
+        binding.manageAccountButton.setOnClickListener { showWebDavConfigDialog() }
 
-        loadSettings()
-
-        // 槽位切换监听
-        binding.slotRadioGroup.setOnCheckedChangeListener { _, checkedId ->
-            val newSlot = when (checkedId) {
-                R.id.slot0 -> 0
-                R.id.slot1 -> 1
-                R.id.slot2 -> 2
-                else -> 0
+        binding.settingServerType.apply {
+            title.text = getString(R.string.server_type)
+            summary.text = "WEBDAV"
+            root.setOnClickListener {
+                Toast.makeText(this@SettingsActivity, getString(R.string.webdav_only), Toast.LENGTH_SHORT).show()
             }
-            // 切换槽位前不保存当前修改，直接加载新槽位的数据
-            settingsManager.setCurrentSlot(newSlot)
-            loadSettings()
-            Toast.makeText(this, "已切换至槽位 ${newSlot + 1}", Toast.LENGTH_SHORT).show()
         }
 
-        binding.testConnectionButton.setOnClickListener {
-            testWebDavConnection()
+        binding.settingHost.apply {
+            title.text = getString(R.string.host_address)
+            root.setOnClickListener { showWebDavConfigDialog() }
         }
 
-        binding.saveToSlotButton.setOnClickListener {
-            saveWebDavToCurrentSlot()
-            Toast.makeText(this, "预设已保存", Toast.LENGTH_SHORT).show()
+        binding.settingTheme.apply {
+            title.text = getString(R.string.theme)
+            root.setOnClickListener { showThemeDialog() }
         }
 
-        binding.saveButton.setOnClickListener {
-            saveSettings()
-            Toast.makeText(this, "设置已保存", Toast.LENGTH_SHORT).show()
-            finish()
+        binding.settingLanguage.apply {
+            title.text = getString(R.string.language)
+            root.setOnClickListener { showLanguageDialog() }
         }
+
+        binding.settingGridColumns.apply {
+            title.text = getString(R.string.grid_columns)
+            root.setOnClickListener { showGridColumnsDialog() }
+        }
+
+        binding.settingSortOrder.apply {
+            title.text = getString(R.string.sort_order)
+            root.setOnClickListener { showSortOrderDialog() }
+        }
+
+        binding.settingClearCache.apply {
+            title.text = getString(R.string.clear_cache)
+            summary.text = getString(R.string.clear_cache_summary)
+            root.setOnClickListener { showClearCacheConfirmation() }
+        }
+
+        binding.settingAbout.apply {
+            title.text = getString(R.string.about)
+            summary.text = getString(R.string.about_summary)
+            root.setOnClickListener {
+                Toast.makeText(this@SettingsActivity, getString(R.string.about_summary), Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun refreshUi() {
+        binding.accountTitle.text = getString(R.string.webdav_server)
+        val host = settingsManager.getWebDavUrl()
+        binding.accountSubtitle.text = if (host.isNotEmpty()) host else getString(R.string.not_configured)
+
+        binding.settingServerType.title.text = getString(R.string.server_type)
+        binding.settingServerType.summary.text = "WEBDAV"
+        binding.settingHost.title.text = getString(R.string.host_address)
+        binding.settingHost.summary.text = host
         
-        // 清理缓存按钮点击事件
-        binding.clearCacheButton.setOnClickListener {
-            showClearCacheConfirmation()
+        binding.settingTheme.title.text = getString(R.string.theme)
+        binding.settingTheme.summary.text = ThemeHelper.getThemeName(this, settingsManager.getThemeId())
+        
+        binding.settingLanguage.title.text = getString(R.string.language)
+        val langSummary = when(settingsManager.getLanguage()) {
+            "zh" -> getString(R.string.language_chinese)
+            "en" -> getString(R.string.language_english)
+            else -> getString(R.string.follow_system)
         }
+        binding.settingLanguage.summary.text = langSummary
+
+        binding.settingGridColumns.title.text = getString(R.string.grid_columns)
+        binding.settingGridColumns.summary.text = getString(R.string.columns_suffix, settingsManager.getGridColumns())
+
+        val sortOrder = when (settingsManager.getSortOrder()) {
+            0 -> getString(R.string.sort_name_asc)
+            1 -> getString(R.string.sort_name_desc)
+            2 -> getString(R.string.sort_date_desc)
+            3 -> getString(R.string.sort_date_asc)
+            else -> getString(R.string.sort_date_desc)
+        }
+        binding.settingSortOrder.title.text = getString(R.string.sort_order)
+        binding.settingSortOrder.summary.text = sortOrder
     }
 
-    private fun testWebDavConnection() {
-        // 先临时保存当前界面上的设置以便测试
-        val protocol = if (binding.protocolHttps.isChecked) "https" else "http"
-        val url = binding.webDavUrlEdit.text.toString().trim()
-        val port = binding.portEdit.text.toString().toIntOrNull() ?: (if (protocol == "https") 443 else 80)
-        val username = binding.usernameEdit.text.toString().trim()
-        val password = binding.passwordEdit.text.toString()
+    private fun showWebDavConfigDialog() {
+        val dialogBinding = DialogServerConfigWebdavBinding.inflate(layoutInflater)
 
-        if (url.isEmpty()) {
-            Toast.makeText(this, "请输入 WebDAV 地址", Toast.LENGTH_SHORT).show()
-            return
-        }
+        val protocols = arrayOf("http", "https")
+        val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, protocols)
+        dialogBinding.protocolEdit.setAdapter(adapter)
+        dialogBinding.protocolEdit.setText(settingsManager.getWebDavProtocol(), false)
 
-        // 创建一个临时的 SettingsManager 用于测试，避免修改当前保存的设置
-        // 或者直接使用现有的 settingsManager 临时设置值
-        val oldProtocol = settingsManager.getWebDavProtocol()
-        val oldUrl = settingsManager.getWebDavUrl()
-        val oldPort = settingsManager.getWebDavPort()
-        val oldUsername = settingsManager.getWebDavUsername()
-        val oldPassword = settingsManager.getWebDavPassword()
+        dialogBinding.aliasEdit.setText(settingsManager.getWebDavAlias())
+        dialogBinding.hostEdit.setText(settingsManager.getWebDavUrl())
+        dialogBinding.portEdit.setText(settingsManager.getWebDavPort().toString())
+        dialogBinding.usernameEdit.setText(settingsManager.getWebDavUsername())
+        dialogBinding.passwordEdit.setText(settingsManager.getWebDavPassword())
 
-        settingsManager.setWebDavProtocol(protocol)
-        settingsManager.setWebDavUrl(url)
-        settingsManager.setWebDavPort(port)
-        settingsManager.setWebDavUsername(username)
-        settingsManager.setWebDavPassword(password)
-
-        lifecycleScope.launch {
-            try {
-                val client = WebDavClient(settingsManager)
-                showDirectoryPicker("/")
-            } catch (e: Exception) {
-                Toast.makeText(this@SettingsActivity, "连接失败: ${e.message}", Toast.LENGTH_LONG).show()
-            } finally {
-                // 恢复旧设置
-                settingsManager.setWebDavProtocol(oldProtocol)
-                settingsManager.setWebDavUrl(oldUrl)
-                settingsManager.setWebDavPort(oldPort)
-                settingsManager.setWebDavUsername(oldUsername)
-                settingsManager.setWebDavPassword(oldPassword)
-            }
-        }
-    }
-
-    private fun showDirectoryPicker(path: String) {
-        lifecycleScope.launch {
-            try {
-                val client = WebDavClient(settingsManager)
-                val resources = client.listFiles(path)
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.webdav_config, settingsManager.getCurrentSlot()))
+            .setView(dialogBinding.root)
+            .setPositiveButton(R.string.save) { _, _ ->
+                settingsManager.setWebDavAlias(dialogBinding.aliasEdit.text.toString())
+                settingsManager.setWebDavProtocol(dialogBinding.protocolEdit.text.toString())
+                settingsManager.setWebDavUrl(dialogBinding.hostEdit.text.toString())
+                settingsManager.setWebDavPort(dialogBinding.portEdit.text.toString().toIntOrNull() ?: 443)
+                settingsManager.setWebDavUsername(dialogBinding.usernameEdit.text.toString())
+                settingsManager.setWebDavPassword(dialogBinding.passwordEdit.text.toString())
+                settingsManager.setWebDavEnabled(true)
                 
-                val items = resources.map { 
-                    if (it.isCollection) "[目录] ${it.displayName}" else "[文件] ${it.displayName}"
-                }.toTypedArray()
+                refreshUi()
+                setResult(RESULT_OK)
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .setNeutralButton(R.string.test_connection, null)
+            .create()
 
-                AlertDialog.Builder(this@SettingsActivity)
-                    .setTitle("目录结构: $path")
-                    .setItems(items) { _, which ->
-                        val selected = resources[which]
-                        if (selected.isCollection) {
-                            showDirectoryPicker(selected.href)
-                        } else {
-                            Toast.makeText(this@SettingsActivity, "这是一个文件: ${selected.displayName}", Toast.LENGTH_SHORT).show()
-                            // 重新打开当前目录
-                            showDirectoryPicker(path)
-                        }
+        dialog.setOnShowListener {
+            dialog.getButton(android.content.DialogInterface.BUTTON_NEUTRAL).setOnClickListener {
+                val protocol = dialogBinding.protocolEdit.text.toString()
+                var rawUrl = dialogBinding.hostEdit.text.toString().replace("http://", "").replace("https://", "")
+                if (rawUrl.endsWith('/')) rawUrl = rawUrl.dropLast(1)
+
+                val firstSlash = rawUrl.indexOf('/')
+                val hostPart = if (firstSlash != -1) rawUrl.substring(0, firstSlash) else rawUrl
+                val pathPart = if (firstSlash != -1) rawUrl.substring(firstSlash) else ""
+
+                var host = hostPart
+                var port = dialogBinding.portEdit.text.toString().toIntOrNull() ?: 443
+
+                if (host.contains(':')) {
+                    val parts = host.split(':')
+                    if (parts.size == 2) {
+                        host = parts[0]
+                        parts[1].toIntOrNull()?.let { port = it }
                     }
-                    .setNegativeButton("关闭", null)
-                    .setPositiveButton("返回上级") { _, _ ->
-                        if (path != "/" && path.isNotEmpty()) {
-                            val parentPath = path.trimEnd('/').split('/').dropLast(1).joinToString("/")
-                            showDirectoryPicker(if (parentPath.isEmpty()) "/" else parentPath)
-                        } else {
-                            Toast.makeText(this@SettingsActivity, "已经在根目录", Toast.LENGTH_SHORT).show()
+                }
+
+                val endpoint = if (port == 80 || port == 443) {
+                    "$protocol://$host$pathPart"
+                } else {
+                    "$protocol://$host:$port$pathPart"
+                }
+
+                val username = dialogBinding.usernameEdit.text.toString()
+                val password = dialogBinding.passwordEdit.text.toString()
+
+                Toast.makeText(this, getString(R.string.testing_connection), Toast.LENGTH_SHORT).show()
+
+                lifecycleScope.launch {
+                    try {
+                        val result = withContext(Dispatchers.IO) {
+                            val repo = WebDAVToonApplication.rustRepository
+                                ?: throw IllegalStateException("Rust repository not initialized: ${WebDAVToonApplication.rustInitError ?: "unknown"}")
+                            repo.testWebdav(endpoint, username, password)
                         }
+
+                        MaterialAlertDialogBuilder(this@SettingsActivity)
+                            .setTitle(getString(R.string.connection_test_result))
+                            .setMessage(result)
+                            .setPositiveButton(R.string.ok, null)
+                            .show()
+                    } catch (e: Exception) {
+                        MaterialAlertDialogBuilder(this@SettingsActivity)
+                            .setTitle(getString(R.string.connection_failed))
+                            .setMessage(getString(R.string.error_prefix, e.message ?: "Unknown error"))
+                            .setPositiveButton(R.string.ok, null)
+                            .show()
                     }
-                    .show()
-            } catch (e: Exception) {
-                Toast.makeText(this@SettingsActivity, "加载失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
             }
         }
+
+        dialog.show()
     }
 
-    private fun loadSettings() {
-        binding.webDavSwitch.isChecked = settingsManager.isWebDavEnabled()
-        
-        // 更新 RadioButton 别名显示
-        updateSlotAliasesDisplay()
+    private fun showLanguageDialog() {
+        val options = arrayOf(
+            getString(R.string.follow_system),
+            getString(R.string.language_english),
+            getString(R.string.language_chinese)
+        )
+        val langCodes = arrayOf("default", "en", "zh")
+        val current = langCodes.indexOf(settingsManager.getLanguage()).coerceAtLeast(0)
 
-        val protocol = settingsManager.getWebDavProtocol()
-        if (protocol == "https") {
-            binding.protocolHttps.isChecked = true
-        } else {
-            binding.protocolHttp.isChecked = true
-        }
-
-        binding.webDavUrlEdit.setText(settingsManager.getWebDavUrl())
-        binding.portEdit.setText(settingsManager.getWebDavPort().toString())
-        binding.usernameEdit.setText(settingsManager.getWebDavUsername())
-        binding.passwordEdit.setText(settingsManager.getWebDavPassword())
-        binding.rememberPasswordCheck.isChecked = settingsManager.isWebDavRememberPassword()
-        
-        binding.columnsEdit.setText(settingsManager.getGridColumns().toString())
-        binding.aliasEdit.setText(settingsManager.getWebDavAlias())
-
-        val sortOrder = settingsManager.getSortOrder()
-        when (sortOrder) {
-            0 -> binding.sortAZ.isChecked = true
-            1 -> binding.sortZA.isChecked = true
-            2 -> binding.sortNewest.isChecked = true
-        }
-    }
-
-    private fun saveSettings() {
-        val oldSortOrder = settingsManager.getSortOrder()
-        val oldWebDavEnabled = settingsManager.isWebDavEnabled()
-        
-        saveWebDavToCurrentSlot()
-        
-        val columns = binding.columnsEdit.text.toString().toIntOrNull() ?: 2
-        settingsManager.setGridColumns(columns)
-
-        val newSortOrder = when (binding.sortRadioGroup.checkedRadioButtonId) {
-            R.id.sortAZ -> 0
-            R.id.sortZA -> 1
-            R.id.sortNewest -> 2
-            else -> 2
-        }
-        settingsManager.setSortOrder(newSortOrder)
-        
-        if (oldSortOrder != newSortOrder || oldWebDavEnabled != settingsManager.isWebDavEnabled()) {
-            setResult(RESULT_OK)
-        }
-    }
-
-    private fun updateSlotAliasesDisplay() {
-        val alias0 = settingsManager.getWebDavAlias(0)
-        val alias1 = settingsManager.getWebDavAlias(1)
-        val alias2 = settingsManager.getWebDavAlias(2)
-        
-        binding.slot0.text = if (alias0.isNotEmpty()) alias0 else "槽位 1"
-        binding.slot1.text = if (alias1.isNotEmpty()) alias1 else "槽位 2"
-        binding.slot2.text = if (alias2.isNotEmpty()) alias2 else "槽位 3"
-    }
-
-    private fun saveWebDavToCurrentSlot() {
-        settingsManager.setWebDavEnabled(binding.webDavSwitch.isChecked)
-        settingsManager.setWebDavAlias(binding.aliasEdit.text.toString().trim())
-        
-        val protocol = if (binding.protocolHttps.isChecked) "https" else "http"
-        settingsManager.setWebDavProtocol(protocol)
-        
-        settingsManager.setWebDavUrl(binding.webDavUrlEdit.text.toString().trim())
-        
-        val port = binding.portEdit.text.toString().toIntOrNull() ?: (if (protocol == "https") 443 else 80)
-        settingsManager.setWebDavPort(port)
-        
-        settingsManager.setWebDavUsername(binding.usernameEdit.text.toString().trim())
-        
-        val rememberPassword = binding.rememberPasswordCheck.isChecked
-        settingsManager.setWebDavRememberPassword(rememberPassword)
-        if (rememberPassword) {
-            settingsManager.setWebDavPassword(binding.passwordEdit.text.toString())
-        } else {
-            settingsManager.setWebDavPassword("")
-        }
-        
-        // 保存后刷新槽位名称显示
-        updateSlotAliasesDisplay()
-    }
-    
-    /**
-     * 显示清理缓存确认对话框
-     */
-    private fun showClearCacheConfirmation() {
-        AlertDialog.Builder(this)
-            .setTitle("清理缓存")
-            .setMessage("确定要清理所有缩略图缓存吗？这将删除所有本地缓存的图片，下次查看图片时需要重新加载。")
-            .setPositiveButton("确定") { _, _ ->
-                clearImageCache()
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.select_language)
+            .setSingleChoiceItems(options, current) { dialog, which ->
+                val selectedLang = langCodes[which]
+                if (settingsManager.getLanguage() != selectedLang) {
+                    settingsManager.setLanguage(selectedLang)
+                    ThemeHelper.applyTheme(this@SettingsActivity)
+                    Toast.makeText(this@SettingsActivity, R.string.language_changed_tip, Toast.LENGTH_LONG).show()
+                    recreate()
+                    dialog.dismiss()
+                } else {
+                    dialog.dismiss()
+                }
             }
-            .setNegativeButton("取消", null)
+            .setNegativeButton(R.string.cancel, null)
             .show()
     }
-    
-    /**
-     * 清理图片缓存
-     */
+
+    private fun showThemeDialog() {
+        val gridView = android.widget.GridView(this).apply {
+            numColumns = 3
+            verticalSpacing = 16
+            horizontalSpacing = 16
+            setPadding(32, 32, 32, 32)
+            clipToPadding = false
+            selector = android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT)
+        }
+
+        val themeIds = mutableListOf<Int>()
+        if (DynamicColors.isDynamicColorAvailable()) {
+            themeIds.add(ThemeHelper.THEME_FOLLOW_DEVICE)
+        }
+        themeIds.addAll(ThemeHelper.getThemeNames().indices.toList())
+        
+        val currentThemeId = settingsManager.getThemeId()
+
+        gridView.adapter = object : android.widget.BaseAdapter() {
+            override fun getCount(): Int = themeIds.size
+            override fun getItem(position: Int): Any = themeIds[position]
+            override fun getItemId(position: Int): Long = position.toLong()
+
+            override fun getView(position: Int, convertView: View?, parent: android.view.ViewGroup?): View {
+                val view = convertView ?: layoutInflater.inflate(R.layout.item_theme_picker, parent, false)
+                val themeId = themeIds[position]
+                val colors = ThemeHelper.getThemeColors(this@SettingsActivity, themeId)
+                
+                view.findViewById<ThemePreviewView>(R.id.theme_preview).apply {
+                    colorPrimary = colors.primary
+                    colorSecondary = colors.secondary
+                    colorTertiary = colors.tertiary
+                    colorSurface = colors.surface
+                }
+                
+                view.findViewById<android.widget.TextView>(R.id.theme_name).text = ThemeHelper.getThemeName(this@SettingsActivity, themeId)
+                view.findViewById<android.widget.ImageView>(R.id.theme_checked).visibility = 
+                    if (themeId == currentThemeId) View.VISIBLE else View.GONE
+
+                return view
+            }
+        }
+
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.choose_app_theme)
+            .setView(gridView)
+            .setNegativeButton(R.string.cancel, null)
+            .create()
+
+        gridView.setOnItemClickListener { _, _, position, _ ->
+            settingsManager.setThemeId(themeIds[position])
+            refreshUi()
+            dialog.dismiss()
+            recreate()
+        }
+
+        dialog.show()
+    }
+
+    private fun showGridColumnsDialog() {
+        val options = arrayOf(
+            getString(R.string.column_count, 1),
+            getString(R.string.columns_count, 2),
+            getString(R.string.columns_count, 3),
+            getString(R.string.columns_count, 4)
+        )
+        val current = (settingsManager.getGridColumns() - 1).coerceIn(0, 3)
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.grid_columns)
+            .setSingleChoiceItems(options, current) { dialog, which ->
+                settingsManager.setGridColumns(which + 1)
+                refreshUi()
+                dialog.dismiss()
+            }
+            .show()
+    }
+
+    private fun showSortOrderDialog() {
+        val options = arrayOf(
+            getString(R.string.sort_name_asc),
+            getString(R.string.sort_name_desc),
+            getString(R.string.sort_date_desc),
+            getString(R.string.sort_date_asc)
+        )
+        val current = settingsManager.getSortOrder()
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.sort_order))
+            .setSingleChoiceItems(options, current) { dialog, which ->
+                settingsManager.setSortOrder(which)
+                refreshUi()
+                dialog.dismiss()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun showClearCacheConfirmation() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.clear_cache))
+            .setMessage(getString(R.string.clear_cache_message))
+            .setPositiveButton(R.string.delete) { _, _ -> clearImageCache() }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
     private fun clearImageCache() {
-        lifecycleScope.launch {
+        lifecycleScope.launch(Dispatchers.IO) {
             try {
-                // 清除 Glide 的缓存
                 Glide.get(this@SettingsActivity).clearDiskCache()
-                Glide.get(this@SettingsActivity).clearMemory()
-                Toast.makeText(this@SettingsActivity, "缓存清理完成", Toast.LENGTH_SHORT).show()
+                withContext(Dispatchers.Main) {
+                    Glide.get(this@SettingsActivity).clearMemory()
+                    Toast.makeText(this@SettingsActivity, getString(R.string.cache_cleared), Toast.LENGTH_SHORT).show()
+                }
             } catch (e: Exception) {
-                Toast.makeText(this@SettingsActivity, "缓存清理失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@SettingsActivity, getString(R.string.cache_clear_failed, e.message ?: "Unknown error"), Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }

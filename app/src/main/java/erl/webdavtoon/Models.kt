@@ -7,13 +7,14 @@ import android.net.Uri
  */
 data class Photo(
     val id: String,
-    val imageUri: Uri,
+    val imageUri: android.net.Uri,
     val title: String,
     val width: Int = 0,
     val height: Int = 0,
     val isLocal: Boolean = true,
     val dateModified: Long = 0,
-    val size: Long = 0
+    val size: Long = 0,
+    val folderPath: String = "" // Added folderPath for grouping
 )
 
 /**
@@ -25,5 +26,6 @@ data class Folder(
     val isLocal: Boolean = true,
     val photoCount: Int = 0,
     val previewUris: List<android.net.Uri> = emptyList(),
-    val hasSubFolders: Boolean = false
+    val hasSubFolders: Boolean = false,
+    val dateModified: Long = 0
 )

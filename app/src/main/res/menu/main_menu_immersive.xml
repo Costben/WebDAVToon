@@ -3,13 +3,13 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
         android:id="@+id/action_immersive_mode"
-        android:title="沉浸模式"
+        android:title="@string/immersive_switch"
         android:icon="@android:drawable/ic_menu_view"
         app:showAsAction="ifRoom"
         app:actionViewClass="androidx.appcompat.widget.SwitchCompat" />
     <item
         android:id="@+id/action_settings"
-        android:title="Settings"
+        android:title="@string/settings"
         android:icon="@android:drawable/ic_menu_preferences"
         app:showAsAction="never" />
 </menu>
