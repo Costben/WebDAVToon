@@ -140,6 +140,8 @@
             <include layout="@layout/item_setting" android:id="@+id/setting_language" />
             <include layout="@layout/item_setting" android:id="@+id/setting_grid_columns" />
             <include layout="@layout/item_setting" android:id="@+id/setting_sort_order" />
+            <include layout="@layout/item_setting" android:id="@+id/setting_thumbnail_quality" />
+            <include layout="@layout/item_setting" android:id="@+id/setting_reader_max_zoom" />
 
             <View
                 android:layout_width="match_parent"

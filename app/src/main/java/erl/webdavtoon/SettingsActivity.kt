@@ -1,6 +1,7 @@
 package erl.webdavtoon
 
 import android.os.Bundle
+import android.text.InputType
 import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.Toast
@@ -23,6 +24,8 @@ class SettingsActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         ThemeHelper.applyTheme(this)
+        settingsManager = SettingsManager(this)
+        applyRotationLock()
         super.onCreate(savedInstanceState)
 
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -32,7 +35,6 @@ class SettingsActivity : AppCompatActivity() {
         binding = ActivitySettingsMd3Binding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        settingsManager = SettingsManager(this)
         settingsManager.setServerType("webdav")
 
         setupToolbar()
@@ -45,6 +47,42 @@ class SettingsActivity : AppCompatActivity() {
             val nextSlot = (slots.maxOrNull() ?: -1) + 1
             settingsManager.setCurrentSlot(nextSlot)
             showWebDavConfigDialog()
+        }
+    }
+
+    private fun applyRotationLock() {
+        if (::settingsManager.isInitialized && settingsManager.isRotationLocked()) {
+            requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        } else {
+            requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+    }
+
+    override fun onCreateOptionsMenu(menu: android.view.Menu): Boolean {
+        menuInflater.inflate(R.menu.main_menu, menu)
+        
+        // 隐藏不必要的项
+        menu.findItem(R.id.action_search)?.isVisible = false
+        menu.findItem(R.id.action_settings)?.isVisible = false
+        menu.findItem(R.id.action_grid_columns)?.isVisible = false
+        menu.findItem(R.id.action_sort_order)?.isVisible = false
+        
+        val rotationLockItem = menu.findItem(R.id.action_rotation_lock)
+        rotationLockItem?.isChecked = settingsManager.isRotationLocked()
+        
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: android.view.MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_rotation_lock -> {
+                val newLockedState = !item.isChecked
+                item.isChecked = newLockedState
+                settingsManager.setRotationLocked(newLockedState)
+                applyRotationLock()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
         }
     }
 
@@ -89,6 +127,16 @@ class SettingsActivity : AppCompatActivity() {
         binding.settingSortOrder.apply {
             title.text = getString(R.string.sort_order)
             root.setOnClickListener { showSortOrderDialog() }
+        }
+
+        binding.settingThumbnailQuality.apply {
+            title.text = getString(R.string.thumbnail_quality)
+            root.setOnClickListener { showThumbnailQualityDialog() }
+        }
+
+        binding.settingReaderMaxZoom.apply {
+            title.text = getString(R.string.reader_max_zoom)
+            root.setOnClickListener { showReaderMaxZoomDialog() }
         }
 
         binding.settingClearCache.apply {
@@ -139,6 +187,20 @@ class SettingsActivity : AppCompatActivity() {
         }
         binding.settingSortOrder.title.text = getString(R.string.sort_order)
         binding.settingSortOrder.summary.text = sortOrder
+
+        binding.settingThumbnailQuality.title.text = getString(R.string.thumbnail_quality)
+        binding.settingThumbnailQuality.summary.text = when (settingsManager.getWaterfallQualityMode()) {
+            SettingsManager.WATERFALL_MODE_MAX_WIDTH ->
+                getString(R.string.thumbnail_quality_summary_max_width, settingsManager.getWaterfallMaxWidth())
+            else ->
+                getString(R.string.thumbnail_quality_summary_percent, settingsManager.getWaterfallPercent())
+        }
+
+        binding.settingReaderMaxZoom.title.text = getString(R.string.reader_max_zoom)
+        binding.settingReaderMaxZoom.summary.text = getString(
+            R.string.reader_max_zoom_summary,
+            settingsManager.getReaderMaxZoomPercent().coerceIn(100, 500)
+        )
     }
 
     private fun showWebDavConfigDialog() {
@@ -358,8 +420,94 @@ class SettingsActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun showClearCacheConfirmation() {
+    private fun showThumbnailQualityDialog() {
+        val modes = arrayOf(
+            getString(R.string.thumbnail_quality_percent_mode),
+            getString(R.string.thumbnail_quality_max_width_mode)
+        )
+        val modeCodes = arrayOf(SettingsManager.WATERFALL_MODE_PERCENT, SettingsManager.WATERFALL_MODE_MAX_WIDTH)
+        var selectedMode = settingsManager.getWaterfallQualityMode()
+        var currentModeIdx = modeCodes.indexOf(selectedMode).coerceAtLeast(0)
+
+        // 第一步：选择模式
         MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.thumbnail_quality_dialog_title))
+            .setSingleChoiceItems(modes, currentModeIdx) { _, which ->
+                currentModeIdx = which
+                selectedMode = modeCodes[which]
+            }
+            .setPositiveButton(R.string.ok) { _, _ ->
+                // 第二步：输入数值
+                val editText = android.widget.EditText(this).apply {
+                    inputType = InputType.TYPE_CLASS_NUMBER
+                    val hint = if (selectedMode == SettingsManager.WATERFALL_MODE_MAX_WIDTH) {
+                        getString(R.string.thumbnail_quality_enter_max_width)
+                    } else {
+                        getString(R.string.thumbnail_quality_enter_percent)
+                    }
+                    this.hint = hint
+                    val currentVal = if (selectedMode == SettingsManager.WATERFALL_MODE_MAX_WIDTH) {
+                        settingsManager.getWaterfallMaxWidth().toString()
+                    } else {
+                        settingsManager.getWaterfallPercent().toString()
+                    }
+                    setText(currentVal)
+                    selectAll()
+                    setPadding(64, 32, 64, 32)
+                }
+
+                MaterialAlertDialogBuilder(this)
+                    .setTitle(if (selectedMode == SettingsManager.WATERFALL_MODE_MAX_WIDTH)
+                        getString(R.string.thumbnail_quality_max_width_mode)
+                    else
+                        getString(R.string.thumbnail_quality_percent_mode))
+                    .setView(editText)
+                    .setPositiveButton(R.string.save) { _, _ ->
+                        val value = editText.text.toString().toIntOrNull()
+                        if (value != null && value > 0) {
+                            settingsManager.setWaterfallQualityMode(selectedMode)
+                            if (selectedMode == SettingsManager.WATERFALL_MODE_MAX_WIDTH) {
+                                settingsManager.setWaterfallMaxWidth(value)
+                            } else {
+                                settingsManager.setWaterfallPercent(value.coerceIn(10, 100))
+                            }
+                            refreshUi()
+                        }
+                    }
+                    .setNegativeButton(R.string.cancel, null)
+                    .show()
+                    .also { d ->
+                        d.window?.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
+                    }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun showReaderMaxZoomDialog() {
+        val editText = android.widget.EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_NUMBER
+            hint = getString(R.string.reader_max_zoom_hint)
+            setText(settingsManager.getReaderMaxZoomPercent().coerceIn(100, 500).toString())
+            selectAll()
+            setPadding(64, 32, 64, 32)
+        }
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.reader_max_zoom_dialog_title)
+            .setView(editText)
+            .setPositiveButton(R.string.save) { _, _ ->
+                val percent = editText.text.toString().toIntOrNull()?.coerceIn(100, 500)
+                if (percent != null) {
+                    settingsManager.setReaderMaxZoomPercent(percent)
+                    refreshUi()
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun showClearCacheConfirmation() {        MaterialAlertDialogBuilder(this)
             .setTitle(getString(R.string.clear_cache))
             .setMessage(getString(R.string.clear_cache_message))
             .setPositiveButton(R.string.delete) { _, _ -> clearImageCache() }

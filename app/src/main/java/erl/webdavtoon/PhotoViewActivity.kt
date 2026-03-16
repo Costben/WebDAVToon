@@ -2,6 +2,7 @@ package erl.webdavtoon
 
 import android.content.Context
 import android.content.DialogInterface
+import android.content.res.Configuration
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
@@ -15,7 +16,9 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import android.view.MotionEvent
+import android.view.ScaleGestureDetector
 import erl.webdavtoon.databinding.ActivityPhotoViewBinding
+
 import kotlinx.coroutines.launch
 
 /**
@@ -37,9 +40,17 @@ class PhotoViewActivity : AppCompatActivity() {
     private var isFavorites = false
     private var deleteMenuItem: android.view.MenuItem? = null
     private var isDraggingFastScroll = false
+    private var isInitialLoad = true
+
+    private val settingsManager by lazy { SettingsManager(this) }
+    private var maxReaderZoomScale = 3f
+    // 移除旧的宽度缩放变量
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         ThemeHelper.applyTheme(this)
+        // 应用旋转锁定设置
+        applyRotationLock()
         super.onCreate(savedInstanceState)
         
         // 启用沉浸式，让导航栏自然悬浮在app之上
@@ -62,9 +73,13 @@ class PhotoViewActivity : AppCompatActivity() {
         // 设置系统栏间距监听器
         setupWindowInsetsListener()
 
+        loadReaderZoomSettings()
+        initScaleGestureDetector()
+
         setupUI()
+
         setupBottomBar()
-        loadData()
+        loadData(savedInstanceState)
         
         // 处理系统返回键
         onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
@@ -91,7 +106,13 @@ class PhotoViewActivity : AppCompatActivity() {
         }
 
         adapter = PhotoDetailAdapter(
-            onLongPress = { position -> enterSelectionMode(position) },
+            onLongPress = { position -> 
+                if (isImmersiveMode) {
+                    toggleImmersiveMode(false)
+                } else {
+                    enterSelectionMode(position)
+                }
+            },
             onClick = { position -> handleItemClick(position) }
         )
         webtoonAdapter = WebtoonAdapter(
@@ -102,15 +123,16 @@ class PhotoViewActivity : AppCompatActivity() {
                     }
                 }
             },
-            onLongPress = { position -> enterSelectionMode(position) },
+            onLongPress = { position -> 
+                if (isImmersiveMode) {
+                    toggleImmersiveMode(false)
+                } else {
+                    enterSelectionMode(position)
+                }
+            },
             onClick = { position -> handleItemClick(position) }
         )
-        
-        // 初始设置为Webtoon模式
-        setupWebtoonMode()
-        
-        // 默认开启沉浸模式
-        toggleImmersiveMode(true)
+        adapter.setMaxZoomPercent((maxReaderZoomScale * 100).toInt())
         
         setupFastScroll()
         
@@ -121,6 +143,7 @@ class PhotoViewActivity : AppCompatActivity() {
                 if (!isDraggingFastScroll) {
                     updateFastScrollThumbPosition()
                 }
+                updateCurrentPosition()
             }
 
             override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
@@ -132,7 +155,44 @@ class PhotoViewActivity : AppCompatActivity() {
         })
     }
 
+    private fun loadReaderZoomSettings() {
+        val percent = settingsManager.getReaderMaxZoomPercent().coerceIn(100, 500)
+        maxReaderZoomScale = percent / 100f
+        if (::adapter.isInitialized) {
+            adapter.setMaxZoomPercent(percent)
+        }
+        binding.recyclerView.setMaxScale(maxReaderZoomScale)
+        
+        // 设置单击监听，用于显示/隐藏工具栏
+        binding.recyclerView.onTapListener = object : ZoomableRecyclerView.OnTapListener {
+            override fun onSingleTap() {
+                // 如果当前工具栏可见，单击可以隐藏它（沉浸模式）
+                if (!isSelectionMode && !isImmersiveMode) {
+                    toggleImmersiveMode(true)
+                }
+            }
+
+            override fun onLongPress() {
+                // 只有在沉浸模式（全屏）下，长按才呼出工具栏
+                // 如果已经在非沉浸模式下，长按是为了进入多选模式，这里不处理，由 Adapter 处理
+                if (!isSelectionMode && isImmersiveMode) {
+                    toggleImmersiveMode(false)
+                }
+            }
+        }
+    }
+
+
+    private fun initScaleGestureDetector() {
+        // 缩放逻辑已迁移至 ZoomableRecyclerView
+    }
+
+    private fun applyWebtoonZoom(scrollX: Int = -1) {
+        // 宽度缩放逻辑已移除，现在使用 Matrix 缩放
+    }
+
     private fun setupFastScroll() {
+
         binding.fastScrollContainer.setOnTouchListener { _, event ->
             val totalHeight = binding.fastScrollContainer.height
             val thumbHeight = binding.fastScrollThumb.height
@@ -197,12 +257,18 @@ class PhotoViewActivity : AppCompatActivity() {
         }
     }
 
+    private var lastImmersiveToggleTime = 0L
+
     private fun enterSelectionMode(position: Int) {
         if (isSelectionMode) return
         // 只有在非沉浸模式（工具栏可见）下才允许进入多选模式
         if (isImmersiveMode) return
         
+        // 如果刚刚才通过长按呼出了工具栏，则本次长按不再进入多选模式，防止一次操作触发两个功能
+        if (System.currentTimeMillis() - lastImmersiveToggleTime < 500) return
+        
         isSelectionMode = true
+        binding.recyclerView.isSelectionMode = true
         
         adapter.setSelectionMode(true)
         webtoonAdapter?.setSelectionMode(true)
@@ -225,12 +291,17 @@ class PhotoViewActivity : AppCompatActivity() {
                 updateSelectionUI()
             }
         } else {
-            toggleImmersiveMode(!isImmersiveMode)
+            // 在卡片模式下，PhotoView 会拦截单击事件，我们需要在这里处理 UI 隐藏逻辑
+            // 如果当前工具栏可见，单击可以隐藏它（沉浸模式）
+            if (!isImmersiveMode) {
+                toggleImmersiveMode(true)
+            }
         }
     }
 
     private fun exitSelectionMode() {
         isSelectionMode = false
+        binding.recyclerView.isSelectionMode = false
         adapter.setSelectionMode(false)
         webtoonAdapter?.setSelectionMode(false)
         adapter.clearSelection()
@@ -241,10 +312,10 @@ class PhotoViewActivity : AppCompatActivity() {
 
     private fun updateSelectionUI() {
         val count = if (isCardMode) adapter.getSelectedCount() else webtoonAdapter?.getSelectedCount() ?: 0
-        val onSurfaceColor = ContextCompat.getColor(this, R.color.onSurface)
-        val onSurfaceTint = android.content.res.ColorStateList.valueOf(onSurfaceColor)
+        val defaultTint = getBottomBarIconTint()
         val primaryTint = android.content.res.ColorStateList.valueOf(ContextCompat.getColor(this, R.color.primary))
         val redTint = android.content.res.ColorStateList.valueOf(android.graphics.Color.RED)
+
 
         if (isSelectionMode) {
             binding.toolbar.title = getString(R.string.selected_count, count)
@@ -259,9 +330,9 @@ class PhotoViewActivity : AppCompatActivity() {
             binding.selectButton.imageTintList = primaryTint
         } else {
             deleteMenuItem?.isVisible = false
-            // 恢复底栏按钮颜色为统一的 onSurface
-            binding.deleteButton.imageTintList = onSurfaceTint
-            binding.selectButton.imageTintList = onSurfaceTint
+            // 恢复底栏按钮颜色
+            binding.deleteButton.imageTintList = defaultTint
+            binding.selectButton.imageTintList = defaultTint
             updateCurrentPosition()
         }
     }
@@ -282,6 +353,11 @@ class PhotoViewActivity : AppCompatActivity() {
                 androidx.core.graphics.drawable.DrawableCompat.setTint(icon, android.graphics.Color.RED)
             }
         }
+
+        // 初始化旋转锁定项状态
+        val rotationLockItem = menu.findItem(R.id.action_rotation_lock)
+        rotationLockItem?.isChecked = settingsManager.isRotationLocked()
+
         return true
     }
 
@@ -289,6 +365,13 @@ class PhotoViewActivity : AppCompatActivity() {
         return when (item.itemId) {
             R.id.action_delete -> {
                 deleteSelectedPhotos()
+                true
+            }
+            R.id.action_rotation_lock -> {
+                val newLockedState = !item.isChecked
+                item.isChecked = newLockedState
+                settingsManager.setRotationLocked(newLockedState)
+                applyRotationLock()
                 true
             }
             else -> super.onOptionsItemSelected(item)
@@ -359,44 +442,51 @@ class PhotoViewActivity : AppCompatActivity() {
     private fun setupCardMode() {
         // 显示沉浸模式按钮
         binding.immersiveButton.visibility = View.VISIBLE
+
+        // 切换到卡片模式：重置缩放，并禁用 ZoomableRecyclerView 的缩放功能
+        // 防止与 Item 内部的 PhotoView 冲突
+        binding.recyclerView.resetScale(false)
+        binding.recyclerView.setMaxScale(1f) // 禁用 RecyclerView 层级的缩放
         
+        val rvLp = binding.recyclerView.layoutParams
+        rvLp.width = android.view.ViewGroup.LayoutParams.MATCH_PARENT
+        binding.recyclerView.layoutParams = rvLp
+
         // 设置为水平布局，支持左右滑动，一页显示一张图片
         val layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         binding.recyclerView.layoutManager = layoutManager
         binding.recyclerView.adapter = adapter
         binding.recyclerView.setHasFixedSize(true)
-        // 确保图片居中显示，没有左右间距
-        // 保留系统栏的内边距处理
         val currentTopPadding = binding.recyclerView.paddingTop
         val currentBottomPadding = binding.recyclerView.paddingBottom
         binding.recyclerView.setPadding(0, currentTopPadding, 0, currentBottomPadding)
-        
+
         // 添加PagerSnapHelper，实现一次翻一页的效果
         pagerSnapHelper = androidx.recyclerview.widget.PagerSnapHelper()
         pagerSnapHelper?.attachToRecyclerView(binding.recyclerView)
     }
 
     private fun setupWebtoonMode() {
-        // 隐藏沉浸模式按钮，并退出沉浸模式
+        // 隐藏沉浸模式按钮
         binding.immersiveButton.visibility = View.GONE
-        if (isImmersiveMode) {
-            toggleImmersiveMode(false)
-        }
         
         // 移除PagerSnapHelper的吸附效果
         pagerSnapHelper?.attachToRecyclerView(null)
         pagerSnapHelper = null
-        
+
+        // 恢复缩放
+        binding.recyclerView.setMaxScale(maxReaderZoomScale)
+
         // 设置为垂直布局，支持上下滑动，连续滚动
         val layoutManager = LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false)
         binding.recyclerView.layoutManager = layoutManager
         binding.recyclerView.adapter = webtoonAdapter
-        binding.recyclerView.setHasFixedSize(true)
-        // 保留系统栏的内边距处理
+        binding.recyclerView.setHasFixedSize(true) 
         val currentTopPadding = binding.recyclerView.paddingTop
         val currentBottomPadding = binding.recyclerView.paddingBottom
         binding.recyclerView.setPadding(0, currentTopPadding, 0, currentBottomPadding)
     }
+
 
     private fun setupBottomBar() {
         // 设置线性 (Outlined) 风格图标
@@ -406,9 +496,9 @@ class PhotoViewActivity : AppCompatActivity() {
         binding.deleteButton.setImageResource(R.drawable.ic_delete_outlined)
         binding.selectButton.setImageResource(R.drawable.ic_check_circle_outlined)
         
-        // 统一设置底栏按钮颜色为 onSurface (深色/黑色)
-        val tintColor = ContextCompat.getColor(this, R.color.onSurface)
-        val tintList = android.content.res.ColorStateList.valueOf(tintColor)
+        // 统一设置底栏按钮颜色：深色模式强制白色，其他模式使用主题色
+        val tintList = getBottomBarIconTint()
+
         
         binding.detailButton.imageTintList = tintList
         binding.favoriteButton.imageTintList = tintList
@@ -505,26 +595,45 @@ class PhotoViewActivity : AppCompatActivity() {
     /**
      * 设置系统栏间距监听器
      */
+    private fun applyRotationLock() {
+        if (settingsManager.isRotationLocked()) {
+            requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        } else {
+            requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // 动态配置变化时再次检查旋转锁定，防止系统强制重置方向
+        applyRotationLock()
+    }
+
     private fun setupWindowInsetsListener() {
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            // 应用栏设置顶部内边距，使其在状态栏下方显示
-            binding.appBarLayout.setPadding(0, systemBars.top, 0, 0)
-            // 底栏设置底部内边距，使其在导航栏上方显示
-            binding.bottomAppBar.setPadding(0, 0, 0, systemBars.bottom)
-            // 内容区域设置相应内边距
-            binding.recyclerView.setPadding(
-                binding.recyclerView.paddingLeft,
-                binding.recyclerView.paddingTop,
-                binding.recyclerView.paddingRight,
-                systemBars.bottom
-            )
+            
+            // 只有在非沉浸模式下才应用内边距，避免覆盖沉浸模式的全屏设置
+            if (!isImmersiveMode) {
+                // 应用栏设置顶部内边距，使其在状态栏下方显示
+                binding.appBarLayout.setPadding(0, systemBars.top, 0, 0)
+                // 底栏设置底部内边距，使其在导航栏上方显示
+                binding.bottomAppBar.setPadding(0, 0, 0, systemBars.bottom)
+                // 内容区域设置相应内边距
+                binding.recyclerView.setPadding(
+                    binding.recyclerView.paddingLeft,
+                    binding.recyclerView.paddingTop,
+                    binding.recyclerView.paddingRight,
+                    systemBars.bottom
+                )
+            }
             insets
         }
     }
     
     private fun toggleImmersiveMode(enabled: Boolean) {
         isImmersiveMode = enabled
+        lastImmersiveToggleTime = System.currentTimeMillis()
         val controller = WindowCompat.getInsetsController(window, window.decorView)
         
         if (enabled) {
@@ -535,38 +644,8 @@ class PhotoViewActivity : AppCompatActivity() {
             binding.bottomAppBar.visibility = View.GONE
             binding.fastScrollContainer.visibility = View.GONE
             
-            // 确保导航栏和状态栏背景透明，让应用使用整个屏幕空间
-            window.navigationBarColor = android.graphics.Color.TRANSPARENT
-            window.statusBarColor = android.graphics.Color.TRANSPARENT
-            
-            // 确保应用可以绘制到状态栏和导航栏区域
-            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
-            window.addFlags(android.view.WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN)
-            
-            // 完全忽略系统栏的存在
-            WindowCompat.setDecorFitsSystemWindows(window, false)
-            
-            // 移除OnApplyWindowInsetsListener，避免系统栏影响布局
-            ViewCompat.setOnApplyWindowInsetsListener(binding.root, null)
-            ViewCompat.setOnApplyWindowInsetsListener(binding.recyclerView, null)
-            ViewCompat.setOnApplyWindowInsetsListener(binding.appBarLayout, null)
-            ViewCompat.setOnApplyWindowInsetsListener(binding.bottomAppBar, null)
-            
-            // 移除所有内边距，让内容占据整个屏幕
+            // 沉浸模式下，RecyclerView 占据全屏
             binding.recyclerView.setPadding(0, 0, 0, 0)
-            binding.appBarLayout.setPadding(0, 0, 0, 0)
-            binding.bottomAppBar.setPadding(0, 0, 0, 0)
-            binding.root.setPadding(0, 0, 0, 0)
-            
-            // 确保RecyclerView布局参数填满整个屏幕
-            binding.recyclerView.layoutParams.height = android.view.ViewGroup.LayoutParams.MATCH_PARENT
-            binding.recyclerView.layoutParams.width = android.view.ViewGroup.LayoutParams.MATCH_PARENT
-            
-            // 强制重新布局
-            binding.recyclerView.requestLayout()
-            binding.appBarLayout.requestLayout()
-            binding.bottomAppBar.requestLayout()
-            binding.root.requestLayout()
         } else {
             // 退出沉浸模式：显示状态栏、导航栏和标题栏
             controller.show(WindowInsetsCompat.Type.systemBars())
@@ -577,21 +656,8 @@ class PhotoViewActivity : AppCompatActivity() {
                 binding.recyclerView.post { updateFastScrollThumbPosition() }
             }
             
-            // 保留系统栏布局标志，只隐藏系统栏
-            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
-            window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN)
-            
-            // 保持系统栏适配设置一致
-            WindowCompat.setDecorFitsSystemWindows(window, false)
-            
-            // 重新设置系统栏间距监听器
-            setupWindowInsetsListener()
-            
-            // 强制重新布局以确保所有组件位置正确
-            binding.recyclerView.requestLayout()
-            binding.appBarLayout.requestLayout()
-            binding.bottomAppBar.requestLayout()
-            binding.root.requestLayout()
+            // 退出沉浸模式后恢复内边距，确保不被底栏遮挡
+            ViewCompat.requestApplyInsets(binding.root)
         }
         
         // 更新底栏图标状态
@@ -600,18 +666,61 @@ class PhotoViewActivity : AppCompatActivity() {
     
 
 
-    private fun loadData() {
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        // 在保存状态前确保 currentIndex 是最新的
+        updateCurrentPosition()
+        outState.putInt("EXTRA_CURRENT_INDEX", currentIndex)
+        outState.putBoolean("EXTRA_IS_CARD_MODE", isCardMode)
+        outState.putBoolean("EXTRA_IS_IMMERSIVE_MODE", isImmersiveMode)
+    }
+
+    private fun loadData(savedInstanceState: Bundle?) {
         photos = PhotoCache.getPhotos()
-        currentIndex = intent.getIntExtra("EXTRA_CURRENT_INDEX", 0)
+        
+        // 优先从 savedInstanceState 恢复索引和模式，如果没有则从 intent 或默认值获取
+        if (savedInstanceState != null) {
+            currentIndex = savedInstanceState.getInt("EXTRA_CURRENT_INDEX", 0)
+            isCardMode = savedInstanceState.getBoolean("EXTRA_IS_CARD_MODE", false)
+            isImmersiveMode = savedInstanceState.getBoolean("EXTRA_IS_IMMERSIVE_MODE", false)
+        } else {
+            currentIndex = intent.getIntExtra("EXTRA_CURRENT_INDEX", 0)
+            // 初始模式由文件夹类型决定，如果是 webtoon 则默认为 webtoon 模式
+            isCardMode = false
+            isImmersiveMode = true // 默认开启沉浸模式
+        }
+            
         isFavorites = intent.getBooleanExtra("EXTRA_IS_FAVORITES", false)
         
         // 检查是否为webtoon文件夹
-        isWebtoonFolder = photos.isNotEmpty() && photos[currentIndex].title.contains("webtoon", ignoreCase = true)
+        isWebtoonFolder = photos.isNotEmpty() && currentIndex in photos.indices && photos[currentIndex].title.contains("webtoon", ignoreCase = true)
         
-        // 更新两个适配器的数据
+        // 根据恢复的模式设置 UI
+        if (isCardMode) {
+            setupCardMode()
+        } else {
+            setupWebtoonMode()
+        }
+        
+        // 恢复沉浸模式状态
+        toggleImmersiveMode(isImmersiveMode)
+        
+        // 更新适配器数据
         adapter.setPhotos(photos)
         webtoonAdapter?.setPhotos(photos)
-        binding.recyclerView.scrollToPosition(currentIndex)
+        
+        // 恢复滚动位置
+        binding.recyclerView.post {
+            val layoutManager = binding.recyclerView.layoutManager as? LinearLayoutManager
+            if (layoutManager != null) {
+                layoutManager.scrollToPositionWithOffset(currentIndex, 0)
+            } else {
+                binding.recyclerView.scrollToPosition(currentIndex)
+            }
+            
+            // 滚动完成后，允许更新 currentIndex
+            isInitialLoad = false
+        }
         
         if (photos.isNotEmpty() && currentIndex in photos.indices) {
             val photo = photos[currentIndex]
@@ -638,6 +747,7 @@ class PhotoViewActivity : AppCompatActivity() {
     }
 
     private fun updateCurrentPosition() {
+        if (isInitialLoad) return
         val layoutManager = binding.recyclerView.layoutManager as? LinearLayoutManager
         if (layoutManager != null) {
             val pos = layoutManager.findFirstVisibleItemPosition()
@@ -733,11 +843,25 @@ class PhotoViewActivity : AppCompatActivity() {
         }
         
         // 重新应用颜色，因为setImageResource可能会重置tint
-        val onSurfaceColor = ContextCompat.getColor(this, R.color.onSurface)
-        val onSurfaceTint = android.content.res.ColorStateList.valueOf(onSurfaceColor)
-        binding.modeSwitchButton.imageTintList = onSurfaceTint
-        binding.immersiveButton.imageTintList = onSurfaceTint
+        val tint = getBottomBarIconTint()
+        binding.modeSwitchButton.imageTintList = tint
+        binding.immersiveButton.imageTintList = tint
     }
+
+    private fun isDarkModeEnabled(): Boolean {
+        val nightModeFlags = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+        return nightModeFlags == Configuration.UI_MODE_NIGHT_YES
+    }
+
+    private fun getBottomBarIconTint(): android.content.res.ColorStateList {
+        val color = if (isDarkModeEnabled()) {
+            android.graphics.Color.WHITE
+        } else {
+            ContextCompat.getColor(this, R.color.onSurface)
+        }
+        return android.content.res.ColorStateList.valueOf(color)
+    }
+
 
     private fun downloadPhoto() {
         if (photos.isEmpty() || currentIndex !in photos.indices) return
@@ -808,8 +932,14 @@ class PhotoViewActivity : AppCompatActivity() {
             .show()
     }
 
+    override fun onResume() {
+        super.onResume()
+        loadReaderZoomSettings()
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         // 不要在这里清除 PhotoCache，因为旋转屏幕可能会重新创建 Activity
     }
 }
+

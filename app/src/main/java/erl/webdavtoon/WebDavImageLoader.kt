@@ -41,22 +41,31 @@ object WebDavImageLoader {
             .placeholder(android.R.drawable.ic_menu_gallery)
             .error(android.R.drawable.ic_menu_report_image)
 
+        val settings = SettingsManager(context)
         if (isWaterfall) {
-            // 瀑布流模式：原图分辨率的 70%
-            requestOptions.override(Target.SIZE_ORIGINAL)
-            requestOptions.sizeMultiplier(0.7f)
-            requestOptions.downsample(DownsampleStrategy.AT_MOST)
+            // 瀑布流模式：根据设置动态应用缩放比例或最大宽度
+            when (settings.getWaterfallQualityMode()) {
+                SettingsManager.WATERFALL_MODE_MAX_WIDTH -> {
+                    val maxWidth = settings.getWaterfallMaxWidth()
+                    requestOptions.override(maxWidth, Target.SIZE_ORIGINAL)
+                    requestOptions.downsample(DownsampleStrategy.AT_MOST)
+                }
+                else -> {
+                    val percent = settings.getWaterfallPercent().coerceIn(10, 100)
+                    requestOptions.override(Target.SIZE_ORIGINAL)
+                    requestOptions.sizeMultiplier(percent / 100f)
+                    requestOptions.downsample(DownsampleStrategy.AT_MOST)
+                }
+            }
         } else if (limitSize) {
             // 普通缩略图模式（如文件夹预览）：固定 320x320
             requestOptions.override(320, 320)
             requestOptions.downsample(DownsampleStrategy.AT_MOST)
         } else {
-            // 全图模式（如详情页）：原分辨率
-            requestOptions.override(Target.SIZE_ORIGINAL)
-            requestOptions.downsample(DownsampleStrategy.NONE)
+            // 全图模式：让 Glide 按目标 View 尺寸解码，避免原图全尺寸解码造成卡顿
+            requestOptions.downsample(DownsampleStrategy.AT_MOST)
         }
 
-        val settings = SettingsManager(context)
         val username = settings.getWebDavUsername()
         val password = settings.getWebDavPassword()
 
@@ -96,18 +105,28 @@ object WebDavImageLoader {
             .error(android.R.drawable.ic_menu_report_image)
 
         if (isWaterfall) {
-            // 瀑布流模式：原图分辨率的 70%
-            requestOptions.override(Target.SIZE_ORIGINAL)
-            requestOptions.sizeMultiplier(0.7f)
-            requestOptions.downsample(DownsampleStrategy.AT_MOST)
+            // 瀑布流模式：根据设置动态应用缩放比例或最大宽度
+            val settings = SettingsManager(context)
+            when (settings.getWaterfallQualityMode()) {
+                SettingsManager.WATERFALL_MODE_MAX_WIDTH -> {
+                    val maxWidth = settings.getWaterfallMaxWidth()
+                    requestOptions.override(maxWidth, Target.SIZE_ORIGINAL)
+                    requestOptions.downsample(DownsampleStrategy.AT_MOST)
+                }
+                else -> {
+                    val percent = settings.getWaterfallPercent().coerceIn(10, 100)
+                    requestOptions.override(Target.SIZE_ORIGINAL)
+                    requestOptions.sizeMultiplier(percent / 100f)
+                    requestOptions.downsample(DownsampleStrategy.AT_MOST)
+                }
+            }
         } else if (limitSize) {
             // 普通缩略图模式（如文件夹预览）：固定 320x320
             requestOptions.override(320, 320)
             requestOptions.downsample(DownsampleStrategy.AT_MOST)
         } else {
-            // 全图模式（如详情页）：原分辨率
-            requestOptions.override(Target.SIZE_ORIGINAL)
-            requestOptions.downsample(DownsampleStrategy.NONE)
+            // 全图模式：让 Glide 按目标 View 尺寸解码，避免原图全尺寸解码造成卡顿
+            requestOptions.downsample(DownsampleStrategy.AT_MOST)
         }
 
         Glide.with(context)

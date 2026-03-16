@@ -51,6 +51,8 @@ class FolderViewActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         ThemeHelper.applyTheme(this)
+        settingsManager = SettingsManager(this)
+        applyRotationLock()
         super.onCreate(savedInstanceState)
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -60,7 +62,6 @@ class FolderViewActivity : AppCompatActivity() {
         binding = ActivityFolderViewBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        settingsManager = SettingsManager(this)
         LogManager.initialize(this)
 
         if (WebDAVToonApplication.rustRepository == null) {
@@ -286,6 +287,9 @@ class FolderViewActivity : AppCompatActivity() {
             }
         })
 
+        val rotationLockItem = menu.findItem(R.id.action_rotation_lock)
+        rotationLockItem?.isChecked = settingsManager.isRotationLocked()
+
         return true
     }
 
@@ -327,6 +331,13 @@ class FolderViewActivity : AppCompatActivity() {
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
+            R.id.action_rotation_lock -> {
+                val newLockedState = !item.isChecked
+                item.isChecked = newLockedState
+                settingsManager.setRotationLocked(newLockedState)
+                applyRotationLock()
+                true
+            }
             R.id.action_delete -> {
                 deleteSelectedFolders()
                 true
@@ -339,12 +350,25 @@ class FolderViewActivity : AppCompatActivity() {
             R.id.action_col_2 -> updateGridColumns(2)
             R.id.action_col_3 -> updateGridColumns(3)
             R.id.action_col_4 -> updateGridColumns(4)
-            R.id.action_sort_name_asc -> updateSortOrder(0)
-            R.id.action_sort_name_desc -> updateSortOrder(1)
-            R.id.action_sort_date_desc -> updateSortOrder(2)
-            R.id.action_sort_date_asc -> updateSortOrder(3)
+            R.id.action_sort_name_asc -> updateSortOrder(SettingsManager.SORT_NAME_ASC)
+            R.id.action_sort_name_desc -> updateSortOrder(SettingsManager.SORT_NAME_DESC)
+            R.id.action_sort_date_desc -> updateSortOrder(SettingsManager.SORT_DATE_DESC)
+            R.id.action_sort_date_asc -> updateSortOrder(SettingsManager.SORT_DATE_ASC)
             else -> super.onOptionsItemSelected(item)
         }
+    }
+
+    private fun applyRotationLock() {
+        if (::settingsManager.isInitialized && settingsManager.isRotationLocked()) {
+            requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        } else {
+            requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        applyRotationLock()
     }
 
     private fun deleteSelectedFolders() {

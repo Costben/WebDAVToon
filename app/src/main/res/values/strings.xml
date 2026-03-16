@@ -98,6 +98,8 @@
     <string name="about_summary">WebDAVToon by Erl</string>
     <string name="cache_cleared">Cache cleared</string>
     <string name="cache_clear_failed">Failed to clear cache: %1$s</string>
+    <string name="rotation_lock">Rotation Lock</string>
+    <string name="more">More</string>
     <string name="clear_cache_message">Are you sure you want to clear all cached images? They will need to be re-downloaded.</string>
     <string name="theme_follow_device">Follow System</string>
     <string name="theme_midnight_blue">Midnight Blue</string>
@@ -122,4 +124,18 @@
     <string name="column_3">3 Columns</string>
     <string name="column_4">4 Columns</string>
     <string name="language_changed_tip">Language changed. Some UI elements may require an app restart to fully update.</string>
+    <string name="thumbnail_quality">Thumbnail Quality</string>
+    <string name="thumbnail_quality_percent_mode">Scale Ratio</string>
+    <string name="thumbnail_quality_max_width_mode">Max Width</string>
+    <string name="thumbnail_quality_summary_percent">Scale Ratio: %1$d%%</string>
+    <string name="thumbnail_quality_summary_max_width">Max Width: %1$dpx</string>
+    <string name="thumbnail_quality_dialog_title">Waterfall Thumbnail Quality</string>
+    <string name="thumbnail_quality_mode_label">Mode</string>
+    <string name="thumbnail_quality_enter_percent">Enter scale ratio (10–100)%%</string>
+    <string name="thumbnail_quality_enter_max_width">Enter max width in px (e.g. 600)</string>
+    <string name="thumbnail_quality_value_label">Value</string>
+    <string name="reader_max_zoom">Reader Max Zoom</string>
+    <string name="reader_max_zoom_summary">Maximum zoom: %1$d%%</string>
+    <string name="reader_max_zoom_dialog_title">Set Maximum Zoom</string>
+    <string name="reader_max_zoom_hint">Enter max zoom percent (100–500)</string>
 </resources>

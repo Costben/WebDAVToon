@@ -37,7 +37,7 @@ class MainActivity : AppCompatActivity() {
     private var isRemote: Boolean = false
     private var isRecursive: Boolean = false
     private var isFavorites: Boolean = false
-    private var pinchZoomHelper: PinchZoomHelper? = null
+    private var scaleDetector: android.view.ScaleGestureDetector? = null
 
     private var currentOffset = 0
     private val pageSize = 120
@@ -58,6 +58,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         ThemeHelper.applyTheme(this)
+        settingsManager = SettingsManager(this)
+        applyRotationLock()
         super.onCreate(savedInstanceState)
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -67,7 +69,6 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        settingsManager = SettingsManager(this)
         UiState.setGridColumns(settingsManager.getPhotoGridColumns())
 
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
@@ -121,10 +122,30 @@ class MainActivity : AppCompatActivity() {
         binding.recyclerView.setItemViewCacheSize(30)
         binding.recyclerView.setHasFixedSize(true)
 
-        pinchZoomHelper = PinchZoomHelper(binding.recyclerView, binding.zoomContainer) { newSpanCount ->
-            settingsManager.setPhotoGridColumns(newSpanCount)
-            UiState.setGridColumns(newSpanCount)
-        }
+        // 使用简单的缩放手势处理器，仅用于改变列数，不使用叠加层
+        scaleDetector = android.view.ScaleGestureDetector(this, object : android.view.ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            private var lastScaleTime = 0L
+            override fun onScale(detector: android.view.ScaleGestureDetector): Boolean {
+                val currentTime = System.currentTimeMillis()
+                if (currentTime - lastScaleTime < 300) return false // 防止缩放太快导致卡顿
+
+                val scaleFactor = detector.scaleFactor
+                val currentColumns = (binding.recyclerView.layoutManager as? StaggeredGridLayoutManager)?.spanCount ?: 1
+                
+                if (scaleFactor > 1.2f && currentColumns > 1) {
+                    // 放大手势 -> 减少列数
+                    updateGridColumns(currentColumns - 1)
+                    lastScaleTime = currentTime
+                    return true
+                } else if (scaleFactor < 0.8f && currentColumns < 5) {
+                    // 缩小手势 -> 增加列数
+                    updateGridColumns(currentColumns + 1)
+                    lastScaleTime = currentTime
+                    return true
+                }
+                return false
+            }
+        })
 
         photoAdapter = PhotoAdapter(
             onPhotoClick = { photos, position ->
@@ -232,7 +253,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         if (ev.pointerCount > 1) {
-            pinchZoomHelper?.onTouchEvent(ev)
+            scaleDetector?.onTouchEvent(ev)
         }
         return super.dispatchTouchEvent(ev)
     }
@@ -333,6 +354,9 @@ class MainActivity : AppCompatActivity() {
             }
         })
 
+        val rotationLockItem = menu.findItem(R.id.action_rotation_lock)
+        rotationLockItem?.isChecked = settingsManager.isRotationLocked()
+
         return true
     }
 
@@ -344,6 +368,13 @@ class MainActivity : AppCompatActivity() {
             return true
         }
         return when (item.itemId) {
+            R.id.action_rotation_lock -> {
+                val newLockedState = !item.isChecked
+                item.isChecked = newLockedState
+                settingsManager.setRotationLocked(newLockedState)
+                applyRotationLock()
+                true
+            }
             R.id.action_select -> {
                 isLongPressSelection = false
                 photoAdapter.setSelectionMode(true)
@@ -362,12 +393,25 @@ class MainActivity : AppCompatActivity() {
             R.id.action_col_2 -> updateGridColumns(2)
             R.id.action_col_3 -> updateGridColumns(3)
             R.id.action_col_4 -> updateGridColumns(4)
-            R.id.action_sort_name_asc -> updateSortOrder(0)
-            R.id.action_sort_name_desc -> updateSortOrder(1)
-            R.id.action_sort_date_desc -> updateSortOrder(2)
-            R.id.action_sort_date_asc -> updateSortOrder(3)
+            R.id.action_sort_name_asc -> updateSortOrder(SettingsManager.SORT_NAME_ASC)
+            R.id.action_sort_name_desc -> updateSortOrder(SettingsManager.SORT_NAME_DESC)
+            R.id.action_sort_date_desc -> updateSortOrder(SettingsManager.SORT_DATE_DESC)
+            R.id.action_sort_date_asc -> updateSortOrder(SettingsManager.SORT_DATE_ASC)
             else -> super.onOptionsItemSelected(item)
         }
+    }
+
+    private fun applyRotationLock() {
+        if (::settingsManager.isInitialized && settingsManager.isRotationLocked()) {
+            requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        } else {
+            requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        applyRotationLock()
     }
 
     private fun updateGridColumns(columns: Int): Boolean {

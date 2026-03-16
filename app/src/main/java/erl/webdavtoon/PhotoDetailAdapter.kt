@@ -17,6 +17,7 @@ class PhotoDetailAdapter(
     private var photos: List<Photo> = emptyList()
     private var selectionMode = false
     private val selectedIds = mutableSetOf<String>()
+    private var maxZoomScale = 3f
 
     fun setPhotos(newPhotos: List<Photo>) {
         photos = newPhotos
@@ -28,6 +29,12 @@ class PhotoDetailAdapter(
         if (!enabled) selectedIds.clear()
         notifyDataSetChanged()
     }
+
+    fun setMaxZoomPercent(percent: Int) {
+        maxZoomScale = (percent.coerceIn(100, 500) / 100f)
+        notifyDataSetChanged()
+    }
+
 
     fun isSelectionMode() = selectionMode
 
@@ -60,7 +67,7 @@ class PhotoDetailAdapter(
 
     override fun onBindViewHolder(holder: PhotoDetailViewHolder, position: Int) {
         val photo = photos[position]
-        holder.bind(photo, selectionMode, selectedIds.contains(photo.id))
+        holder.bind(photo, selectionMode, selectedIds.contains(photo.id), maxZoomScale)
     }
 
     override fun getItemCount(): Int = photos.size
@@ -82,7 +89,7 @@ class PhotoDetailAdapter(
                 // 我们通过设置 OnDoubleTapListener 来拦截默认行为
                 setOnDoubleTapListener(object : android.view.GestureDetector.OnDoubleTapListener {
                     override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
-                        // 单击仍然交给 PhotoView 的其他监听器或外部处理
+                        // 单击仍然交给外部处理
                         onClick(bindingAdapterPosition)
                         return true
                     }
@@ -105,10 +112,16 @@ class PhotoDetailAdapter(
                 // 2. 提高缩放优先级，防止双指操作触发 ViewPager2/RecyclerView 翻页
                 // PhotoView 内部在检测到多指时会自动调用 requestDisallowInterceptTouchEvent(true)
                 // 但为了更保险，我们可以在缩放开始时显式调用
-                setOnScaleChangeListener { scaleFactor, focusX, focusY ->
+                setOnScaleChangeListener { _, _, _ ->
                     if (scale > 1.0f) {
                         parent.requestDisallowInterceptTouchEvent(true)
                     }
+                }
+
+                setOnTouchListener { v, event ->
+                    val disallowParent = event.pointerCount > 1 || scale > 1.0f
+                    v.parent?.requestDisallowInterceptTouchEvent(disallowParent)
+                    false
                 }
                 
                 // 设置长按监听
@@ -119,9 +132,12 @@ class PhotoDetailAdapter(
             }
         }
 
-        fun bind(photo: Photo, isSelectionMode: Boolean, isSelected: Boolean) {
-            // 3. 每次重新绑定数据时重置缩放比例，确保页面切换后恢复 1x
+        fun bind(photo: Photo, isSelectionMode: Boolean, isSelected: Boolean, maxZoomScale: Float) {
+            binding.imageView.minimumScale = 1.0f
+            binding.imageView.mediumScale = ((1.0f + maxZoomScale) / 2f).coerceAtLeast(1.5f)
+            binding.imageView.maximumScale = maxZoomScale
             binding.imageView.setScale(1.0f, false)
+
             
             if (photo.isLocal) {
                 WebDavImageLoader.loadLocalImage(

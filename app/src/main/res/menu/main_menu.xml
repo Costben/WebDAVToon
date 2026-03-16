@@ -45,4 +45,14 @@
             <item android:id="@+id/action_sort_date_asc" android:title="@string/sort_date_asc" />
         </menu>
     </item>
+    <item
+        android:id="@+id/action_rotation_lock"
+        android:title="@string/rotation_lock"
+        android:checkable="true"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_version"
+        android:title="v1.2.4"
+        android:enabled="false"
+        app:showAsAction="never" />
 </menu>

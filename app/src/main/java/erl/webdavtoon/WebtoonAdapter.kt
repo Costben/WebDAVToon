@@ -76,33 +76,27 @@ class WebtoonAdapter(
         private val onClick: (Int) -> Unit
     ) : RecyclerView.ViewHolder(binding.root) {
         
-        private val gestureDetector = android.view.GestureDetector(binding.root.context, object : android.view.GestureDetector.SimpleOnGestureListener() {
-            override fun onDoubleTap(e: android.view.MotionEvent): Boolean {
-                tapListener?.onDoubleTap()
-                return true
-            }
-
-            override fun onLongPress(e: android.view.MotionEvent) {
-                onLongPress(bindingAdapterPosition)
-            }
-
-            override fun onSingleTapConfirmed(e: android.view.MotionEvent): Boolean {
-                onClick(bindingAdapterPosition)
-                return true
-            }
-        })
-
+        private var selectionMode = false
+        
         init {
-            binding.root.setOnTouchListener { _, event ->
-                gestureDetector.onTouchEvent(event)
-                true 
+            binding.root.setOnLongClickListener {
+                onLongPress(bindingAdapterPosition)
+                true
             }
         }
 
         fun bind(photo: Photo, isSelectionMode: Boolean, isSelected: Boolean) {
+            this.selectionMode = isSelectionMode
             val context = binding.root.context
             
-            binding.progressBar.visibility = android.view.View.VISIBLE
+            // 如果不是多选模式，禁用 click listener，让事件传给父容器 ZoomableRecyclerView
+            if (!isSelectionMode) {
+                binding.root.setOnClickListener(null)
+            } else {
+                binding.root.setOnClickListener {
+                    onClick(bindingAdapterPosition)
+                }
+            }
 
             if (photo.isLocal) {
                 WebDavImageLoader.loadLocalImage(

@@ -45,6 +45,15 @@ class SettingsManager(context: Context) {
         const val KEY_THEME_ID = "theme_id"
         const val KEY_LANGUAGE = "language"
 
+        const val KEY_WATERFALL_QUALITY_MODE = "waterfall_quality_mode"
+        const val KEY_WATERFALL_PERCENT = "waterfall_percent"
+        const val KEY_WATERFALL_MAX_WIDTH = "waterfall_max_width"
+        const val KEY_READER_MAX_ZOOM_PERCENT = "reader_max_zoom_percent"
+        const val KEY_ROTATION_LOCKED = "rotation_locked"
+
+        const val WATERFALL_MODE_PERCENT = "percent"
+        const val WATERFALL_MODE_MAX_WIDTH = "max_width"
+
         const val SORT_NAME_ASC = 0
         const val SORT_NAME_DESC = 1
         const val SORT_DATE_DESC = 2
@@ -74,6 +83,21 @@ class SettingsManager(context: Context) {
 
     fun getLanguage(): String = prefs.getString(KEY_LANGUAGE, "default") ?: "default"
     fun setLanguage(lang: String) = prefs.edit().putString(KEY_LANGUAGE, lang).apply()
+
+    fun getWaterfallQualityMode(): String = prefs.getString(KEY_WATERFALL_QUALITY_MODE, WATERFALL_MODE_PERCENT) ?: WATERFALL_MODE_PERCENT
+    fun setWaterfallQualityMode(mode: String) = prefs.edit().putString(KEY_WATERFALL_QUALITY_MODE, mode).apply()
+
+    fun getWaterfallPercent(): Int = prefs.getInt(KEY_WATERFALL_PERCENT, 70)
+    fun setWaterfallPercent(percent: Int) = prefs.edit().putInt(KEY_WATERFALL_PERCENT, percent).apply()
+
+    fun getWaterfallMaxWidth(): Int = prefs.getInt(KEY_WATERFALL_MAX_WIDTH, 600)
+    fun setWaterfallMaxWidth(maxWidth: Int) = prefs.edit().putInt(KEY_WATERFALL_MAX_WIDTH, maxWidth).apply()
+
+    fun getReaderMaxZoomPercent(): Int = prefs.getInt(KEY_READER_MAX_ZOOM_PERCENT, 300)
+    fun setReaderMaxZoomPercent(percent: Int) = prefs.edit().putInt(KEY_READER_MAX_ZOOM_PERCENT, percent).apply()
+
+    fun isRotationLocked(): Boolean = prefs.getBoolean(KEY_ROTATION_LOCKED, false)
+    fun setRotationLocked(locked: Boolean) = prefs.edit().putBoolean(KEY_ROTATION_LOCKED, locked).apply()
 
     fun getCurrentSlot(): Int = prefs.getInt(KEY_CURRENT_SLOT, 0)
     fun setCurrentSlot(slot: Int) = prefs.edit().putInt(KEY_CURRENT_SLOT, slot).apply()
