@@ -52,6 +52,7 @@ class FolderViewActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         ThemeHelper.applyTheme(this)
         settingsManager = SettingsManager(this)
+        LogManager.initialize(this)
         applyRotationLock()
         super.onCreate(savedInstanceState)
 
@@ -61,8 +62,6 @@ class FolderViewActivity : AppCompatActivity() {
 
         binding = ActivityFolderViewBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
-        LogManager.initialize(this)
 
         if (WebDAVToonApplication.rustRepository == null) {
             Toast.makeText(this, getString(R.string.rust_core_not_initialized), Toast.LENGTH_LONG).show()

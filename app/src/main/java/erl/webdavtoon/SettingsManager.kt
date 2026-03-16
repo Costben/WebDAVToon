@@ -194,7 +194,7 @@ class SettingsManager(context: Context) {
             "$protocol://$host:$finalPort$pathPart"
         }
 
-        Log.d("SettingsManager", "Built URL: $fullUrl")
+        LogManager.log("Built URL: $fullUrl", Log.DEBUG, "SettingsManager")
         return fullUrl
     }
 

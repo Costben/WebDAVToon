@@ -38,6 +38,7 @@ class SubFolderActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         ThemeHelper.applyTheme(this)
         settingsManager = SettingsManager(this)
+        LogManager.initialize(this)
         applyRotationLock()
         super.onCreate(savedInstanceState)
 

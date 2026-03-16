@@ -37,6 +37,11 @@ object LogManager {
     }
 
     fun log(message: String, level: Int = Log.DEBUG, tag: String = "WebDAVToon") {
+        // 在 Release 版本中，跳过 VERBOSE 和 DEBUG 级别的日志处理
+        if (!BuildConfig.DEBUG && (level == Log.VERBOSE || level == Log.DEBUG)) {
+            return
+        }
+
         if (level >= minLogLevel) {
             when (level) {
                 Log.VERBOSE -> Log.v(tag, message)

@@ -49,6 +49,7 @@ class PhotoViewActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         ThemeHelper.applyTheme(this)
+        LogManager.initialize(this)
         // 应用旋转锁定设置
         applyRotationLock()
         super.onCreate(savedInstanceState)

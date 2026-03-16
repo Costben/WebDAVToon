@@ -184,7 +184,7 @@ class ZoomableRecyclerView @JvmOverloads constructor(
                 
                 moveLogCounter++
                 if (moveLogCounter % 50 == 0) {
-                    Log.d(TAG, "DRAG (v1.1.7): dx=${"%.2f".format(dx)}, dy=${"%.2f".format(dy)}")
+                    LogManager.log("DRAG (v1.1.7): dx=${"%.2f".format(dx)}, dy=${"%.2f".format(dy)}", Log.DEBUG, TAG)
                 }
 
                 // 1. 处理水平平移 (Matrix)
@@ -274,7 +274,7 @@ class ZoomableRecyclerView @JvmOverloads constructor(
         if (deltaX != 0f || deltaY != 0f) {
             moveLogCounter++
             if (moveLogCounter % 20 == 0) {
-                Log.d(TAG, "applyBoundaries: rect=$displayRect, dx=$deltaX, dy=$deltaY")
+                LogManager.log("applyBoundaries: rect=$displayRect, dx=$deltaX, dy=$deltaY", Log.DEBUG, TAG)
             }
             transformMatrix.postTranslate(deltaX, deltaY)
             mapDisplayRect()
@@ -343,7 +343,7 @@ class ZoomableRecyclerView @JvmOverloads constructor(
             val targetScale = currentScale * scaleFactor
             
             if (targetScale in (minScale * 0.8f)..(maxScale * 1.2f)) {
-                Log.d(TAG, "onScale: factor=$scaleFactor, focusX=${detector.focusX}, focusY=${detector.focusY}")
+                LogManager.log("onScale: factor=$scaleFactor, focusX=${detector.focusX}, focusY=${detector.focusY}", Log.DEBUG, TAG)
                 // 使用双指中心作为缩放原点，修复“焦点永远在顶部”的问题
                 transformMatrix.postScale(scaleFactor, scaleFactor, detector.focusX, detector.focusY)
                 
