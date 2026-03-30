@@ -50,14 +50,17 @@ jobs:
             rust-core/target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('rust-core/Cargo.lock') }}
 
-      # 确保 NDK 和 Python 环境正确
+      # 动态寻找并设置 NDK 路径
       - name: Set up Environment
         run: |
           # 链接 python 到 python3
           sudo ln -sf /usr/bin/python3 /usr/bin/python
-          # 设置 NDK 环境变量
-          echo "ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/26.3.11579224" >> $GITHUB_ENV
-          echo "ndk.dir=${ANDROID_HOME}/ndk/26.3.11579224" > local.properties
+          # 寻找系统中已存在的 NDK 目录并将其设置为环境变量
+          # 我们通常查找第一个匹配的版本
+          AVAILABLE_NDK=$(ls -d ${ANDROID_HOME}/ndk/* | head -n 1)
+          echo "Found NDK at: $AVAILABLE_NDK"
+          echo "ANDROID_NDK_HOME=$AVAILABLE_NDK" >> $GITHUB_ENV
+          echo "ndk.dir=$AVAILABLE_NDK" > local.properties
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
@@ -66,7 +69,8 @@ jobs:
       - name: Build APK
         run: |
           # 明确导出变量，防止某些插件读不到 GITHUB_ENV
-          export ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/26.3.11579224
+          export ANDROID_NDK_HOME=$ANDROID_NDK_HOME
+          echo "Using NDK path: $ANDROID_NDK_HOME"
           if [ "${{ startsWith(github.ref, 'refs/tags/v') }}" = "true" ]; then
             echo "Building Release APK..."
             echo "${{ secrets.SIGNING_KEY }}" | base64 -d > app/release.jks
