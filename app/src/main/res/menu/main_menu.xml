@@ -50,9 +50,4 @@
         android:title="@string/rotation_lock"
         android:checkable="true"
         app:showAsAction="never" />
-    <item
-        android:id="@+id/action_version"
-        android:title="Version"
-        android:enabled="false"
-        app:showAsAction="never" />
 </menu>

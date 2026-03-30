@@ -47,10 +47,6 @@ object DrawerHelper {
         val favoritesBtn = navView.findViewById<View>(R.id.nav_favorites)
         val settingsBtn = navView.findViewById<View>(R.id.nav_settings)
         val headerView = navView.findViewById<View>(R.id.nav_header)
-        val versionText = navView.findViewById<TextView>(R.id.app_version_text)
-
-        // Set Version Text
-        versionText?.text = "v${BuildConfig.VERSION_NAME}"
 
         // Handle System Windows Insets (Status Bar)
         ViewCompat.setOnApplyWindowInsetsListener(navView) { v, insets ->

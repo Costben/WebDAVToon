@@ -358,9 +358,6 @@ class MainActivity : AppCompatActivity() {
         val rotationLockItem = menu.findItem(R.id.action_rotation_lock)
         rotationLockItem?.isChecked = settingsManager.isRotationLocked()
 
-        val versionItem = menu.findItem(R.id.action_version)
-        versionItem?.title = "v${BuildConfig.VERSION_NAME}"
-
         return true
     }
 
