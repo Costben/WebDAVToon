@@ -8,9 +8,6 @@ on:
       - 'v*'
   workflow_dispatch: # 允许手动触发
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
-
 jobs:
   build:
     name: Build and Publish
@@ -50,14 +47,18 @@ jobs:
             rust-core/target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('rust-core/Cargo.lock') }}
 
+      # 确保 NDK 路径正确
+      - name: Set up NDK
+        run: |
+          echo "ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/26.3.11579224" >> $GITHUB_ENV
+
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
       # 编译 APK (如果是 Tag 推送，编译 Release 版)
       - name: Build APK
-        env:
-          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.0.12077973 # GitHub Actions 默认自带的一个 NDK 版本
         run: |
+          echo "NDK path: $ANDROID_NDK_HOME"
           if [ "${{ startsWith(github.ref, 'refs/tags/v') }}" = "true" ]; then
             echo "Building Release APK..."
             # 将 Secrets 里的 Base64 还原为密钥文件
@@ -66,10 +67,11 @@ jobs:
               -Pandroid.injected.signing.store.file=$(pwd)/app/release.jks \
               -Pandroid.injected.signing.store.password=${{ secrets.KEY_STORE_PASSWORD }} \
               -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
-              -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
+              -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }} \
+              --info
           else
             echo "Building Debug APK..."
-            ./gradlew assembleDebug
+            ./gradlew assembleDebug --info
           fi
 
       # 上传编译产物到 Artifacts (非 Tag 推送时)
