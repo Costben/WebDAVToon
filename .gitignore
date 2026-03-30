@@ -1,0 +1,52 @@
+# Gradle
+.gradle/
+.gradle-home/
+build/
+app/build/
+local.properties
+
+# Android
+*.apk
+*.ap_
+*.dex
+*.class
+/captures
+.externalNativeBuild
+.cxx
+crash.log
+*.log
+
+# Rust
+/target/
+/rust-core/target/
+**/target/
+rust-core/uniffi-bindgen
+rust-core/uniffi-bindgen.exe
+rust-core/src/uniffi_rust_core.kt
+rust-core/src/librust_core.so
+**/rust-core/target/
+**/rust-core/target/**
+
+# IDE
+.idea/
+.vscode/
+*.iml
+.DS_Store
+
+# Trae
+.trae/
+
+# Temp
+ui.xml
+ui_home.xml
+tmp_x86_64_librust_core.so
+test_ignore/
+.codebuddy/
+
+# Keystore and build secrets
+keystore/release.jks
+keystore/signing.properties
+*.jks
+build_log.txt
+build_trace.log
+build_report.txt

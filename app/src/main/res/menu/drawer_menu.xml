@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <group android:id="@+id/group_servers" android:checkableBehavior="single">
+        <!-- Servers will be added dynamically here -->
+    </group>
+    
+    <item android:id="@+id/nav_add_server"
+        android:title="@string/add_webdav_server"
+        android:icon="@android:drawable/ic_input_add" />
+
+    <item
+        android:id="@+id/nav_settings"
+        android:icon="@android:drawable/ic_menu_preferences"
+        android:title="@string/settings" />
+</menu>
