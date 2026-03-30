@@ -45,6 +45,14 @@ android {
                 keyAlias = properties.getProperty("KEY_ALIAS")
                 keyPassword = properties.getProperty("KEY_PASSWORD")
             }
+        } else if (System.getenv("SIGNING_KEY") != null) {
+            // Support for GitHub Actions or other CI environments
+            create("release") {
+                storeFile = file("release.jks")
+                storePassword = System.getenv("KEY_STORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            }
         }
     }
 
@@ -54,7 +62,10 @@ android {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("release")
+            // Safely assign signing config
+            if (signingConfigs.findByName("release") != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 

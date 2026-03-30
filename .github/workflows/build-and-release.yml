@@ -50,12 +50,22 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      # 编译 APK
-      # 注意：Gradle 会调用 Cargo 编译 Rust 代码，前提是环境变量正确
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug
-        env:
-          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+      # 编译 APK (如果是 Tag 推送，编译 Release 版)
+      - name: Build APK
+        run: |
+          if [ "${{ startsWith(github.ref, 'refs/tags/v') }}" = "true" ]; then
+            echo "Building Release APK..."
+            # 将 Secrets 里的 Base64 还原为密钥文件
+            echo "${{ secrets.SIGNING_KEY }}" | base64 -d > app/release.jks
+            ./gradlew assembleRelease \
+              -Pandroid.injected.signing.store.file=$(pwd)/app/release.jks \
+              -Pandroid.injected.signing.store.password=${{ secrets.KEY_STORE_PASSWORD }} \
+              -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
+              -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
+          else
+            echo "Building Debug APK..."
+            ./gradlew assembleDebug
+          fi
 
       # 上传编译产物到 Artifacts (非 Tag 推送时)
       - name: Upload APK Artifact
@@ -70,7 +80,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: app/build/outputs/apk/debug/*.apk
+          files: app/build/outputs/apk/release/*.apk
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
