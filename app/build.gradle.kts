@@ -18,13 +18,14 @@ cargo {
 android {
     namespace = "erl.webdavtoon"
     compileSdk = 36
+    ndkVersion = "28.2.13676358"
 
     defaultConfig {
         applicationId = "erl.webdavtoon"
         minSdk = 24
         targetSdk = 36
-        versionCode = 8
-        versionName = "1.2.7"
+        versionCode = 9
+        versionName = "1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -71,6 +72,7 @@ android {
     sourceSets {
         getByName("main") {
             java.srcDir("build/generated/source/uniffi/java")
+            jniLibs.srcDirs("src/main/jniLibs")
         }
     }
 
