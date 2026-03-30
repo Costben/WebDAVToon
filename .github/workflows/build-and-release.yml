@@ -55,6 +55,8 @@ jobs:
 
       # 编译 APK (如果是 Tag 推送，编译 Release 版)
       - name: Build APK
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.0.12077973 # GitHub Actions 默认自带的一个 NDK 版本
         run: |
           if [ "${{ startsWith(github.ref, 'refs/tags/v') }}" = "true" ]; then
             echo "Building Release APK..."
