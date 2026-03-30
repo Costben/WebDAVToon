@@ -12,13 +12,13 @@ cargo {
     libname = "rust_core"
     targets = listOf("arm", "arm64", "x86", "x86_64")
     profile = "release"
-    pythonCommand = "python"
+    pythonCommand = "python3"
 }
 
 android {
     namespace = "erl.webdavtoon"
     compileSdk = 36
-    ndkVersion = "29.0.14206865"
+    ndkVersion = "26.3.11579224"
 
     defaultConfig {
         applicationId = "erl.webdavtoon"
