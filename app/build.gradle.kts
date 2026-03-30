@@ -18,7 +18,7 @@ cargo {
 android {
     namespace = "erl.webdavtoon"
     compileSdk = 36
-    ndkVersion = "28.2.13676358"
+    ndkVersion = "27.3.13750724"
 
     defaultConfig {
         applicationId = "erl.webdavtoon"
