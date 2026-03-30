@@ -51,6 +51,7 @@ jobs:
       - name: Set up NDK
         run: |
           echo "ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/26.3.11579224" >> $GITHUB_ENV
+          echo "ndk.dir=${ANDROID_HOME}/ndk/26.3.11579224" > local.properties
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
@@ -58,6 +59,7 @@ jobs:
       # 编译 APK (如果是 Tag 推送，编译 Release 版)
       - name: Build APK
         run: |
+          export ANDROID_NDK_HOME=${ANDROID_HOME}/ndk/26.3.11579224
           echo "NDK path: $ANDROID_NDK_HOME"
           if [ "${{ startsWith(github.ref, 'refs/tags/v') }}" = "true" ]; then
             echo "Building Release APK..."
@@ -68,10 +70,10 @@ jobs:
               -Pandroid.injected.signing.store.password=${{ secrets.KEY_STORE_PASSWORD }} \
               -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
               -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }} \
-              --info
+              --stacktrace
           else
             echo "Building Debug APK..."
-            ./gradlew assembleDebug --info
+            ./gradlew assembleDebug --stacktrace
           fi
 
       # 上传编译产物到 Artifacts (非 Tag 推送时)
