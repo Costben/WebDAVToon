@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="primary">#6750A4</color>
+    <color name="onPrimary">#FFFFFF</color>
+    <color name="primaryContainer">#EADDFF</color>
+    <color name="onPrimaryContainer">#21005D</color>
+    <color name="secondary">#625B71</color>
+    <color name="onSecondary">#FFFFFF</color>
+    <color name="secondaryContainer">#E8DEF8</color>
+    <color name="onSecondaryContainer">#1D192B</color>
+    <color name="tertiary">#7D5260</color>
+    <color name="onTertiary">#FFFFFF</color>
+    <color name="tertiaryContainer">#FFD8E4</color>
+    <color name="onTertiaryContainer">#31111D</color>
+    <color name="surface">#FEF7FF</color>
+    <color name="onSurface">#1D1B20</color>
+    <color name="surfaceVariant">#E7E0EB</color>
+    <color name="onSurfaceVariant">#49454F</color>
+    <color name="outline">#79747E</color>
+
+    <!-- Theme Blue -->
+    <color name="primary_blue">#005FB0</color>
+    <color name="onPrimary_blue">#FFFFFF</color>
+    <color name="primaryContainer_blue">#D5E3FF</color>
+    <color name="onPrimaryContainer_blue">#001C3B</color>
+    <color name="secondary_blue">#565E71</color>
+    <color name="onSecondary_blue">#FFFFFF</color>
+    <color name="secondaryContainer_blue">#DAE2F9</color>
+    <color name="onSecondaryContainer_blue">#131C2B</color>
+    <color name="tertiary_blue">#705573</color>
+    <color name="onTertiary_blue">#FFFFFF</color>
+    <color name="tertiaryContainer_blue">#FAD8FD</color>
+    <color name="onTertiaryContainer_blue">#28132D</color>
+    <color name="surface_blue">#F8F9FF</color>
+    <color name="onSurface_blue">#191C20</color>
+    <color name="surfaceVariant_blue">#E0E2EC</color>
+    <color name="onSurfaceVariant_blue">#44474E</color>
+
+    <!-- Theme Green -->
+    <color name="primary_green">#006E1C</color>
+    <color name="onPrimary_green">#FFFFFF</color>
+    <color name="primaryContainer_green">#B6F2AF</color>
+    <color name="onPrimaryContainer_green">#002204</color>
+    <color name="secondary_green">#52634F</color>
+    <color name="onSecondary_green">#FFFFFF</color>
+    <color name="secondaryContainer_green">#D5E8CF</color>
+    <color name="onSecondaryContainer_green">#111F0F</color>
+    <color name="tertiary_green">#38656A</color>
+    <color name="onTertiary_green">#FFFFFF</color>
+    <color name="tertiaryContainer_green">#BCEBF0</color>
+    <color name="onTertiaryContainer_green">#002022</color>
+    <color name="surface_green">#F7FBF1</color>
+    <color name="onSurface_green">#191D19</color>
+    <color name="surfaceVariant_green">#DEE5D8</color>
+    <color name="onSurfaceVariant_green">#424940</color>
+
+    <!-- Theme Red -->
+    <color name="primary_red">#B3261E</color>
+    <color name="onPrimary_red">#FFFFFF</color>
+    <color name="primaryContainer_red">#F9DEDC</color>
+    <color name="onPrimaryContainer_red">#410E0B</color>
+    <color name="secondary_red">#775652</color>
+    <color name="onSecondary_red">#FFFFFF</color>
+    <color name="secondaryContainer_red">#FFDAD6</color>
+    <color name="onSecondaryContainer_red">#2C1512</color>
+    <color name="tertiary_red">#715B29</color>
+    <color name="onTertiary_red">#FFFFFF</color>
+    <color name="tertiaryContainer_red">#FDE2A7</color>
+    <color name="onTertiaryContainer_red">#251A00</color>
+    <color name="surface_red">#FFF8F7</color>
+    <color name="onSurface_red">#231918</color>
+    <color name="surfaceVariant_red">#F4DDDB</color>
+    <color name="onSurfaceVariant_red">#534341</color>
+
+    <!-- Theme Orange -->
+    <color name="primary_orange">#8B5000</color>
+    <color name="onPrimary_orange">#FFFFFF</color>
+    <color name="primaryContainer_orange">#FFDCBE</color>
+    <color name="onPrimaryContainer_orange">#2C1600</color>
+    <color name="secondary_orange">#715D4C</color>
+    <color name="onSecondary_orange">#FFFFFF</color>
+    <color name="secondaryContainer_orange">#FDDDC2</color>
+    <color name="onSecondaryContainer_orange">#281B0E</color>
+    <color name="tertiary_orange">#5D6236</color>
+    <color name="onTertiary_orange">#FFFFFF</color>
+    <color name="tertiaryContainer_orange">#E2E7B0</color>
+    <color name="onTertiaryContainer_orange">#1A1E00</color>
+    <color name="surface_orange">#FFF8F5</color>
+    <color name="onSurface_orange">#211A14</color>
+    <color name="surfaceVariant_orange">#F1E0D0</color>
+    <color name="onSurfaceVariant_orange">#504539</color>
+
+    <!-- Theme Teal -->
+    <color name="primary_teal">#006A6A</color>
+    <color name="onPrimary_teal">#FFFFFF</color>
+    <color name="primaryContainer_teal">#6FF7F6</color>
+    <color name="onPrimaryContainer_teal">#002020</color>
+    <color name="secondary_teal">#4A6363</color>
+    <color name="onSecondary_teal">#FFFFFF</color>
+    <color name="secondaryContainer_teal">#CCE8E7</color>
+    <color name="onSecondaryContainer_teal">#051F1F</color>
+    <color name="tertiary_teal">#4B6078</color>
+    <color name="onTertiary_teal">#FFFFFF</color>
+    <color name="tertiaryContainer_teal">#D2E4FF</color>
+    <color name="onTertiaryContainer_teal">#041C31</color>
+    <color name="surface_teal">#F4FBFA</color>
+    <color name="onSurface_teal">#161D1D</color>
+    <color name="surfaceVariant_teal">#DAE5E4</color>
+    <color name="onSurfaceVariant_teal">#3F4948</color>
+
+    <!-- Theme Purple -->
+    <color name="primary_purple">#6750A4</color>
+    <color name="onPrimary_purple">#FFFFFF</color>
+    <color name="primaryContainer_purple">#EADDFF</color>
+    <color name="onPrimaryContainer_purple">#21005D</color>
+    <color name="secondary_purple">#625B71</color>
+    <color name="onSecondary_purple">#FFFFFF</color>
+    <color name="secondaryContainer_purple">#E8DEF8</color>
+    <color name="onSecondaryContainer_purple">#1D192B</color>
+    <color name="tertiary_purple">#7D5260</color>
+    <color name="onTertiary_purple">#FFFFFF</color>
+    <color name="tertiaryContainer_purple">#FFD8E4</color>
+    <color name="onTertiaryContainer_purple">#31111D</color>
+    <color name="surface_purple">#FEF7FF</color>
+    <color name="onSurface_purple">#1D1B20</color>
+    <color name="surfaceVariant_purple">#E7E0EB</color>
+    <color name="onSurfaceVariant_purple">#49454F</color>
+
+    <!-- Theme Pink -->
+    <color name="primary_pink">#BC004B</color>
+    <color name="onPrimary_pink">#FFFFFF</color>
+    <color name="primaryContainer_pink">#FFD9E2</color>
+    <color name="onPrimaryContainer_pink">#3E0016</color>
+    <color name="secondary_pink">#75565F</color>
+    <color name="onSecondary_pink">#FFFFFF</color>
+    <color name="secondaryContainer_pink">#FFD9E2</color>
+    <color name="onSecondaryContainer_pink">#2B151C</color>
+    <color name="tertiary_pink">#7E5733</color>
+    <color name="onTertiary_pink">#FFFFFF</color>
+    <color name="tertiaryContainer_pink">#FFDDBF</color>
+    <color name="onTertiaryContainer_pink">#2F1500</color>
+    <color name="surface_pink">#FFF8F8</color>
+    <color name="onSurface_pink">#201A1B</color>
+    <color name="surfaceVariant_pink">#F3DDDF</color>
+    <color name="onSurfaceVariant_pink">#514345</color>
+
+    <!-- Theme Brown -->
+    <color name="primary_brown">#8D4F2A</color>
+    <color name="onPrimary_brown">#FFFFFF</color>
+    <color name="primaryContainer_brown">#FFDBCC</color>
+    <color name="onPrimaryContainer_brown">#351000</color>
+    <color name="secondary_brown">#75584A</color>
+    <color name="onSecondary_brown">#FFFFFF</color>
+    <color name="secondaryContainer_brown">#FFDBCC</color>
+    <color name="onSecondaryContainer_brown">#2B160C</color>
+    <color name="tertiary_brown">#665F31</color>
+    <color name="onTertiary_brown">#FFFFFF</color>
+    <color name="tertiaryContainer_brown">#EEE4A9</color>
+    <color name="onTertiaryContainer_brown">#201C00</color>
+    <color name="surface_brown">#FFF8F6</color>
+    <color name="onSurface_brown">#221A17</color>
+    <color name="surfaceVariant_brown">#F4DED4</color>
+    <color name="onSurfaceVariant_brown">#52443D</color>
+
+    <!-- Theme Grey -->
+    <color name="primary_grey">#5E5E5E</color>
+    <color name="onPrimary_grey">#FFFFFF</color>
+    <color name="primaryContainer_grey">#E3E3E3</color>
+    <color name="onPrimaryContainer_grey">#1B1B1B</color>
+    <color name="secondary_grey">#5E5E5E</color>
+    <color name="onSecondary_grey">#FFFFFF</color>
+    <color name="secondaryContainer_grey">#E3E3E3</color>
+    <color name="onSecondaryContainer_grey">#1B1B1B</color>
+    <color name="tertiary_grey">#5E5E5E</color>
+    <color name="onTertiary_grey">#FFFFFF</color>
+    <color name="tertiaryContainer_grey">#E3E3E3</color>
+    <color name="onTertiaryContainer_grey">#1B1B1B</color>
+    <color name="surface_grey">#F9F9F9</color>
+    <color name="onSurface_grey">#1B1B1B</color>
+    <color name="surfaceVariant_grey">#E2E2E2</color>
+    <color name="onSurfaceVariant_grey">#454545</color>
+    
+</resources>

@@ -1,0 +1,261 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme. -->
+    <style name="Base.Theme.WebDAVToon" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowTranslucentNavigation">false</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <!-- Customize your light theme here. -->
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorOnPrimary">@color/onPrimary</item>
+        <item name="colorPrimaryContainer">@color/primaryContainer</item>
+        <item name="colorOnPrimaryContainer">@color/onPrimaryContainer</item>
+        
+        <item name="colorSecondary">@color/secondary</item>
+        <item name="colorOnSecondary">@color/onSecondary</item>
+        <item name="colorSecondaryContainer">@color/secondaryContainer</item>
+        <item name="colorOnSecondaryContainer">@color/onSecondaryContainer</item>
+        
+        <item name="colorTertiary">@color/tertiary</item>
+        <item name="colorOnTertiary">@color/onTertiary</item>
+        <item name="colorTertiaryContainer">@color/tertiaryContainer</item>
+        <item name="colorOnTertiaryContainer">@color/onTertiaryContainer</item>
+        
+        <item name="android:windowBackground">@color/surface</item>
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorOnSurface">@color/onSurface</item>
+        <item name="colorSurfaceVariant">@color/surfaceVariant</item>
+        <item name="colorOnSurfaceVariant">@color/onSurfaceVariant</item>
+        <item name="colorOutline">@color/outline</item>
+
+        <!-- 菜单圆角设置 -->
+        <item name="actionOverflowMenuStyle">@style/RoundedOverflowMenu</item>
+        <item name="popupMenuStyle">@style/RoundedPopupMenu</item>
+    </style>
+
+    <style name="RoundedOverflowMenu" parent="Widget.AppCompat.PopupMenu.Overflow">
+        <item name="android:popupBackground">@drawable/bg_menu_rounded</item>
+    </style>
+
+    <style name="RoundedPopupMenu" parent="Widget.AppCompat.PopupMenu">
+        <item name="android:popupBackground">@drawable/bg_menu_rounded</item>
+    </style>
+
+    <style name="Theme.WebDAVToon" parent="Base.Theme.WebDAVToon">
+        <item name="toolbarStyle">@style/Widget.App.Toolbar</item>
+    </style>
+
+    <!-- Blue Theme -->
+    <style name="Theme.WebDAVToon.Blue" parent="Base.Theme.WebDAVToon">
+        <item name="colorPrimary">@color/primary_blue</item>
+        <item name="colorOnPrimary">@color/onPrimary_blue</item>
+        <item name="colorPrimaryContainer">@color/primaryContainer_blue</item>
+        <item name="colorOnPrimaryContainer">@color/onPrimaryContainer_blue</item>
+        <item name="colorSecondary">@color/secondary_blue</item>
+        <item name="colorOnSecondary">@color/onSecondary_blue</item>
+        <item name="colorSecondaryContainer">@color/secondaryContainer_blue</item>
+        <item name="colorOnSecondaryContainer">@color/onSecondaryContainer_blue</item>
+        <item name="colorTertiary">@color/tertiary_blue</item>
+        <item name="colorOnTertiary">@color/onTertiary_blue</item>
+        <item name="colorTertiaryContainer">@color/tertiaryContainer_blue</item>
+        <item name="colorOnTertiaryContainer">@color/onTertiaryContainer_blue</item>
+        <item name="android:windowBackground">@color/surface_blue</item>
+        <item name="colorSurface">@color/surface_blue</item>
+        <item name="colorOnSurface">@color/onSurface_blue</item>
+        <item name="colorSurfaceVariant">@color/surfaceVariant_blue</item>
+        <item name="colorOnSurfaceVariant">@color/onSurfaceVariant_blue</item>
+        <item name="toolbarStyle">@style/Widget.App.Toolbar</item>
+    </style>
+
+    <!-- Green Theme -->
+    <style name="Theme.WebDAVToon.Green" parent="Base.Theme.WebDAVToon">
+        <item name="colorPrimary">@color/primary_green</item>
+        <item name="colorOnPrimary">@color/onPrimary_green</item>
+        <item name="colorPrimaryContainer">@color/primaryContainer_green</item>
+        <item name="colorOnPrimaryContainer">@color/onPrimaryContainer_green</item>
+        <item name="colorSecondary">@color/secondary_green</item>
+        <item name="colorOnSecondary">@color/onSecondary_green</item>
+        <item name="colorSecondaryContainer">@color/secondaryContainer_green</item>
+        <item name="colorOnSecondaryContainer">@color/onSecondaryContainer_green</item>
+        <item name="colorTertiary">@color/tertiary_green</item>
+        <item name="colorOnTertiary">@color/onTertiary_green</item>
+        <item name="colorTertiaryContainer">@color/tertiaryContainer_green</item>
+        <item name="colorOnTertiaryContainer">@color/onTertiaryContainer_green</item>
+        <item name="android:windowBackground">@color/surface_green</item>
+        <item name="colorSurface">@color/surface_green</item>
+        <item name="colorOnSurface">@color/onSurface_green</item>
+        <item name="colorSurfaceVariant">@color/surfaceVariant_green</item>
+        <item name="colorOnSurfaceVariant">@color/onSurfaceVariant_green</item>
+        <item name="toolbarStyle">@style/Widget.App.Toolbar</item>
+    </style>
+
+    <!-- Red Theme -->
+    <style name="Theme.WebDAVToon.Red" parent="Base.Theme.WebDAVToon">
+        <item name="colorPrimary">@color/primary_red</item>
+        <item name="colorOnPrimary">@color/onPrimary_red</item>
+        <item name="colorPrimaryContainer">@color/primaryContainer_red</item>
+        <item name="colorOnPrimaryContainer">@color/onPrimaryContainer_red</item>
+        <item name="colorSecondary">@color/secondary_red</item>
+        <item name="colorOnSecondary">@color/onSecondary_red</item>
+        <item name="colorSecondaryContainer">@color/secondaryContainer_red</item>
+        <item name="colorOnSecondaryContainer">@color/onSecondaryContainer_red</item>
+        <item name="colorTertiary">@color/tertiary_red</item>
+        <item name="colorOnTertiary">@color/onTertiary_red</item>
+        <item name="colorTertiaryContainer">@color/tertiaryContainer_red</item>
+        <item name="colorOnTertiaryContainer">@color/onTertiaryContainer_red</item>
+        <item name="android:windowBackground">@color/surface_red</item>
+        <item name="colorSurface">@color/surface_red</item>
+        <item name="colorOnSurface">@color/onSurface_red</item>
+        <item name="colorSurfaceVariant">@color/surfaceVariant_red</item>
+        <item name="colorOnSurfaceVariant">@color/onSurfaceVariant_red</item>
+        <item name="toolbarStyle">@style/Widget.App.Toolbar</item>
+    </style>
+
+    <!-- Orange Theme -->
+    <style name="Theme.WebDAVToon.Orange" parent="Base.Theme.WebDAVToon">
+        <item name="colorPrimary">@color/primary_orange</item>
+        <item name="colorOnPrimary">@color/onPrimary_orange</item>
+        <item name="colorPrimaryContainer">@color/primaryContainer_orange</item>
+        <item name="colorOnPrimaryContainer">@color/onPrimaryContainer_orange</item>
+        <item name="colorSecondary">@color/secondary_orange</item>
+        <item name="colorOnSecondary">@color/onSecondary_orange</item>
+        <item name="colorSecondaryContainer">@color/secondaryContainer_orange</item>
+        <item name="colorOnSecondaryContainer">@color/onSecondaryContainer_orange</item>
+        <item name="colorTertiary">@color/tertiary_orange</item>
+        <item name="colorOnTertiary">@color/onTertiary_orange</item>
+        <item name="colorTertiaryContainer">@color/tertiaryContainer_orange</item>
+        <item name="colorOnTertiaryContainer">@color/onTertiaryContainer_orange</item>
+        <item name="android:windowBackground">@color/surface_orange</item>
+        <item name="colorSurface">@color/surface_orange</item>
+        <item name="colorOnSurface">@color/onSurface_orange</item>
+        <item name="colorSurfaceVariant">@color/surfaceVariant_orange</item>
+        <item name="colorOnSurfaceVariant">@color/onSurfaceVariant_orange</item>
+        <item name="toolbarStyle">@style/Widget.App.Toolbar</item>
+    </style>
+
+    <!-- Teal Theme -->
+    <style name="Theme.WebDAVToon.Teal" parent="Base.Theme.WebDAVToon">
+        <item name="colorPrimary">@color/primary_teal</item>
+        <item name="colorOnPrimary">@color/onPrimary_teal</item>
+        <item name="colorPrimaryContainer">@color/primaryContainer_teal</item>
+        <item name="colorOnPrimaryContainer">@color/onPrimaryContainer_teal</item>
+        <item name="colorSecondary">@color/secondary_teal</item>
+        <item name="colorOnSecondary">@color/onSecondary_teal</item>
+        <item name="colorSecondaryContainer">@color/secondaryContainer_teal</item>
+        <item name="colorOnSecondaryContainer">@color/onSecondaryContainer_teal</item>
+        <item name="colorTertiary">@color/tertiary_teal</item>
+        <item name="colorOnTertiary">@color/onTertiary_teal</item>
+        <item name="colorTertiaryContainer">@color/tertiaryContainer_teal</item>
+        <item name="colorOnTertiaryContainer">@color/onTertiaryContainer_teal</item>
+        <item name="android:windowBackground">@color/surface_teal</item>
+        <item name="colorSurface">@color/surface_teal</item>
+        <item name="colorOnSurface">@color/onSurface_teal</item>
+        <item name="colorSurfaceVariant">@color/surfaceVariant_teal</item>
+        <item name="colorOnSurfaceVariant">@color/onSurfaceVariant_teal</item>
+        <item name="toolbarStyle">@style/Widget.App.Toolbar</item>
+    </style>
+
+    <!-- Purple Theme -->
+    <style name="Theme.WebDAVToon.Purple" parent="Base.Theme.WebDAVToon">
+        <item name="colorPrimary">@color/primary_purple</item>
+        <item name="colorOnPrimary">@color/onPrimary_purple</item>
+        <item name="colorPrimaryContainer">@color/primaryContainer_purple</item>
+        <item name="colorOnPrimaryContainer">@color/onPrimaryContainer_purple</item>
+        <item name="colorSecondary">@color/secondary_purple</item>
+        <item name="colorOnSecondary">@color/onSecondary_purple</item>
+        <item name="colorSecondaryContainer">@color/secondaryContainer_purple</item>
+        <item name="colorOnSecondaryContainer">@color/onSecondaryContainer_purple</item>
+        <item name="colorTertiary">@color/tertiary_purple</item>
+        <item name="colorOnTertiary">@color/onTertiary_purple</item>
+        <item name="colorTertiaryContainer">@color/tertiaryContainer_purple</item>
+        <item name="colorOnTertiaryContainer">@color/onTertiaryContainer_purple</item>
+        <item name="android:windowBackground">@color/surface_purple</item>
+        <item name="colorSurface">@color/surface_purple</item>
+        <item name="colorOnSurface">@color/onSurface_purple</item>
+        <item name="colorSurfaceVariant">@color/surfaceVariant_purple</item>
+        <item name="colorOnSurfaceVariant">@color/onSurfaceVariant_purple</item>
+        <item name="toolbarStyle">@style/Widget.App.Toolbar</item>
+    </style>
+
+    <!-- Pink Theme -->
+    <style name="Theme.WebDAVToon.Pink" parent="Base.Theme.WebDAVToon">
+        <item name="colorPrimary">@color/primary_pink</item>
+        <item name="colorOnPrimary">@color/onPrimary_pink</item>
+        <item name="colorPrimaryContainer">@color/primaryContainer_pink</item>
+        <item name="colorOnPrimaryContainer">@color/onPrimaryContainer_pink</item>
+        <item name="colorSecondary">@color/secondary_pink</item>
+        <item name="colorOnSecondary">@color/onSecondary_pink</item>
+        <item name="colorSecondaryContainer">@color/secondaryContainer_pink</item>
+        <item name="colorOnSecondaryContainer">@color/onSecondaryContainer_pink</item>
+        <item name="colorTertiary">@color/tertiary_pink</item>
+        <item name="colorOnTertiary">@color/onTertiary_pink</item>
+        <item name="colorTertiaryContainer">@color/tertiaryContainer_pink</item>
+        <item name="colorOnTertiaryContainer">@color/onTertiaryContainer_pink</item>
+        <item name="android:windowBackground">@color/surface_pink</item>
+        <item name="colorSurface">@color/surface_pink</item>
+        <item name="colorOnSurface">@color/onSurface_pink</item>
+        <item name="colorSurfaceVariant">@color/surfaceVariant_pink</item>
+        <item name="colorOnSurfaceVariant">@color/onSurfaceVariant_pink</item>
+        <item name="toolbarStyle">@style/Widget.App.Toolbar</item>
+    </style>
+
+    <!-- Brown Theme -->
+    <style name="Theme.WebDAVToon.Brown" parent="Base.Theme.WebDAVToon">
+        <item name="colorPrimary">@color/primary_brown</item>
+        <item name="colorOnPrimary">@color/onPrimary_brown</item>
+        <item name="colorPrimaryContainer">@color/primaryContainer_brown</item>
+        <item name="colorOnPrimaryContainer">@color/onPrimaryContainer_brown</item>
+        <item name="colorSecondary">@color/secondary_brown</item>
+        <item name="colorOnSecondary">@color/onSecondary_brown</item>
+        <item name="colorSecondaryContainer">@color/secondaryContainer_brown</item>
+        <item name="colorOnSecondaryContainer">@color/onSecondaryContainer_brown</item>
+        <item name="colorTertiary">@color/tertiary_brown</item>
+        <item name="colorOnTertiary">@color/onTertiary_brown</item>
+        <item name="colorTertiaryContainer">@color/tertiaryContainer_brown</item>
+        <item name="colorOnTertiaryContainer">@color/onTertiaryContainer_brown</item>
+        <item name="android:windowBackground">@color/surface_brown</item>
+        <item name="colorSurface">@color/surface_brown</item>
+        <item name="colorOnSurface">@color/onSurface_brown</item>
+        <item name="colorSurfaceVariant">@color/surfaceVariant_brown</item>
+        <item name="colorOnSurfaceVariant">@color/onSurfaceVariant_brown</item>
+        <item name="toolbarStyle">@style/Widget.App.Toolbar</item>
+    </style>
+
+    <!-- Grey Theme -->
+    <style name="Theme.WebDAVToon.Grey" parent="Base.Theme.WebDAVToon">
+        <item name="colorPrimary">@color/primary_grey</item>
+        <item name="colorOnPrimary">@color/onPrimary_grey</item>
+        <item name="colorPrimaryContainer">@color/primaryContainer_grey</item>
+        <item name="colorOnPrimaryContainer">@color/onPrimaryContainer_grey</item>
+        <item name="colorSecondary">@color/secondary_grey</item>
+        <item name="colorOnSecondary">@color/onSecondary_grey</item>
+        <item name="colorSecondaryContainer">@color/secondaryContainer_grey</item>
+        <item name="colorOnSecondaryContainer">@color/onSecondaryContainer_grey</item>
+        <item name="colorTertiary">@color/tertiary_grey</item>
+        <item name="colorOnTertiary">@color/onTertiary_grey</item>
+        <item name="colorTertiaryContainer">@color/tertiaryContainer_grey</item>
+        <item name="colorOnTertiaryContainer">@color/onTertiaryContainer_grey</item>
+        <item name="android:windowBackground">@color/surface_grey</item>
+        <item name="colorSurface">@color/surface_grey</item>
+        <item name="colorOnSurface">@color/onSurface_grey</item>
+        <item name="colorSurfaceVariant">@color/surfaceVariant_grey</item>
+        <item name="colorOnSurfaceVariant">@color/onSurfaceVariant_grey</item>
+        <item name="toolbarStyle">@style/Widget.App.Toolbar</item>
+    </style>
+
+    <style name="Widget.App.Toolbar" parent="Widget.Material3.Toolbar">
+        <item name="titleTextColor">?attr/colorOnSurface</item>
+        <item name="navigationIconTint">?attr/colorOnSurface</item>
+        <item name="android:textColorSecondary">?attr/colorOnSurface</item>
+        <!-- 强制溢出菜单图标颜色为 onSurface -->
+        <item name="colorControlNormal">?attr/colorOnSurface</item>
+    </style>
+
+    <style name="RoundedImageView">
+        <item name="cornerSize">4dp</item>
+    </style>
+
+    <style name="ShapeAppearanceOverlay.App.Fab.Circle" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">50%</item>
+    </style>
+</resources>
