@@ -43,9 +43,8 @@ tmp_x86_64_librust_core.so
 test_ignore/
 .codebuddy/
 
-# Generated JNI libs and UniFFI bindings
+# Generated JNI libs
 app/src/main/jniLibs/
-app/src/main/java/uniffi/
 build_output.txt
 
 # Keystore and build secrets
