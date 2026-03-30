@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿use crate::models::{Folder, FolderInspection, Photo, SortOrder};
+use crate::models::{Folder, FolderInspection, Photo, SortOrder};
 use futures::StreamExt;
 use opendal::Operator;
 use std::sync::Arc;
