@@ -50,17 +50,23 @@ jobs:
             rust-core/target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('rust-core/Cargo.lock') }}
 
-      # 动态寻找并设置 NDK 路径
+      # 设置 Python 和 NDK 环境变量
       - name: Set up Environment
         run: |
           # 链接 python 到 python3
           sudo ln -sf /usr/bin/python3 /usr/bin/python
-          # 寻找系统中已存在的 NDK 目录并将其设置为环境变量
-          # 我们通常查找第一个匹配的版本
-          AVAILABLE_NDK=$(ls -d ${ANDROID_HOME}/ndk/* | head -n 1)
-          echo "Found NDK at: $AVAILABLE_NDK"
-          echo "ANDROID_NDK_HOME=$AVAILABLE_NDK" >> $GITHUB_ENV
-          echo "ndk.dir=$AVAILABLE_NDK" > local.properties
+          
+          # 设置 NDK 版本和路径，使其与 build.gradle.kts 一致
+          NDK_VERSION="27.3.13750724"
+          NDK_PATH="${ANDROID_HOME}/ndk/${NDK_VERSION}"
+          echo "Using NDK version: $NDK_VERSION"
+          echo "ANDROID_NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
+          
+          # 注意：GitHub Actions 环境下，指定的 NDK 可能尚未安装
+          # Gradle 会在构建开始后自动下载它。
+          # 某些较旧的插件可能需要在 local.properties 中明确指定 ndk.dir
+          # 我们在构建任务前动态创建它（如果目录已存在或将被 Gradle 创建）
+          # 但在这里我们先不写入 local.properties，让 Gradle 自己决定。
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
