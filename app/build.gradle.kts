@@ -55,7 +55,7 @@ android {
             // Support for GitHub Actions or other CI environments
             create("release") {
                 storeFile = file("release.jks")
-                storePassword = System.getenv("KEY_STORE_PASSWORD")
+                storePassword = System.getenv("KEYSTORE_PASSWORD") ?: System.getenv("KEY_STORE_PASSWORD")
                 keyAlias = System.getenv("KEY_ALIAS")
                 keyPassword = System.getenv("KEY_PASSWORD")
             }
