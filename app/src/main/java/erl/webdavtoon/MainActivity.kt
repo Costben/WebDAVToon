@@ -39,9 +39,6 @@ class MainActivity : AppCompatActivity() {
     private var isFavorites: Boolean = false
     private var scaleDetector: android.view.ScaleGestureDetector? = null
 
-    private var currentOffset = 0
-    private val pageSize = 120
-    private var isPageLoading = false
     private var currentQuery = MediaQuery()
     private var deleteMenuItem: android.view.MenuItem? = null
 
@@ -205,52 +202,12 @@ class MainActivity : AppCompatActivity() {
                 } else if (state.photos.isEmpty()) {
                     binding.emptyView.text = getString(R.string.no_photos_found)
                 }
-                val sortedPhotos = if (isRecursive) {
-                    sortPhotosByFolder(state.photos, settingsManager.getPhotoSortOrder())
-                } else {
-                    state.photos
-                }
+                val sortedPhotos = MediaManager.sortPhotos(state.photos, settingsManager.getPhotoSortOrder(), isRecursive)
                 photoAdapter.setPhotos(sortedPhotos)
             }
         }
     }
 
-    private fun sortPhotosByFolder(photos: List<Photo>, sortOrder: Int): List<Photo> {
-        val grouped = photos.groupBy { it.folderPath }
-        
-        // Sort folder paths based on the requested order
-        val sortedFolderPaths = when (sortOrder) {
-            SettingsManager.SORT_NAME_ASC -> grouped.keys.sortedBy { it }
-            SettingsManager.SORT_NAME_DESC -> grouped.keys.sortedByDescending { it }
-            // For date, we need to pick a representative date for each folder
-            // SORT_DATE_DESC: newest photo in folder
-            SettingsManager.SORT_DATE_DESC -> grouped.keys.sortedByDescending { path ->
-                grouped[path]?.maxOfOrNull { it.dateModified } ?: 0L
-            }
-            // SORT_DATE_ASC: oldest photo in folder
-            SettingsManager.SORT_DATE_ASC -> grouped.keys.sortedBy { path ->
-                grouped[path]?.minOfOrNull { it.dateModified } ?: 0L
-            }
-            else -> grouped.keys.sortedByDescending { path ->
-                grouped[path]?.maxOfOrNull { it.dateModified } ?: 0L
-            }
-        }
-
-        val result = mutableListOf<Photo>()
-        for (path in sortedFolderPaths) {
-            val folderPhotos = grouped[path] ?: continue
-            // Sort photos within each folder as well
-            val sortedPhotos = when (sortOrder) {
-                SettingsManager.SORT_NAME_ASC -> folderPhotos.sortedBy { it.title }
-                SettingsManager.SORT_NAME_DESC -> folderPhotos.sortedByDescending { it.title }
-                SettingsManager.SORT_DATE_DESC -> folderPhotos.sortedByDescending { it.dateModified }
-                SettingsManager.SORT_DATE_ASC -> folderPhotos.sortedBy { it.dateModified }
-                else -> folderPhotos.sortedByDescending { it.dateModified }
-            }
-            result.addAll(sortedPhotos)
-        }
-        return result
-    }
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         if (ev.pointerCount > 1) {
@@ -260,59 +217,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshMedia() {
-        currentOffset = 0
-        MediaState.start(buildSessionKey())
-        loadPage(append = false, forceRefresh = true)
+        MediaManager.refresh(
+            this, lifecycleScope, buildSessionKey(),
+            folderPath, isRemote, isRecursive, isFavorites, currentQuery
+        )
     }
 
     private fun loadNextPage() {
-        val state = MediaState.state.value
-        if (state.sessionKey != buildSessionKey()) return
-        if (isPageLoading || !state.hasMore) return
-        MediaState.startAppend()
-        loadPage(append = true, forceRefresh = false)
-    }
-
-    private fun loadPage(append: Boolean, forceRefresh: Boolean = false) {
-        if (isPageLoading) return
-        isPageLoading = true
-
-        val sessionKey = buildSessionKey()
-        lifecycleScope.launch {
-            try {
-                val page = withContext(Dispatchers.IO) {
-                    if (isFavorites) {
-                        val allFavorites = settingsManager.getFavoritePhotos()
-                        val keyword = currentQuery.keyword.trim()
-                        val filtered = if (keyword.isNotEmpty()) {
-                            allFavorites.filter { it.title.contains(keyword, ignoreCase = true) }
-                        } else {
-                            allFavorites
-                        }
-                        
-                        val safeOffset = currentOffset.coerceAtLeast(0)
-                        val items = filtered.drop(safeOffset).take(pageSize)
-                        val next = safeOffset + items.size
-                        MediaPageResult(items = items, hasMore = next < filtered.size, nextOffset = next)
-                    } else if (isRemote) {
-                        RustWebDavPhotoRepository(settingsManager)
-                            .queryMediaPage(folderPath, isRecursive, currentQuery, currentOffset, pageSize, forceRefresh)
-                    } else {
-                        LocalPhotoRepository(this@MainActivity)
-                            .queryMediaPage(folderPath, isRecursive, currentQuery, currentOffset, pageSize, forceRefresh)
-                    }
-                }
-
-                currentOffset = page.nextOffset
-                MediaState.setPage(sessionKey, page.items, page.hasMore, append)
-            } catch (e: Exception) {
-                val errorMessage = e.message ?: e.toString()
-                android.util.Log.e("MainActivity", "Load failed: $errorMessage", e)
-                MediaState.setError(sessionKey, errorMessage)
-            } finally {
-                isPageLoading = false
-            }
-        }
+        MediaManager.loadNextPage(this, lifecycleScope)
     }
 
     private fun buildSessionKey(): String {

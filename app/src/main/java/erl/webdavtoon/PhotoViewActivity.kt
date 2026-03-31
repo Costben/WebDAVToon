@@ -145,6 +145,15 @@ class PhotoViewActivity : AppCompatActivity() {
                     updateFastScrollThumbPosition()
                 }
                 updateCurrentPosition()
+                
+                // 检查是否需要加载下一页
+                val layoutManager = recyclerView.layoutManager as? LinearLayoutManager
+                if (layoutManager != null && photos.isNotEmpty()) {
+                    val lastVisible = layoutManager.findLastVisibleItemPosition()
+                    if (lastVisible >= photos.size - 10) { // 提前 10 张开始预加载
+                        MediaManager.loadNextPage(this@PhotoViewActivity, lifecycleScope)
+                    }
+                }
             }
 
             override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
@@ -667,6 +676,30 @@ class PhotoViewActivity : AppCompatActivity() {
     
 
 
+    private fun observeMediaState() {
+        lifecycleScope.launch {
+            MediaState.state.collect { state ->
+                // 仅当会话匹配且图片列表确实发生变化时才更新
+                if (state.sessionKey.isNotEmpty()) {
+                    val currentSortOrder = settingsManager.getPhotoSortOrder()
+                    val sortedStatePhotos = MediaManager.sortPhotos(state.photos, currentSortOrder, state.isRecursive)
+                    
+                    if (sortedStatePhotos != photos) {
+                        photos = sortedStatePhotos
+                        adapter.setPhotos(photos)
+                        webtoonAdapter?.setPhotos(photos)
+                        
+                        // 更新标题等信息
+                        if (currentIndex in photos.indices) {
+                            binding.toolbar.title = photos[currentIndex].title
+                            updateFavoriteButtonState()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         // 在保存状态前确保 currentIndex 是最新的
@@ -690,6 +723,8 @@ class PhotoViewActivity : AppCompatActivity() {
             isCardMode = false
             isImmersiveMode = true // 默认开启沉浸模式
         }
+
+        observeMediaState()
             
         isFavorites = intent.getBooleanExtra("EXTRA_IS_FAVORITES", false)
         
