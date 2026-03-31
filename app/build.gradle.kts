@@ -1,5 +1,7 @@
 import java.util.Properties
 
+import org.mozilla.rust_android_gradle.CargoExtension
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -7,7 +9,7 @@ plugins {
     id("org.mozilla.rust-android-gradle.rust-android")
 }
 
-cargo {
+configure<CargoExtension> {
     module = "../rust-core"
     libname = "rust_core"
     targets = listOf("arm", "arm64", "x86", "x86_64")
@@ -31,6 +33,10 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
+        }
+        
+        ndk {
+            abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64"))
         }
     }
 

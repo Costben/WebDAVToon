@@ -48,7 +48,9 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             rust-core/target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('rust-core/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('rust-core/Cargo.lock', 'rust-core/src/**/*.rs') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
 
       # 设置 Python 和 NDK 环境变量
       - name: Set up Environment
@@ -62,11 +64,8 @@ jobs:
           echo "Using NDK version: $NDK_VERSION"
           echo "ANDROID_NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
           
-          # 注意：GitHub Actions 环境下，指定的 NDK 可能尚未安装
-          # Gradle 会在构建开始后自动下载它。
-          # 某些较旧的插件可能需要在 local.properties 中明确指定 ndk.dir
-          # 我们在构建任务前动态创建它（如果目录已存在或将被 Gradle 创建）
-          # 但在这里我们先不写入 local.properties，让 Gradle 自己决定。
+          # 写入 ndk.dir 到 local.properties 强制插件识别
+          echo "ndk.dir=$NDK_PATH" > local.properties
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
@@ -77,6 +76,11 @@ jobs:
           # 明确导出变量，防止某些插件读不到 GITHUB_ENV
           export ANDROID_NDK_HOME=$ANDROID_NDK_HOME
           echo "Using NDK path: $ANDROID_NDK_HOME"
+          
+          # 显式执行 cargoBuild 以确保 Rust 编译被触发
+          echo "Running cargoBuild..."
+          ./gradlew :app:cargoBuild --stacktrace
+          
           if [ "${{ startsWith(github.ref, 'refs/tags/v') }}" = "true" ]; then
             echo "Building Release APK..."
             echo "${{ secrets.SIGNING_KEY }}" | base64 -d > app/release.jks
