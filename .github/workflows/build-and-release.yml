@@ -91,6 +91,13 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build APK
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+          SIGNING_KEY_B64: ${{ secrets.SIGNING_KEY }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEYSTORE_PASSWORD_LEGACY: ${{ secrets.KEY_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           # Explicit export in case a plugin does not read $GITHUB_ENV.
           export ANDROID_NDK_HOME=$ANDROID_NDK_HOME
@@ -98,12 +105,29 @@ jobs:
 
           if [ "${{ startsWith(github.ref, 'refs/tags/v') }}" = "true" ]; then
             echo "Building Release APK..."
-            echo "${{ secrets.SIGNING_KEY }}" | base64 -d > app/release.jks
+            STORE_PASS="${KEYSTORE_PASSWORD:-$KEYSTORE_PASSWORD_LEGACY}"
+
+            missing=()
+            [ -z "$SIGNING_KEY_B64" ] && missing+=("SIGNING_KEY")
+            [ -z "$STORE_PASS" ] && missing+=("KEYSTORE_PASSWORD")
+            [ -z "$KEY_ALIAS" ] && missing+=("KEY_ALIAS")
+            [ -z "$KEY_PASSWORD" ] && missing+=("KEY_PASSWORD")
+            if [ "${#missing[@]}" -gt 0 ]; then
+              echo "::error::Missing release secrets: ${missing[*]}"
+              exit 1
+            fi
+
+            printf '%s' "$SIGNING_KEY_B64" | base64 --decode > app/release.jks
+            if ! keytool -list -keystore app/release.jks -storepass "$STORE_PASS" -alias "$KEY_ALIAS" > /dev/null 2>&1; then
+              echo "::error::Keystore validation failed. Check SIGNING_KEY / KEYSTORE_PASSWORD / KEY_ALIAS."
+              exit 1
+            fi
+
             ./gradlew assembleRelease \
               -Pandroid.injected.signing.store.file=$(pwd)/app/release.jks \
-              -Pandroid.injected.signing.store.password=${{ secrets.KEY_STORE_PASSWORD }} \
-              -Pandroid.injected.signing.key.alias=${{ secrets.KEY_ALIAS }} \
-              -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }} \
+              -Pandroid.injected.signing.store.password="$STORE_PASS" \
+              -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
+              -Pandroid.injected.signing.key.password="$KEY_PASSWORD" \
               --stacktrace
           else
             echo "Building Debug APK..."
