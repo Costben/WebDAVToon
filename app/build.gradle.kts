@@ -13,6 +13,7 @@ cargo {
     targets = listOf("arm", "arm64", "x86", "x86_64")
     profile = "release"
     pythonCommand = "python3"
+    apiLevel = 24
 }
 
 android {
@@ -71,8 +72,7 @@ android {
 
     sourceSets {
         getByName("main") {
-            java.srcDir("build/generated/source/uniffi/java")
-            jniLibs.srcDirs("src/main/jniLibs")
+            java.srcDirs(file("src/main/java"), file("build/generated/source/uniffi/java"))
         }
     }
 
