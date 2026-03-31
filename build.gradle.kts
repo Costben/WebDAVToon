@@ -3,5 +3,5 @@ plugins {
     id("com.android.application") version "8.2.2" apply false
     id("org.jetbrains.kotlin.android") version "1.9.22" apply false
     id("org.jetbrains.kotlin.kapt") version "1.9.22" apply false
-    id("com.nishtahir.rust-android") version "0.9.0" apply false
+    id("org.mozilla.rust-android-gradle.rust-android") version "0.9.6" apply false
 }
