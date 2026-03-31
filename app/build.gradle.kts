@@ -4,10 +4,10 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("kotlin-kapt")
-    id("com.nishtahir.rust-android")
+    id("org.mozilla.rust-android-gradle.rust-android")
 }
 
-cargo {
+extensions.configure<org.mozilla.rust_android_gradle.CargoExtension> {
     module = "../rust-core"
     libname = "rust_core"
     targets = listOf("arm", "arm64", "x86", "x86_64")
@@ -19,7 +19,7 @@ cargo {
 android {
     namespace = "erl.webdavtoon"
     compileSdk = 36
-    ndkVersion = "27.3.13750724"
+    ndkVersion = "26.3.11579264"
 
     defaultConfig {
         applicationId = "erl.webdavtoon"
@@ -77,7 +77,6 @@ android {
     sourceSets {
         getByName("main") {
             java.srcDirs(file("src/main/java"), file("build/generated/source/uniffi/java"))
-            jniLibs.srcDir("build/rustJniLibs/android")
         }
     }
 

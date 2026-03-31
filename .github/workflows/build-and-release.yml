@@ -59,13 +59,21 @@ jobs:
           sudo ln -sf /usr/bin/python3 /usr/bin/python
           
           # 设置 NDK 版本和路径，使其与 build.gradle.kts 一致
-          NDK_VERSION="27.3.13750724"
+          NDK_VERSION="26.3.11579264"
           NDK_PATH="${ANDROID_HOME}/ndk/${NDK_VERSION}"
           echo "Using NDK version: $NDK_VERSION"
           echo "ANDROID_NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
           
           # 写入 ndk.dir 到 local.properties 强制插件识别
           echo "ndk.dir=$NDK_PATH" > local.properties
+
+      - name: Verify NDK Path
+        run: |
+          if [ ! -d "$ANDROID_NDK_HOME" ]; then
+            echo "NDK directory not found at $ANDROID_NDK_HOME, will let Gradle install it."
+          else
+            echo "NDK found at $ANDROID_NDK_HOME"
+          fi
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
