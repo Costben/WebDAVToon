@@ -1,15 +1,13 @@
 import java.util.Properties
 
-import org.mozilla.rust_android_gradle.CargoExtension
-
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("kotlin-kapt")
-    id("org.mozilla.rust-android-gradle.rust-android")
+    id("com.nishtahir.rust-android")
 }
 
-configure<CargoExtension> {
+cargo {
     module = "../rust-core"
     libname = "rust_core"
     targets = listOf("arm", "arm64", "x86", "x86_64")
@@ -79,6 +77,13 @@ android {
     sourceSets {
         getByName("main") {
             java.srcDirs(file("src/main/java"), file("build/generated/source/uniffi/java"))
+            jniLibs.srcDir("build/rustJniLibs/android")
+        }
+    }
+
+    tasks.whenTaskAdded {
+        if (name == "mergeDebugJniLibFolders" || name == "mergeReleaseJniLibFolders") {
+            dependsOn("cargoBuild")
         }
     }
 

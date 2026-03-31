@@ -77,10 +77,6 @@ jobs:
           export ANDROID_NDK_HOME=$ANDROID_NDK_HOME
           echo "Using NDK path: $ANDROID_NDK_HOME"
           
-          # 显式执行 cargoBuild 以确保 Rust 编译被触发
-          echo "Running cargoBuild..."
-          ./gradlew :app:cargoBuild --stacktrace
-          
           if [ "${{ startsWith(github.ref, 'refs/tags/v') }}" = "true" ]; then
             echo "Building Release APK..."
             echo "${{ secrets.SIGNING_KEY }}" | base64 -d > app/release.jks
