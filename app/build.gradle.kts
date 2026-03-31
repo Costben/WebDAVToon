@@ -1,4 +1,5 @@
 import java.util.Properties
+import com.nishtahir.CargoExtension
 
 plugins {
     id("com.android.application")
@@ -7,7 +8,7 @@ plugins {
     id("org.mozilla.rust-android-gradle.rust-android")
 }
 
-extensions.configure<org.mozilla.rust_android_gradle.CargoExtension> {
+extensions.configure<CargoExtension> {
     module = "../rust-core"
     libname = "rust_core"
     targets = listOf("arm", "arm64", "x86", "x86_64")
