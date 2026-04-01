@@ -57,8 +57,9 @@ class MainActivity : AppCompatActivity() {
         ThemeHelper.applyTheme(this)
         settingsManager = SettingsManager(this)
         LogManager.initialize(this)
-        applyRotationLock()
         super.onCreate(savedInstanceState)
+        MediaManager.mediaViewModel = androidx.lifecycle.ViewModelProvider(this)[MediaViewModel::class.java]
+        applyRotationLock()
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
         window.navigationBarColor = android.graphics.Color.TRANSPARENT
@@ -193,7 +194,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun observeState() {
         lifecycleScope.launch {
-            MediaState.state.collect { state ->
+            MediaManager.mediaViewModel?.state?.collect { state: MediaUiState ->
                 if (state.sessionKey != buildSessionKey()) return@collect
                 binding.progressBar.visibility = if (state.isLoading && state.photos.isEmpty()) View.VISIBLE else View.GONE
                 binding.emptyView.visibility = if (!state.isLoading && state.photos.isEmpty()) View.VISIBLE else View.GONE
@@ -408,16 +409,17 @@ class MainActivity : AppCompatActivity() {
 }
 
 object PhotoCache {
-    private var photos: List<Photo> = emptyList()
+    private val photos = java.util.concurrent.CopyOnWriteArrayList<Photo>()
 
     fun setPhotos(list: List<Photo>) {
-        photos = list
+        photos.clear()
+        photos.addAll(list)
     }
 
-    fun getPhotos(): List<Photo> = photos
+    fun getPhotos(): List<Photo> = photos.toList()
 
     fun clear() {
-        photos = emptyList()
+        photos.clear()
     }
 }
 

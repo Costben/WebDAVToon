@@ -1,15 +1,21 @@
 package erl.webdavtoon
 
 import android.content.Context
-import android.net.Uri
 import android.util.Log
-import com.google.gson.*
+import android.net.Uri
+import com.google.gson.GsonBuilder
+import com.google.gson.JsonDeserializer
+import com.google.gson.JsonElement
+import com.google.gson.JsonPrimitive
+import com.google.gson.JsonSerializer
+import com.google.gson.JsonSerializationContext
+import com.google.gson.JsonDeserializationContext
 import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.runBlocking
 import java.lang.reflect.Type
 
-class SettingsManager(context: Context) {
-    private val prefs = context.getSharedPreferences("webdavtoon_prefs", Context.MODE_PRIVATE)
-    
+class SettingsManager(private val context: Context) {
+    private val appSettings = AppSettingsStore(context)
     private val gson = GsonBuilder()
         .registerTypeAdapter(Uri::class.java, UriAdapter())
         .create()
@@ -60,113 +66,91 @@ class SettingsManager(context: Context) {
         const val SORT_DATE_ASC = 3
     }
 
-    private fun getSlotKey(key: String): String = "slot${getCurrentSlot()}_$key"
-    private fun getSpecificSlotKey(slot: Int, key: String): String = "slot${slot}_$key"
+    fun getGridColumns(): Int = runBlocking { appSettings.getOrDefaultInt(AppSettingsStore.GRID_COLUMNS, 2) }
+    fun setGridColumns(count: Int) = runBlocking { appSettings.putInt(AppSettingsStore.GRID_COLUMNS, count) }
 
-    fun getGridColumns(): Int = prefs.getInt(KEY_GRID_COLUMNS, 2)
-    fun setGridColumns(count: Int) = prefs.edit().putInt(KEY_GRID_COLUMNS, count).apply()
+    fun getPhotoGridColumns(): Int = runBlocking { appSettings.getOrDefaultInt(AppSettingsStore.PHOTO_GRID_COLUMNS, 2) }
+    fun setPhotoGridColumns(count: Int) = runBlocking { appSettings.putInt(AppSettingsStore.PHOTO_GRID_COLUMNS, count) }
 
-    fun getPhotoGridColumns(): Int = prefs.getInt(KEY_PHOTO_GRID_COLUMNS, 2)
-    fun setPhotoGridColumns(count: Int) = prefs.edit().putInt(KEY_PHOTO_GRID_COLUMNS, count).apply()
+    fun getSortOrder(): Int = runBlocking { appSettings.getOrDefaultInt(AppSettingsStore.SORT_ORDER, 2) }
+    fun setSortOrder(order: Int) = runBlocking { appSettings.putInt(AppSettingsStore.SORT_ORDER, order) }
 
-    fun getSortOrder(): Int = prefs.getInt(KEY_SORT_ORDER, 2)
-    fun setSortOrder(order: Int) = prefs.edit().putInt(KEY_SORT_ORDER, order).apply()
+    fun getPhotoSortOrder(): Int = runBlocking { appSettings.getOrDefaultInt(AppSettingsStore.PHOTO_SORT_ORDER, 2) }
+    fun setPhotoSortOrder(order: Int) = runBlocking { appSettings.putInt(AppSettingsStore.PHOTO_SORT_ORDER, order) }
 
-    fun getPhotoSortOrder(): Int = prefs.getInt(KEY_PHOTO_SORT_ORDER, 2)
-    fun setPhotoSortOrder(order: Int) = prefs.edit().putInt(KEY_PHOTO_SORT_ORDER, order).apply()
+    fun getLogLevel(): Int = runBlocking { appSettings.getOrDefaultInt(AppSettingsStore.LOG_LEVEL, Log.INFO) }
+    fun setLogLevel(level: Int) = runBlocking { appSettings.putInt(AppSettingsStore.LOG_LEVEL, level) }
 
-    fun getLogLevel(): Int = prefs.getInt(KEY_LOG_LEVEL, Log.INFO)
-    fun setLogLevel(level: Int) = prefs.edit().putInt(KEY_LOG_LEVEL, level).apply()
+    fun getThemeId(): Int = runBlocking { appSettings.getOrDefaultInt(AppSettingsStore.THEME_ID, 0) }
+    fun setThemeId(id: Int) = runBlocking { appSettings.putInt(AppSettingsStore.THEME_ID, id) }
 
-    fun getThemeId(): Int = prefs.getInt(KEY_THEME_ID, 0)
-    fun setThemeId(id: Int) = prefs.edit().putInt(KEY_THEME_ID, id).apply()
+    fun getLanguage(): String = runBlocking { appSettings.getOrDefaultString(AppSettingsStore.LANGUAGE, "default") }
+    fun setLanguage(lang: String) = runBlocking { appSettings.putString(AppSettingsStore.LANGUAGE, lang) }
 
-    fun getLanguage(): String = prefs.getString(KEY_LANGUAGE, "default") ?: "default"
-    fun setLanguage(lang: String) = prefs.edit().putString(KEY_LANGUAGE, lang).apply()
+    fun getWaterfallQualityMode(): String = runBlocking { appSettings.getOrDefaultString(AppSettingsStore.WATERFALL_QUALITY_MODE, WATERFALL_MODE_PERCENT) }
+    fun setWaterfallQualityMode(mode: String) = runBlocking { appSettings.putString(AppSettingsStore.WATERFALL_QUALITY_MODE, mode) }
 
-    fun getWaterfallQualityMode(): String = prefs.getString(KEY_WATERFALL_QUALITY_MODE, WATERFALL_MODE_PERCENT) ?: WATERFALL_MODE_PERCENT
-    fun setWaterfallQualityMode(mode: String) = prefs.edit().putString(KEY_WATERFALL_QUALITY_MODE, mode).apply()
+    fun getWaterfallPercent(): Int = runBlocking { appSettings.getOrDefaultInt(AppSettingsStore.WATERFALL_PERCENT, 70) }
+    fun setWaterfallPercent(percent: Int) = runBlocking { appSettings.putInt(AppSettingsStore.WATERFALL_PERCENT, percent) }
 
-    fun getWaterfallPercent(): Int = prefs.getInt(KEY_WATERFALL_PERCENT, 70)
-    fun setWaterfallPercent(percent: Int) = prefs.edit().putInt(KEY_WATERFALL_PERCENT, percent).apply()
+    fun getWaterfallMaxWidth(): Int = runBlocking { appSettings.getOrDefaultInt(AppSettingsStore.WATERFALL_MAX_WIDTH, 600) }
+    fun setWaterfallMaxWidth(maxWidth: Int) = runBlocking { appSettings.putInt(AppSettingsStore.WATERFALL_MAX_WIDTH, maxWidth) }
 
-    fun getWaterfallMaxWidth(): Int = prefs.getInt(KEY_WATERFALL_MAX_WIDTH, 600)
-    fun setWaterfallMaxWidth(maxWidth: Int) = prefs.edit().putInt(KEY_WATERFALL_MAX_WIDTH, maxWidth).apply()
+    fun getReaderMaxZoomPercent(): Int = runBlocking { appSettings.getOrDefaultInt(AppSettingsStore.READER_MAX_ZOOM_PERCENT, 300) }
+    fun setReaderMaxZoomPercent(percent: Int) = runBlocking { appSettings.putInt(AppSettingsStore.READER_MAX_ZOOM_PERCENT, percent) }
 
-    fun getReaderMaxZoomPercent(): Int = prefs.getInt(KEY_READER_MAX_ZOOM_PERCENT, 300)
-    fun setReaderMaxZoomPercent(percent: Int) = prefs.edit().putInt(KEY_READER_MAX_ZOOM_PERCENT, percent).apply()
+    fun isRotationLocked(): Boolean = runBlocking { appSettings.getOrDefaultBoolean(AppSettingsStore.ROTATION_LOCKED, false) }
+    fun setRotationLocked(locked: Boolean) = runBlocking { appSettings.putBoolean(AppSettingsStore.ROTATION_LOCKED, locked) }
 
-    fun isRotationLocked(): Boolean = prefs.getBoolean(KEY_ROTATION_LOCKED, false)
-    fun setRotationLocked(locked: Boolean) = prefs.edit().putBoolean(KEY_ROTATION_LOCKED, locked).apply()
-
-    fun getCurrentSlot(): Int = prefs.getInt(KEY_CURRENT_SLOT, 0)
-    fun setCurrentSlot(slot: Int) = prefs.edit().putInt(KEY_CURRENT_SLOT, slot).apply()
+    fun getCurrentSlot(): Int = runBlocking { appSettings.getOrDefaultInt(AppSettingsStore.CURRENT_SLOT, 0) }
+    fun setCurrentSlot(slot: Int) = runBlocking { appSettings.putInt(AppSettingsStore.CURRENT_SLOT, slot) }
 
     // Deprecated legacy switch: app runs in webdav-only mode.
     fun getServerType(): String = "webdav"
-    fun setServerType(type: String) {
-        // no-op, kept for backward compatibility
-    }
+    fun setServerType(type: String) { }
 
-    fun deleteSlot(slot: Int) {
-        val editor = prefs.edit()
-        editor.remove(getSpecificSlotKey(slot, KEY_WEBDAV_ENABLED))
-        editor.remove(getSpecificSlotKey(slot, KEY_WEBDAV_PROTOCOL))
-        editor.remove(getSpecificSlotKey(slot, KEY_WEBDAV_URL))
-        editor.remove(getSpecificSlotKey(slot, KEY_WEBDAV_PORT))
-        editor.remove(getSpecificSlotKey(slot, KEY_WEBDAV_USERNAME))
-        editor.remove(getSpecificSlotKey(slot, KEY_WEBDAV_PASSWORD))
-        editor.remove(getSpecificSlotKey(slot, KEY_WEBDAV_REMEMBER_PASSWORD))
-        editor.remove(getSpecificSlotKey(slot, KEY_WEBDAV_ALIAS))
-        editor.apply()
-        
-        // If current slot is deleted, switch to another valid slot or 0
+    fun deleteSlot(slot: Int) = runBlocking {
+        val slots = getWebDavSlots()
+        if (slots.remove(slot) != null) {
+            saveWebDavSlots(slots)
+        }
+
         if (getCurrentSlot() == slot) {
-            val all = getAllSlots()
-            val next = all.firstOrNull { it != slot } ?: 0
+            val next = slots.keys.firstOrNull() ?: 0
             setCurrentSlot(next)
         }
     }
 
     fun getAllSlots(): List<Int> {
-        val slots = mutableListOf<Int>()
-        // We scan slots 0 to 9 for simplicity, or we could store a list of active slots.
-        // For now, let's assume if an alias or URL exists, the slot is valid.
-        for (i in 0..9) {
-            if (getWebDavUrl(i).isNotEmpty() || getWebDavAlias(i).isNotEmpty()) {
-                slots.add(i)
-            }
-        }
-        if (slots.isEmpty()) slots.add(0) // Ensure at least default slot
-        return slots
+        val slots = getWebDavSlots().keys.sorted()
+        return if (slots.isEmpty()) listOf(0) else slots
     }
 
-    fun getWebDavUrl(slot: Int = getCurrentSlot()): String = prefs.getString(getSpecificSlotKey(slot, KEY_WEBDAV_URL), "") ?: ""
-    fun setWebDavUrl(url: String, slot: Int = getCurrentSlot()) = prefs.edit().putString(getSpecificSlotKey(slot, KEY_WEBDAV_URL), url).apply()
 
-    fun getWebDavProtocol(slot: Int = getCurrentSlot()): String = prefs.getString(getSpecificSlotKey(slot, KEY_WEBDAV_PROTOCOL), "https") ?: "https"
-    fun setWebDavProtocol(protocol: String, slot: Int = getCurrentSlot()) = prefs.edit().putString(getSpecificSlotKey(slot, KEY_WEBDAV_PROTOCOL), protocol).apply()
+    fun getWebDavUrl(slot: Int = getCurrentSlot()): String = getWebDavSlot(slot)?.url ?: ""
+    fun setWebDavUrl(url: String, slot: Int = getCurrentSlot()) = upsertWebDavSlot(slot) { copy(url = url) }
 
-    fun getWebDavPort(slot: Int = getCurrentSlot()): Int = prefs.getInt(getSpecificSlotKey(slot, KEY_WEBDAV_PORT), if (getWebDavProtocol(slot) == "https") 443 else 80)
-    fun setWebDavPort(port: Int, slot: Int = getCurrentSlot()) = prefs.edit().putInt(getSpecificSlotKey(slot, KEY_WEBDAV_PORT), port).apply()
+    fun getWebDavProtocol(slot: Int = getCurrentSlot()): String = getWebDavSlot(slot)?.protocol ?: "https"
+    fun setWebDavProtocol(protocol: String, slot: Int = getCurrentSlot()) = upsertWebDavSlot(slot) { copy(protocol = protocol) }
 
-    fun getWebDavUsername(slot: Int = getCurrentSlot()): String = prefs.getString(getSpecificSlotKey(slot, KEY_WEBDAV_USERNAME), "") ?: ""
-    fun setWebDavUsername(username: String, slot: Int = getCurrentSlot()) = prefs.edit().putString(getSpecificSlotKey(slot, KEY_WEBDAV_USERNAME), username).apply()
+    fun getWebDavPort(slot: Int = getCurrentSlot()): Int = getWebDavSlot(slot)?.port ?: if (getWebDavProtocol(slot) == "https") 443 else 80
+    fun setWebDavPort(port: Int, slot: Int = getCurrentSlot()) = upsertWebDavSlot(slot) { copy(port = port) }
 
-    fun getWebDavPassword(slot: Int = getCurrentSlot()): String = prefs.getString(getSpecificSlotKey(slot, KEY_WEBDAV_PASSWORD), "") ?: ""
-    fun setWebDavPassword(password: String, slot: Int = getCurrentSlot()) = prefs.edit().putString(getSpecificSlotKey(slot, KEY_WEBDAV_PASSWORD), password).apply()
+    fun getWebDavUsername(slot: Int = getCurrentSlot()): String = getWebDavSlot(slot)?.username ?: ""
+    fun setWebDavUsername(username: String, slot: Int = getCurrentSlot()) = upsertWebDavSlot(slot) { copy(username = username) }
 
-    fun isWebDavRememberPassword(slot: Int = getCurrentSlot()): Boolean = prefs.getBoolean(getSpecificSlotKey(slot, KEY_WEBDAV_REMEMBER_PASSWORD), true)
-    fun setWebDavRememberPassword(remember: Boolean, slot: Int = getCurrentSlot()) = prefs.edit().putBoolean(getSpecificSlotKey(slot, KEY_WEBDAV_REMEMBER_PASSWORD), remember).apply()
+    fun getWebDavPassword(slot: Int = getCurrentSlot()): String = getWebDavSlot(slot)?.password ?: ""
+    fun setWebDavPassword(password: String, slot: Int = getCurrentSlot()) = upsertWebDavSlot(slot) { copy(password = password) }
 
-    fun getWebDavAlias(slot: Int = getCurrentSlot()): String =
-        prefs.getString(getSpecificSlotKey(slot, KEY_WEBDAV_ALIAS), "") ?: ""
+    fun isWebDavRememberPassword(slot: Int = getCurrentSlot()): Boolean = getWebDavSlot(slot)?.rememberPassword ?: true
+    fun setWebDavRememberPassword(remember: Boolean, slot: Int = getCurrentSlot()) = upsertWebDavSlot(slot) { copy(rememberPassword = remember) }
 
-    fun setWebDavAlias(alias: String, slot: Int = getCurrentSlot()) =
-        prefs.edit().putString(getSpecificSlotKey(slot, KEY_WEBDAV_ALIAS), alias).apply()
+    fun getWebDavAlias(slot: Int = getCurrentSlot()): String = getWebDavSlot(slot)?.alias ?: ""
 
-    fun isWebDavEnabled(slot: Int = getCurrentSlot()): Boolean = prefs.getBoolean(getSpecificSlotKey(slot, KEY_WEBDAV_ENABLED), false)
-    fun setWebDavEnabled(enabled: Boolean, slot: Int = getCurrentSlot()) = prefs.edit().putBoolean(getSpecificSlotKey(slot, KEY_WEBDAV_ENABLED), enabled).apply()
+    fun setWebDavAlias(alias: String, slot: Int = getCurrentSlot()) = upsertWebDavSlot(slot) { copy(alias = alias) }
+
+    fun isWebDavEnabled(slot: Int = getCurrentSlot()): Boolean = getWebDavSlot(slot)?.enabled ?: false
+    fun setWebDavEnabled(enabled: Boolean, slot: Int = getCurrentSlot()) = upsertWebDavSlot(slot) { copy(enabled = enabled) }
 
     fun getFullWebDavUrl(slot: Int = getCurrentSlot()): String {
         val protocol = getWebDavProtocol(slot)
@@ -198,50 +182,105 @@ class SettingsManager(context: Context) {
         return fullUrl
     }
 
-    fun isPhotoFavorite(photoId: String): Boolean = getFavoritePhotosMap().containsKey(photoId)
+    fun isPhotoFavorite(photoId: String): Boolean = runBlocking {
+        AppDatabase.getInstance(context).favoritePhotoDao().isFavorite(photoId)
+    }
 
     fun addFavoritePhoto(photo: Photo) {
-        val favorites = getFavoritePhotosMap().toMutableMap()
-        favorites[photo.id] = gson.toJson(photo)
-        saveFavoritePhotosMap(favorites)
+        runBlocking {
+            val dao = AppDatabase.getInstance(context).favoritePhotoDao()
+            dao.insert(photo.toFavoriteEntity())
+            removeFavoritePhotoFromLegacyPrefs(photo.id)
+        }
     }
 
     fun removeFavoritePhoto(photoId: String) {
-        val favorites = getFavoritePhotosMap().toMutableMap()
-        favorites.remove(photoId)
-        saveFavoritePhotosMap(favorites)
+        runBlocking {
+            val dao = AppDatabase.getInstance(context).favoritePhotoDao()
+            dao.deleteById(photoId)
+            removeFavoritePhotoFromLegacyPrefs(photoId)
+        }
     }
 
     fun getFavoritePhotos(): List<Photo> {
-        val map = getFavoritePhotosMap()
-        val photos = mutableListOf<Photo>()
-        for (json in map.values) {
-            try {
-                val photo = gson.fromJson(json, Photo::class.java)
-                if (photo != null) {
-                    photos.add(photo)
-                }
-            } catch (e: Exception) {
-                Log.e("SettingsManager", "Error parsing favorite photo: $json", e)
+        return runBlocking {
+            val dao = AppDatabase.getInstance(context).favoritePhotoDao()
+            val favorites = dao.getAll()
+            if (favorites.isEmpty()) {
+                migrateFavoritesFromLegacyPrefs(dao)
+                dao.getAll().map { it.toPhoto() }
+            } else {
+                favorites.map { it.toPhoto() }
             }
         }
-        return photos
     }
 
-    private fun getFavoritePhotosMap(): Map<String, String> {
-        val favoritesString = prefs.getString(KEY_FAVORITE_PHOTOS, "") ?: ""
-        if (favoritesString.isEmpty()) return emptyMap()
-        return try {
-            val type = object : TypeToken<Map<String, String>>() {}.type
-            val result: Map<String, String> = gson.fromJson(favoritesString, type)
-            result
+    private data class LegacyWebDavSlotConfig(
+        val enabled: Boolean = false,
+        val protocol: String = "https",
+        val url: String = "",
+        val port: Int = 443,
+        val username: String = "",
+        val password: String = "",
+        val rememberPassword: Boolean = true,
+        val alias: String = ""
+    )
+
+    private fun getWebDavSlots(): MutableMap<Int, LegacyWebDavSlotConfig> = runBlocking {
+        val json = appSettings.getOrDefaultString(AppSettingsStore.WEBDAV_SLOTS_JSON, "")
+        if (json.isBlank()) return@runBlocking mutableMapOf()
+        return@runBlocking try {
+            val type = object : TypeToken<Map<String, LegacyWebDavSlotConfig>>() {}.type
+            @Suppress("UNCHECKED_CAST")
+            val result = gson.fromJson<Map<String, LegacyWebDavSlotConfig>>(json, type)
+            result.mapKeys { it.key.toInt() }.toMutableMap()
         } catch (e: Exception) {
-            Log.e("SettingsManager", "Error parsing favorite photos map: $favoritesString", e)
-            emptyMap()
+            Log.e("SettingsManager", "Error parsing WebDAV slots: $json", e)
+            mutableMapOf()
         }
     }
 
-    private fun saveFavoritePhotosMap(favorites: Map<String, String>) {
-        prefs.edit().putString(KEY_FAVORITE_PHOTOS, gson.toJson(favorites)).apply()
+    private fun saveWebDavSlots(slots: Map<Int, LegacyWebDavSlotConfig>) = runBlocking {
+        val asStringMap = slots.mapKeys { it.key.toString() }
+        appSettings.putString(AppSettingsStore.WEBDAV_SLOTS_JSON, gson.toJson(asStringMap))
     }
+
+    private fun getWebDavSlot(slot: Int): LegacyWebDavSlotConfig? {
+        return getWebDavSlots()[slot]
+    }
+
+    private fun upsertWebDavSlot(slot: Int, transform: LegacyWebDavSlotConfig.() -> LegacyWebDavSlotConfig) = runBlocking {
+        val slots = getWebDavSlots()
+        val current = slots[slot] ?: LegacyWebDavSlotConfig()
+        slots[slot] = current.transform()
+        saveWebDavSlots(slots)
+    }
+
+    private suspend fun migrateFavoritesFromLegacyPrefs(dao: FavoritePhotoDao) { }
+
+    private fun removeFavoritePhotoFromLegacyPrefs(photoId: String) { }
+
+    private fun Photo.toFavoriteEntity(): FavoritePhotoEntity = FavoritePhotoEntity(
+        id = id,
+        imageUri = imageUri.toString(),
+        title = title,
+        width = width,
+        height = height,
+        isLocal = isLocal,
+        dateModified = dateModified,
+        size = size,
+        folderPath = folderPath
+    )
+
+    private fun FavoritePhotoEntity.toPhoto(): Photo = Photo(
+        id = id,
+        imageUri = Uri.parse(imageUri),
+        title = title,
+        width = width,
+        height = height,
+        isLocal = isLocal,
+        dateModified = dateModified,
+        size = size,
+        folderPath = folderPath
+    )
 }

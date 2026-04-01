@@ -4,6 +4,9 @@ import android.app.Application
 import android.content.Context
 import android.util.Base64
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import com.bumptech.glide.Glide
 import com.bumptech.glide.GlideBuilder
 import com.bumptech.glide.load.engine.cache.InternalCacheDiskCacheFactory
@@ -19,6 +22,10 @@ class WebDAVToonApplication : Application() {
 
         appContext = applicationContext
         LogManager.initialize(this)
+        AppDatabase.getInstance(this)
+        CoroutineScope(Dispatchers.IO).launch {
+            ConfigMigration.migrateIfNeeded(this@WebDAVToonApplication)
+        }
 
         try {
             try {

@@ -22,24 +22,32 @@ class RustWebDavPhotoRepository(
         forceRefresh: Boolean
     ): MediaPageResult = withContext(Dispatchers.IO) {
         val photos = getPhotos(folderPath, recursive, forceRefresh)
-        
-        // Since Rust core might not support all sort orders (like DATE_ASC), 
-        // we re-sort here to ensure the user's preference is respected.
-        val sortedAll = when (settingsManager.getPhotoSortOrder()) {
-            0 -> photos.sortedBy { it.title }
-            1 -> photos.sortedByDescending { it.title }
-            2 -> photos.sortedByDescending { it.dateModified }
-            3 -> photos.sortedBy { it.dateModified }
-            else -> photos.sortedByDescending { it.dateModified }
-        }.asSequence()
-            .filter { matchesMediaQuery(it, query) }
-            .toList()
+
+        val comparator: Comparator<Photo> = when (settingsManager.getPhotoSortOrder()) {
+            0 -> compareBy { it.title.lowercase(Locale.ROOT) }
+            1 -> compareByDescending { it.title.lowercase(Locale.ROOT) }
+            2 -> compareByDescending { it.dateModified }
+            3 -> compareBy { it.dateModified }
+            else -> compareByDescending { it.dateModified }
+        }
 
         val safeOffset = offset.coerceAtLeast(0)
         val safeLimit = limit.coerceAtLeast(1)
-        val page = sortedAll.drop(safeOffset).take(safeLimit)
-        val next = safeOffset + page.size
-        MediaPageResult(items = page, hasMore = next < sortedAll.size, nextOffset = next)
+
+        val page = photos.asSequence()
+            .sortedWith(comparator)
+            .filter { matchesMediaQuery(it, query) }
+            .drop(safeOffset)
+            .take(safeLimit)
+            .toList()
+
+        val hasMore = photos.asSequence()
+            .sortedWith(comparator)
+            .filter { matchesMediaQuery(it, query) }
+            .drop(safeOffset + safeLimit)
+            .any()
+
+        MediaPageResult(items = page, hasMore = hasMore, nextOffset = safeOffset + page.size)
     }
 
     override suspend fun getPhotos(folderPath: String, recursive: Boolean, forceRefresh: Boolean): List<Photo> = withContext(Dispatchers.IO) {

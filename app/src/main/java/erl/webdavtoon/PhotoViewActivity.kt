@@ -44,15 +44,17 @@ class PhotoViewActivity : AppCompatActivity() {
 
     private val settingsManager by lazy { SettingsManager(this) }
     private var maxReaderZoomScale = 3f
+    private val mediaViewModel by lazy { androidx.lifecycle.ViewModelProvider(this)[MediaViewModel::class.java] }
     // 移除旧的宽度缩放变量
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
         ThemeHelper.applyTheme(this)
         LogManager.initialize(this)
+        super.onCreate(savedInstanceState)
+        MediaManager.mediaViewModel = mediaViewModel
         // 应用旋转锁定设置
         applyRotationLock()
-        super.onCreate(savedInstanceState)
         
         // 启用沉浸式，让导航栏自然悬浮在app之上
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -426,7 +428,7 @@ class PhotoViewActivity : AppCompatActivity() {
                     
                     // 更新缓存和状态，以便 MainActivity 同步更新
                     PhotoCache.setPhotos(newPhotos)
-                    MediaState.removePhotos(selectedPhotos)
+                    mediaViewModel.removePhotos(selectedPhotos)
                     
                     adapter.setPhotos(newPhotos)
                     webtoonAdapter?.setPhotos(newPhotos)
@@ -678,7 +680,7 @@ class PhotoViewActivity : AppCompatActivity() {
 
     private fun observeMediaState() {
         lifecycleScope.launch {
-            MediaState.state.collect { state ->
+            mediaViewModel.state.collect { state: MediaUiState ->
                 // 仅当会话匹配且图片列表确实发生变化时才更新
                 if (state.sessionKey.isNotEmpty()) {
                     val currentSortOrder = settingsManager.getPhotoSortOrder()
@@ -832,7 +834,7 @@ class PhotoViewActivity : AppCompatActivity() {
                 
                 // 更新全局缓存和状态
                 PhotoCache.setPhotos(newPhotos)
-                MediaState.removePhotos(listOf(photo))
+                mediaViewModel.removePhotos(listOf(photo))
                 
                 photos = newPhotos
                 
@@ -938,7 +940,7 @@ class PhotoViewActivity : AppCompatActivity() {
                         
                         // 更新缓存和状态，以便 MainActivity 同步更新
                         PhotoCache.setPhotos(newPhotos)
-                        MediaState.removePhotos(listOf(deletedPhoto))
+                        mediaViewModel.removePhotos(listOf(deletedPhoto))
                         
                         // 更新适配器数据
                         adapter.setPhotos(newPhotos)

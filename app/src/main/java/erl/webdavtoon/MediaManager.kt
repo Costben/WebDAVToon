@@ -11,11 +11,21 @@ import kotlinx.coroutines.withContext
  */
 object MediaManager {
     private const val PAGE_SIZE = 120
+    var mediaViewModel: MediaViewModel? = null
 
     fun sortPhotos(photos: List<Photo>, sortOrder: Int, isRecursive: Boolean): List<Photo> {
+        if (photos.isEmpty()) return photos
+
+        // 非递归模式的数据已经由 Repository 排好序，直接返回，避免重复排序
         if (!isRecursive) return photos
 
-        val grouped = photos.groupBy { it.folderPath }
+        val grouped = LinkedHashMap<String, MutableList<Photo>>()
+        for (photo in photos) {
+            grouped.getOrPut(photo.folderPath) { mutableListOf() }.add(photo)
+        }
+
+        // 只有一个文件夹时无需重排
+        if (grouped.size <= 1) return photos
 
         val sortedFolderPaths = when (sortOrder) {
             SettingsManager.SORT_NAME_ASC -> grouped.keys.sortedBy { it }
@@ -31,27 +41,20 @@ object MediaManager {
             }
         }
 
-        val result = mutableListOf<Photo>()
+        val result = ArrayList<Photo>(photos.size)
         for (path in sortedFolderPaths) {
-            val folderPhotos = grouped[path] ?: continue
-            val sortedPhotos = when (sortOrder) {
-                SettingsManager.SORT_NAME_ASC -> folderPhotos.sortedBy { it.title }
-                SettingsManager.SORT_NAME_DESC -> folderPhotos.sortedByDescending { it.title }
-                SettingsManager.SORT_DATE_DESC -> folderPhotos.sortedByDescending { it.dateModified }
-                SettingsManager.SORT_DATE_ASC -> folderPhotos.sortedBy { it.dateModified }
-                else -> folderPhotos.sortedByDescending { it.dateModified }
-            }
-            result.addAll(sortedPhotos)
+            grouped[path]?.let { result.addAll(it) }
         }
         return result
     }
 
     fun loadNextPage(context: Context, scope: CoroutineScope) {
-        val state = MediaState.state.value
+        val viewModel = mediaViewModel ?: return
+        val state = viewModel.state.value
         if (state.isLoading || !state.hasMore) return
 
         val sessionKey = state.sessionKey
-        MediaState.startAppend()
+        viewModel.startAppend()
 
         loadPageInternal(context, scope, sessionKey, state, append = true, forceRefresh = false)
     }
@@ -59,9 +62,10 @@ object MediaManager {
     fun refresh(context: Context, scope: CoroutineScope, sessionKey: String, 
                 folderPath: String, isRemote: Boolean, isRecursive: Boolean, 
                 isFavorites: Boolean, query: MediaQuery) {
-        
-        MediaState.start(sessionKey, folderPath, isRemote, isRecursive, isFavorites, query)
-        val state = MediaState.state.value
+
+        val viewModel = mediaViewModel ?: return
+        viewModel.start(sessionKey, folderPath, isRemote, isRecursive, isFavorites, query)
+        val state = viewModel.state.value
         
         loadPageInternal(context, scope, sessionKey, state, append = false, forceRefresh = true)
     }
@@ -114,7 +118,7 @@ object MediaManager {
                     }
                 }
 
-                MediaState.setPage(sessionKey, page.items, page.hasMore, page.nextOffset, append)
+                mediaViewModel?.setPage(page.items, page.hasMore, page.nextOffset, append)
                 
                 // 同时更新 PhotoCache，确保 PhotoViewActivity 也能拿到最新的全量列表
                 if (append) {
@@ -127,7 +131,7 @@ object MediaManager {
                 
             } catch (e: Exception) {
                 android.util.Log.e("MediaManager", "Load failed: ${e.message}", e)
-                MediaState.setError(sessionKey, e.message ?: e.toString())
+                mediaViewModel?.setError(e.message ?: e.toString())
             }
         }
     }
