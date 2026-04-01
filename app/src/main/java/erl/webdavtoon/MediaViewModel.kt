@@ -1,5 +1,7 @@
 package erl.webdavtoon
 
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -10,7 +12,6 @@ data class MediaUiState(
     val photos: List<Photo> = emptyList(),
     val hasMore: Boolean = false,
     val error: String? = null,
-    // 分页参数
     val folderPath: String = "",
     val isRemote: Boolean = false,
     val isRecursive: Boolean = false,
@@ -19,9 +20,14 @@ data class MediaUiState(
     val currentOffset: Int = 0
 )
 
-object MediaState {
+class MediaViewModel(
+    private val savedStateHandle: SavedStateHandle
+) : ViewModel() {
+
     private val _state = MutableStateFlow(MediaUiState())
     val state: StateFlow<MediaUiState> = _state.asStateFlow()
+
+    private val sessionKeyKey = "media_session_key"
 
     fun start(
         sessionKey: String,
@@ -31,6 +37,7 @@ object MediaState {
         isFavorites: Boolean,
         query: MediaQuery
     ) {
+        savedStateHandle[sessionKeyKey] = sessionKey
         _state.value = MediaUiState(
             sessionKey = sessionKey,
             isLoading = true,
@@ -47,8 +54,7 @@ object MediaState {
         _state.value = _state.value.copy(isLoading = true, error = null)
     }
 
-    fun setPage(sessionKey: String, photos: List<Photo>, hasMore: Boolean, nextOffset: Int, append: Boolean) {
-        if (_state.value.sessionKey != sessionKey) return
+    fun setPage(photos: List<Photo>, hasMore: Boolean, nextOffset: Int, append: Boolean) {
         val merged = if (append) _state.value.photos + photos else photos
         _state.value = _state.value.copy(
             isLoading = false,
@@ -59,8 +65,7 @@ object MediaState {
         )
     }
 
-    fun setError(sessionKey: String, message: String) {
-        if (_state.value.sessionKey != sessionKey) return
+    fun setError(message: String) {
         _state.value = _state.value.copy(isLoading = false, error = message)
     }
 
@@ -69,5 +74,6 @@ object MediaState {
         currentPhotos.removeAll(photosToRemove)
         _state.value = _state.value.copy(photos = currentPhotos)
     }
-}
 
+    fun currentSessionKey(): String = savedStateHandle[sessionKeyKey] ?: _state.value.sessionKey
+}

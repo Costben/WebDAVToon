@@ -1,14 +1,100 @@
 package erl.webdavtoon
 
 import android.content.ContentUris
+import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
+import android.os.Bundle
 import android.provider.MediaStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 
 class LocalPhotoRepository(private val context: Context) : PhotoRepository {
+
+    private fun buildSortOrder(): String {
+        return when (SettingsManager(context).getPhotoSortOrder()) {
+            0 -> "${MediaStore.Images.Media.DISPLAY_NAME} ASC"
+            1 -> "${MediaStore.Images.Media.DISPLAY_NAME} DESC"
+            2 -> "${MediaStore.Images.Media.DATE_MODIFIED} DESC"
+            3 -> "${MediaStore.Images.Media.DATE_MODIFIED} ASC"
+            else -> "${MediaStore.Images.Media.DATE_MODIFIED} DESC"
+        }
+    }
+
+    private fun buildSelection(
+        folderPath: String,
+        recursive: Boolean,
+        query: MediaQuery
+    ): Pair<String?, Array<String>?> {
+        val parts = mutableListOf<String>()
+        val args = mutableListOf<String>()
+
+        if (folderPath.isNotEmpty()) {
+            val normalized = folderPath.trimEnd('/')
+            parts.add("${MediaStore.Images.Media.DATA} LIKE ?")
+            args.add("$normalized/%")
+            if (!recursive) {
+                parts.add("${MediaStore.Images.Media.DATA} NOT LIKE ?")
+                args.add("$normalized/%/%")
+            }
+        }
+
+        if (query.minSizeBytes != null) {
+            parts.add("${MediaStore.Images.Media.SIZE} >= ?")
+            args.add(query.minSizeBytes.toString())
+        }
+        if (query.maxSizeBytes != null) {
+            parts.add("${MediaStore.Images.Media.SIZE} <= ?")
+            args.add(query.maxSizeBytes.toString())
+        }
+
+        return if (parts.isEmpty()) null to null else parts.joinToString(" AND ") to args.toTypedArray()
+    }
+
+    private fun matchesMediaQuery(photo: Photo, query: MediaQuery): Boolean {
+        val keyword = query.keyword.trim()
+        if (keyword.isNotEmpty() && !photo.title.contains(keyword, ignoreCase = true)) return false
+        if (query.extensions.isNotEmpty()) {
+            val uri = photo.imageUri.toString().lowercase()
+            val matched = query.extensions.any { ext ->
+                val clean = ext.trim().trimStart('.').lowercase()
+                uri.endsWith(".$clean")
+            }
+            if (!matched) return false
+        }
+        return true
+    }
+
+    private fun parsePhotoFromCursor(cursor: android.database.Cursor): Photo? {
+        val idCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+        val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
+        val widthCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.WIDTH)
+        val heightCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.HEIGHT)
+        val dateCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_MODIFIED)
+        val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.SIZE)
+        val dataCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA)
+
+        val path = cursor.getString(dataCol) ?: return null
+        val name = cursor.getString(nameCol) ?: return null
+        if (path.contains("/.") || name.startsWith(".")) return null
+
+        val id = cursor.getLong(idCol)
+        val contentUri = ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
+        val parentPath = File(path).parent ?: ""
+
+        return Photo(
+            id = id.toString(),
+            imageUri = contentUri,
+            title = name,
+            width = cursor.getInt(widthCol),
+            height = cursor.getInt(heightCol),
+            isLocal = true,
+            dateModified = cursor.getLong(dateCol),
+            size = cursor.getLong(sizeCol),
+            folderPath = parentPath
+        )
+    }
 
     override suspend fun queryMediaPage(
         folderPath: String,
@@ -18,34 +104,6 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
         limit: Int,
         forceRefresh: Boolean
     ): MediaPageResult = withContext(Dispatchers.IO) {
-        val all = getPhotos(folderPath, recursive, forceRefresh)
-            .asSequence()
-            .filter { photo ->
-                val keyword = query.keyword.trim()
-                if (keyword.isNotEmpty() && !photo.title.contains(keyword, ignoreCase = true)) return@filter false
-                if (query.minSizeBytes != null && photo.size < query.minSizeBytes) return@filter false
-                if (query.maxSizeBytes != null && photo.size > query.maxSizeBytes) return@filter false
-                if (query.extensions.isNotEmpty()) {
-                    val uri = photo.imageUri.toString().lowercase()
-                    val matched = query.extensions.any { ext ->
-                        val clean = ext.trim().trimStart('.').lowercase()
-                        uri.endsWith(".$clean")
-                    }
-                    if (!matched) return@filter false
-                }
-                true
-            }
-            .toList()
-
-        val safeOffset = offset.coerceAtLeast(0)
-        val safeLimit = limit.coerceAtLeast(1)
-        val items = all.drop(safeOffset).take(safeLimit)
-        val next = safeOffset + items.size
-        MediaPageResult(items = items, hasMore = next < all.size, nextOffset = next)
-    }
-
-    override suspend fun getPhotos(folderPath: String, recursive: Boolean, forceRefresh: Boolean): List<Photo> = withContext(Dispatchers.IO) {
-        val photos = mutableListOf<Photo>()
         val projection = arrayOf(
             MediaStore.Images.Media._ID,
             MediaStore.Images.Media.DISPLAY_NAME,
@@ -56,30 +114,87 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
             MediaStore.Images.Media.DATA
         )
 
-        val selection = if (folderPath.isNotEmpty()) {
-            if (recursive) {
-                "${MediaStore.Images.Media.DATA} LIKE ?"
-            } else {
-                "${MediaStore.Images.Media.DATA} LIKE ? AND ${MediaStore.Images.Media.DATA} NOT LIKE ?"
+        val sortOrder = buildSortOrder()
+        val (selection, selectionArgs) = buildSelection(folderPath, recursive, query)
+
+        // 查询总数
+        val totalCount = context.contentResolver.query(
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+            arrayOf(MediaStore.Images.Media._ID),
+            selection,
+            selectionArgs,
+            sortOrder
+        )?.use { it.count } ?: 0
+
+        // SQL 分页查询，使用 queryArgs 避免把 LIMIT/OFFSET 拼进 sortOrder
+        val safeOffset = offset.coerceAtLeast(0)
+        val safeLimit = limit.coerceAtLeast(1)
+
+        val items = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            val queryArgs = Bundle().apply {
+                if (selection != null) {
+                    putString(ContentResolver.QUERY_ARG_SQL_SELECTION, selection)
+                }
+                if (selectionArgs != null) {
+                    putStringArray(ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS, selectionArgs)
+                }
+                putStringArray(ContentResolver.QUERY_ARG_SORT_COLUMNS, arrayOf(sortOrder.substringBefore(' ')))
+                putInt(ContentResolver.QUERY_ARG_SORT_DIRECTION, if (sortOrder.endsWith("ASC")) {
+                    ContentResolver.QUERY_SORT_DIRECTION_ASCENDING
+                } else {
+                    ContentResolver.QUERY_SORT_DIRECTION_DESCENDING
+                })
+                putInt(ContentResolver.QUERY_ARG_LIMIT, safeLimit)
+                putInt(ContentResolver.QUERY_ARG_OFFSET, safeOffset)
             }
-        } else {
-            null
-        }
 
-        val selectionArgs = if (folderPath.isNotEmpty()) {
-            val normalized = folderPath.trimEnd('/')
-            if (recursive) arrayOf("$normalized/%") else arrayOf("$normalized/%", "$normalized/%/%")
+            context.contentResolver.query(
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                projection,
+                queryArgs,
+                null
+            )
         } else {
-            null
-        }
+            context.contentResolver.query(
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                projection,
+                selection,
+                selectionArgs,
+                sortOrder
+            )
+        }?.use { cursor ->
+            val photos = mutableListOf<Photo>()
+            while (cursor.moveToNext()) {
+                parsePhotoFromCursor(cursor)?.let { photos.add(it) }
+            }
+            photos
+        } ?: emptyList()
 
-        val sortOrder = when (SettingsManager(context).getPhotoSortOrder()) {
-            0 -> "${MediaStore.Images.Media.DISPLAY_NAME} ASC"
-            1 -> "${MediaStore.Images.Media.DISPLAY_NAME} DESC"
-            2 -> "${MediaStore.Images.Media.DATE_MODIFIED} DESC"
-            3 -> "${MediaStore.Images.Media.DATE_MODIFIED} ASC"
-            else -> "${MediaStore.Images.Media.DATE_MODIFIED} DESC"
-        }
+        // 应用 keyword / extension 过滤
+        val filtered = items.asSequence()
+            .filter { matchesMediaQuery(it, query) }
+            .toList()
+
+        MediaPageResult(
+            items = filtered,
+            hasMore = safeOffset + filtered.size < totalCount,
+            nextOffset = safeOffset + filtered.size
+        )
+    }
+
+    override suspend fun getPhotos(folderPath: String, recursive: Boolean, forceRefresh: Boolean): List<Photo> = withContext(Dispatchers.IO) {
+        val projection = arrayOf(
+            MediaStore.Images.Media._ID,
+            MediaStore.Images.Media.DISPLAY_NAME,
+            MediaStore.Images.Media.WIDTH,
+            MediaStore.Images.Media.HEIGHT,
+            MediaStore.Images.Media.DATE_MODIFIED,
+            MediaStore.Images.Media.SIZE,
+            MediaStore.Images.Media.DATA
+        )
+
+        val sortOrder = buildSortOrder()
+        val (selection, selectionArgs) = buildSelection(folderPath, recursive, MediaQuery())
 
         context.contentResolver.query(
             MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
@@ -88,39 +203,12 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
             selectionArgs,
             sortOrder
         )?.use { cursor ->
-            val idCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
-            val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DISPLAY_NAME)
-            val widthCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.WIDTH)
-            val heightCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.HEIGHT)
-            val dateCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATE_MODIFIED)
-            val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.SIZE)
-            val dataCol = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA)
-
+            val photos = mutableListOf<Photo>()
             while (cursor.moveToNext()) {
-                val path = cursor.getString(dataCol) ?: continue
-                val name = cursor.getString(nameCol) ?: continue
-                if (path.contains("/.") || name.startsWith(".")) continue
-
-                val id = cursor.getLong(idCol)
-                val contentUri = ContentUris.withAppendedId(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, id)
-                val parentPath = File(path).parent ?: ""
-                photos.add(
-                    Photo(
-                        id = id.toString(),
-                        imageUri = contentUri,
-                        title = name,
-                        width = cursor.getInt(widthCol),
-                        height = cursor.getInt(heightCol),
-                        isLocal = true,
-                        dateModified = cursor.getLong(dateCol),
-                        size = cursor.getLong(sizeCol),
-                        folderPath = parentPath
-                    )
-                )
+                parsePhotoFromCursor(cursor)?.let { photos.add(it) }
             }
-        }
-
-        photos
+            photos
+        } ?: emptyList()
     }
 
     override suspend fun getFolders(rootPath: String, forceRefresh: Boolean): List<Folder> = withContext(Dispatchers.IO) {
