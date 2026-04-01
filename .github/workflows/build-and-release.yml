@@ -9,7 +9,8 @@ on:
   workflow_dispatch:
 
 env:
-  NDK_VERSION: '26.3.11579264'
+  # CI uses the NDK version required by the Android Gradle config.
+  CI_NDK_VERSION: '28.2.13676358'
 
 jobs:
   build:
@@ -56,7 +57,7 @@ jobs:
       - name: Install Android NDK
         run: |
           yes | sdkmanager --licenses > /dev/null
-          sdkmanager --install "ndk;${NDK_VERSION}"
+          sdkmanager --install "ndk;${CI_NDK_VERSION}"
 
       - name: Set up Environment
         run: |
@@ -65,10 +66,10 @@ jobs:
 
           # GitHub runners may expose either ANDROID_HOME or ANDROID_SDK_ROOT.
           SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
-          NDK_PATH="${SDK_ROOT}/ndk/${NDK_VERSION}"
+          NDK_PATH="${SDK_ROOT}/ndk/${CI_NDK_VERSION}"
 
           echo "Using SDK root: $SDK_ROOT"
-          echo "Using NDK version: $NDK_VERSION"
+          echo "Using NDK version: $CI_NDK_VERSION"
 
           {
             echo "ANDROID_HOME=$SDK_ROOT"
