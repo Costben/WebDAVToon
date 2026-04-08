@@ -23,6 +23,7 @@ pub struct Folder {
     pub is_local: bool,
     pub has_sub_folders: bool,
     pub preview_uris: Vec<String>,
+    pub date_modified: u64,
 }
 
 #[derive(Debug, Clone, uniffi::Enum)]

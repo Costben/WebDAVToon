@@ -39,11 +39,32 @@ impl Database {
                 is_local INTEGER NOT NULL,
                 has_sub_folders INTEGER NOT NULL,
                 preview_uris TEXT, -- JSON array
+                date_modified INTEGER NOT NULL DEFAULT 0,
                 last_synced INTEGER NOT NULL
             )",
             [],
         )?;
-        
+
+        let has_date_modified = {
+            let mut stmt = self.conn.prepare("PRAGMA table_info(folders)")?;
+            let columns = stmt.query_map([], |row| row.get::<_, String>(1))?;
+            let mut found = false;
+            for column in columns {
+                if column? == "date_modified" {
+                    found = true;
+                    break;
+                }
+            }
+            found
+        };
+
+        if !has_date_modified {
+            let _ = self.conn.execute(
+                "ALTER TABLE folders ADD COLUMN date_modified INTEGER NOT NULL DEFAULT 0",
+                [],
+            );
+        }
+
         // 创建索引
         self.conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_photos_parent ON photos(parent_path)",
@@ -59,10 +80,10 @@ impl Database {
 
     pub fn save_photos(&mut self, parent_path: &str, photos: &[Photo]) -> Result<()> {
         let tx = self.conn.transaction()?;
-        
+
         // 清除旧数据 (简单策略：全量覆盖该目录)
         tx.execute("DELETE FROM photos WHERE parent_path = ?", [parent_path])?;
-        
+
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
@@ -87,7 +108,7 @@ impl Database {
                 ])?;
             }
         }
-        
+
         tx.commit()
     }
 
@@ -97,12 +118,12 @@ impl Database {
             SortOrder::NameDesc => "title DESC",
             SortOrder::DateDesc => "date_modified DESC",
         };
-        
+
         let mut stmt = self.conn.prepare(&format!(
             "SELECT id, title, uri, is_local, size, date_modified FROM photos WHERE parent_path = ? ORDER BY {}",
             order_clause
         ))?;
-        
+
         let photo_iter = stmt.query_map([parent_path], |row| {
             Ok(Photo {
                 id: row.get(0)?,
@@ -128,10 +149,10 @@ impl Database {
 
     pub fn save_folders(&mut self, parent_path: &str, folders: &[Folder]) -> Result<()> {
         let tx = self.conn.transaction()?;
-        
+
         // 清除旧数据
         tx.execute("DELETE FROM folders WHERE parent_path = ?", [parent_path])?;
-        
+
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
@@ -139,8 +160,8 @@ impl Database {
 
         {
             let mut stmt = tx.prepare(
-                "INSERT INTO folders (path, parent_path, name, is_local, has_sub_folders, preview_uris, last_synced)
-                 VALUES (?, ?, ?, ?, ?, ?, ?)"
+                "INSERT INTO folders (path, parent_path, name, is_local, has_sub_folders, preview_uris, date_modified, last_synced)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
             )?;
 
             for folder in folders {
@@ -152,39 +173,13 @@ impl Database {
                     folder.is_local as i32,
                     folder.has_sub_folders as i32,
                     previews_json,
+                    folder.date_modified as i64,
                     now as i64
                 ])?;
             }
         }
-        
+
         tx.commit()
     }
 
-    pub fn get_folders(&self, parent_path: &str) -> Result<Vec<Folder>> {
-        let mut stmt = self.conn.prepare(
-            "SELECT path, name, is_local, has_sub_folders, preview_uris 
-             FROM folders 
-             WHERE parent_path = ? 
-             ORDER BY name ASC"
-        )?;
-
-        let rows = stmt.query_map([parent_path], |row| {
-            let previews_json: String = row.get(4)?;
-            let preview_uris: Vec<String> = serde_json::from_str(&previews_json).unwrap_or_default();
-
-            Ok(Folder {
-                path: row.get(0)?,
-                name: row.get(1)?,
-                is_local: row.get::<_, i32>(2)? != 0,
-                has_sub_folders: row.get::<_, i32>(3)? != 0,
-                preview_uris,
-            })
-        })?;
-
-        let mut folders = Vec::new();
-        for row in rows {
-            folders.push(row?);
-        }
-        Ok(folders)
-    }
 }
