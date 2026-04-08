@@ -428,6 +428,7 @@ class FolderViewActivity : AppCompatActivity() {
                 val allFolders = withContext(Dispatchers.IO) {
                     val folders = mutableListOf<Folder>()
                     val isRemoteEnabled = settingsManager.isWebDavEnabled()
+                    var remoteEmptyReason: String? = null
 
                     if (isRemoteEnabled) {
                         val remoteRepo = RustWebDavPhotoRepository(settingsManager)
@@ -436,6 +437,10 @@ class FolderViewActivity : AppCompatActivity() {
                             f.name.startsWith(".") || f.path.trim('/').split('/').any { it.startsWith(".") }
                         }
                         folders.addAll(remoteFolders)
+
+                        if (remoteFolders.isEmpty()) {
+                            remoteEmptyReason = remoteRepo.diagnoseEmptyFolderResult(remoteRoot)
+                        }
                     }
 
                     try {
@@ -459,6 +464,12 @@ class FolderViewActivity : AppCompatActivity() {
                     } catch (e: Exception) {
                         android.util.Log.e("FolderViewActivity", "Local folders load failed: ${e.message}", e)
                     }
+                    remoteEmptyReason?.let { reason ->
+                        if (folders.none { !it.isLocal }) {
+                            FolderState.setError(reason)
+                        }
+                    }
+
                     folders.toList()
                 }
 
@@ -471,5 +482,4 @@ class FolderViewActivity : AppCompatActivity() {
         }
     }
 }
-
 

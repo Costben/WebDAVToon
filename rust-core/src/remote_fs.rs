@@ -168,21 +168,19 @@ impl RemoteService {
         
         let op_clone = op.clone();
         let base_url = self.base_url.clone();
-        let protocol = self.protocol.clone();
-
         let tasks = futures::stream::iter(candidates)
             .map(|(folder_path, name)| {
                 let op = op_clone.clone();
                 let base_url = base_url.clone();
-                let protocol = protocol.clone();
                 async move {
-                    if let Some(preview_uris) = Self::check_has_images_webdav(op, &folder_path, &base_url).await {
-                         Some(Folder {
+                    if let Some((preview_uris, date_modified)) = Self::check_has_images_webdav(op, &folder_path, &base_url).await {
+                          Some(Folder {
                             path: folder_path,
                             name,
                             is_local: false,
                             has_sub_folders: true, 
                             preview_uris,
+                            date_modified,
                         })
                     } else {
                         None
@@ -197,38 +195,36 @@ impl RemoteService {
     }
 
 
-    async fn check_has_images_webdav(op: Arc<Operator>, folder_path: &str, base_url: &str) -> Option<Vec<String>> {
-         // Use recursive=true
-         match op.lister_with(folder_path).recursive(true).await {
-             Ok(mut lister) => {
-                 let mut checks = 0;
-                 let mut preview_uris = Vec::new();
-                 while let Some(result) = lister.next().await {
-                      if checks > 100 { 
-                          if !preview_uris.is_empty() { return Some(preview_uris); }
-                          return None; 
-                      }
-                      checks += 1;
-                      if let Ok(entry) = result {
-                          let path_str = entry.path();
-                          if is_hidden_path(path_str) { continue; }
-                          if path_str.contains("__MACOSX") { continue; }
-                          if !entry.path().ends_with('/') {
-                              if entry.metadata().content_length() == 0 { continue; }
-                              let name = path_str.trim_matches('/').split('/').last().unwrap_or("");
-                              if is_image_file(name) {
-                                  let full_uri = format!("{}/{}", base_url.trim_end_matches('/'), entry.path().trim_start_matches('/'));
-                                  preview_uris.push(full_uri);
-                                  if preview_uris.len() >= 4 { return Some(preview_uris); }
-                              }
-                          }
-                      }
-                 }
-                 if !preview_uris.is_empty() { Some(preview_uris) } else { None }
-             }
-             Err(_) => None
-         }
-    }
+    async fn check_has_images_webdav(op: Arc<Operator>, folder_path: &str, base_url: &str) -> Option<(Vec<String>, u64)> {
+          // Use recursive=true
+          match op.lister_with(folder_path).recursive(true).await {
+              Ok(mut lister) => {
+                  let mut preview_uris = Vec::new();
+                  let mut newest_modified = 0u64;
+                  while let Some(result) = lister.next().await {
+                       if let Ok(entry) = result {
+                           let path_str = entry.path();
+                           if is_hidden_path(path_str) { continue; }
+                           if path_str.contains("__MACOSX") { continue; }
+                            if !entry.path().ends_with('/') {
+                               let metadata = entry.metadata();
+                               if metadata.content_length() == 0 { continue; }
+                               let name = path_str.trim_matches('/').split('/').last().unwrap_or("");
+                               if is_image_file(name) {
+                                    if let Some(last_modified) = metadata.last_modified().map(|t| t.timestamp() as u64) {
+                                        newest_modified = newest_modified.max(last_modified);
+                                    }
+                                    let full_uri = format!("{}/{}", base_url.trim_end_matches('/'), entry.path().trim_start_matches('/'));
+                                    preview_uris.push(full_uri);
+                                }
+                            }
+                        }
+                   }
+                  if !preview_uris.is_empty() { Some((preview_uris, newest_modified)) } else { None }
+              }
+              Err(_) => None
+          }
+     }
 
     pub async fn inspect_folder(&self, folder_path: &str) -> Result<FolderInspection, String> {
         match self.protocol {

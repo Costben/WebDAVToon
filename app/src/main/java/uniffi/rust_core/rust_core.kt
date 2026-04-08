@@ -1503,7 +1503,8 @@ data class Folder (
     var `name`: kotlin.String, 
     var `isLocal`: kotlin.Boolean, 
     var `hasSubFolders`: kotlin.Boolean, 
-    var `previewUris`: List<kotlin.String>
+    var `previewUris`: List<kotlin.String>,
+    var `dateModified`: kotlin.ULong
 ) {
     
     companion object
@@ -1520,6 +1521,7 @@ public object FfiConverterTypeFolder: FfiConverterRustBuffer<Folder> {
             FfiConverterBoolean.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterSequenceString.read(buf),
+            FfiConverterULong.read(buf),
         )
     }
 
@@ -1528,7 +1530,8 @@ public object FfiConverterTypeFolder: FfiConverterRustBuffer<Folder> {
             FfiConverterString.allocationSize(value.`name`) +
             FfiConverterBoolean.allocationSize(value.`isLocal`) +
             FfiConverterBoolean.allocationSize(value.`hasSubFolders`) +
-            FfiConverterSequenceString.allocationSize(value.`previewUris`)
+            FfiConverterSequenceString.allocationSize(value.`previewUris`) +
+            FfiConverterULong.allocationSize(value.`dateModified`)
     )
 
     override fun write(value: Folder, buf: ByteBuffer) {
@@ -1537,6 +1540,7 @@ public object FfiConverterTypeFolder: FfiConverterRustBuffer<Folder> {
             FfiConverterBoolean.write(value.`isLocal`, buf)
             FfiConverterBoolean.write(value.`hasSubFolders`, buf)
             FfiConverterSequenceString.write(value.`previewUris`, buf)
+            FfiConverterULong.write(value.`dateModified`, buf)
     }
 }
 

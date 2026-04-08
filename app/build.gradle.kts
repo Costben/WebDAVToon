@@ -1,5 +1,6 @@
 import java.util.Properties
 import com.nishtahir.CargoExtension
+import org.gradle.api.tasks.PathSensitivity
 
 plugins {
     id("com.android.application")
@@ -81,12 +82,6 @@ android {
         }
     }
 
-    tasks.whenTaskAdded {
-        if (name == "mergeDebugJniLibFolders" || name == "mergeReleaseJniLibFolders") {
-            dependsOn("cargoBuild")
-        }
-    }
-
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
@@ -98,6 +93,22 @@ android {
         viewBinding = true
         buildConfig = true
     }
+}
+
+val rustJniLibDir = layout.buildDirectory.dir("rustJniLibs/android")
+
+tasks.named("preBuild").configure {
+    dependsOn("cargoBuild")
+}
+
+tasks.matching { task ->
+    task.name.startsWith("merge") && task.name.endsWith("JniLibFolders")
+}.configureEach {
+    dependsOn("cargoBuild")
+    inputs.dir(rustJniLibDir)
+        .withPropertyName("rustJniLibDir")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.upToDateWhen { false }
 }
 
 dependencies {
