@@ -8,7 +8,6 @@ import com.google.gson.reflect.TypeToken
 class SettingsManager(context: Context) {
     private val appContext = context.applicationContext
     private val appSettings = AppSettingsStore(appContext)
-    private val gson = Gson()
     private val credentialPolicy = WebDavCredentialPolicy(
         persistentStore = AndroidKeystoreWebDavPasswordStore(appContext),
         sessionStore = WebDavSessionPasswordStore
@@ -49,6 +48,15 @@ class SettingsManager(context: Context) {
         const val SORT_NAME_DESC = 1
         const val SORT_DATE_DESC = 2
         const val SORT_DATE_ASC = 3
+
+        private val gson = Gson()
+        private val slotCacheLock = Any()
+
+        @Volatile
+        private var cachedSlotsJson: String? = null
+
+        @Volatile
+        private var cachedSlotsMap: MutableMap<Int, WebDavSlotConfig> = mutableMapOf()
     }
 
     fun getGridColumns(): Int = appSettings.getOrDefaultInt(AppSettingsStore.GRID_COLUMNS, 2)
@@ -188,23 +196,48 @@ class SettingsManager(context: Context) {
 
     private fun getWebDavSlots(): MutableMap<Int, WebDavSlotConfig> {
         val json = appSettings.getOrDefaultString(AppSettingsStore.WEBDAV_SLOTS_JSON, "")
-        if (json.isBlank()) return mutableMapOf()
+        if (json.isBlank()) {
+            cachedSlotsJson = ""
+            cachedSlotsMap = mutableMapOf()
+            return mutableMapOf()
+        }
 
-        return try {
-            val type = object : TypeToken<Map<String, WebDavSlotConfig>>() {}.type
-            val result = gson.fromJson<Map<String, WebDavSlotConfig>>(json, type).orEmpty()
-            result.mapNotNull { (key, value) ->
-                key.toIntOrNull()?.let { it to value }
-            }.toMap().toMutableMap()
-        } catch (e: Exception) {
-            Log.e("SettingsManager", "Error parsing WebDAV slots: $json", e)
-            mutableMapOf()
+        if (cachedSlotsJson == json) {
+            return cachedSlotsMap.toMutableMap()
+        }
+
+        synchronized(slotCacheLock) {
+            if (cachedSlotsJson == json) {
+                return cachedSlotsMap.toMutableMap()
+            }
+
+            return try {
+                val type = object : TypeToken<Map<String, WebDavSlotConfig>>() {}.type
+                val result = gson.fromJson<Map<String, WebDavSlotConfig>>(json, type).orEmpty()
+                val parsed = result.mapNotNull { (key, value) ->
+                    key.toIntOrNull()?.let { it to value }
+                }.toMap().toMutableMap()
+
+                cachedSlotsJson = json
+                cachedSlotsMap = parsed
+                parsed.toMutableMap()
+            } catch (e: Exception) {
+                Log.e("SettingsManager", "Error parsing WebDAV slots: $json", e)
+                cachedSlotsJson = json
+                cachedSlotsMap = mutableMapOf()
+                mutableMapOf()
+            }
         }
     }
 
     private fun saveWebDavSlots(slots: Map<Int, WebDavSlotConfig>) {
         val asStringMap = slots.mapKeys { it.key.toString() }
-        appSettings.putString(AppSettingsStore.WEBDAV_SLOTS_JSON, gson.toJson(asStringMap))
+        val json = gson.toJson(asStringMap)
+        synchronized(slotCacheLock) {
+            cachedSlotsJson = json
+            cachedSlotsMap = slots.toMutableMap()
+        }
+        appSettings.putString(AppSettingsStore.WEBDAV_SLOTS_JSON, json)
     }
 
     private fun getWebDavSlot(slot: Int): WebDavSlotConfig? {
