@@ -18,11 +18,8 @@ import com.bumptech.glide.request.RequestListener
 import com.bumptech.glide.request.RequestOptions
 import com.bumptech.glide.request.target.Target
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.net.URLDecoder
-import java.net.URLEncoder
 
 object WebDavImageLoader {
 
@@ -34,37 +31,8 @@ object WebDavImageLoader {
         limitSize: Boolean = true,
         isWaterfall: Boolean = false
     ) {
-        val requestOptions = RequestOptions()
-            .diskCacheStrategy(DiskCacheStrategy.ALL)
-            .skipMemoryCache(false)
-            .priority(Priority.HIGH)
-            .placeholder(android.R.drawable.ic_menu_gallery)
-            .error(android.R.drawable.ic_menu_report_image)
-
         val settings = SettingsManager(context)
-        if (isWaterfall) {
-            // 瀑布流模式：根据设置动态应用缩放比例或最大宽度
-            when (settings.getWaterfallQualityMode()) {
-                SettingsManager.WATERFALL_MODE_MAX_WIDTH -> {
-                    val maxWidth = settings.getWaterfallMaxWidth()
-                    requestOptions.override(maxWidth, Target.SIZE_ORIGINAL)
-                    requestOptions.downsample(DownsampleStrategy.AT_MOST)
-                }
-                else -> {
-                    val percent = settings.getWaterfallPercent().coerceIn(10, 100)
-                    requestOptions.override(Target.SIZE_ORIGINAL)
-                    requestOptions.sizeMultiplier(percent / 100f)
-                    requestOptions.downsample(DownsampleStrategy.AT_MOST)
-                }
-            }
-        } else if (limitSize) {
-            // 普通缩略图模式（如文件夹预览）：固定 320x320
-            requestOptions.override(320, 320)
-            requestOptions.downsample(DownsampleStrategy.AT_MOST)
-        } else {
-            // 全图模式：让 Glide 按目标 View 尺寸解码，避免原图全尺寸解码造成卡顿
-            requestOptions.downsample(DownsampleStrategy.AT_MOST)
-        }
+        val requestOptions = buildRequestOptions(context, limitSize, isWaterfall)
 
         val username = settings.getWebDavUsername()
         val password = settings.getWebDavPassword()
@@ -97,7 +65,21 @@ object WebDavImageLoader {
         limitSize: Boolean = true,
         isWaterfall: Boolean = false
     ) {
-        val requestOptions = RequestOptions()
+        val requestOptions = buildRequestOptions(context, limitSize, isWaterfall)
+
+        Glide.with(context)
+            .load(imageUri)
+            .apply(requestOptions)
+            .listener(defaultListener("Local", progressBar))
+            .into(imageView)
+    }
+
+    private fun buildRequestOptions(
+        context: Context,
+        limitSize: Boolean,
+        isWaterfall: Boolean
+    ): RequestOptions {
+        var requestOptions = RequestOptions()
             .diskCacheStrategy(DiskCacheStrategy.ALL)
             .skipMemoryCache(false)
             .priority(Priority.HIGH)
@@ -105,35 +87,32 @@ object WebDavImageLoader {
             .error(android.R.drawable.ic_menu_report_image)
 
         if (isWaterfall) {
-            // 瀑布流模式：根据设置动态应用缩放比例或最大宽度
             val settings = SettingsManager(context)
-            when (settings.getWaterfallQualityMode()) {
+            requestOptions = when (settings.getWaterfallQualityMode()) {
                 SettingsManager.WATERFALL_MODE_MAX_WIDTH -> {
                     val maxWidth = settings.getWaterfallMaxWidth()
-                    requestOptions.override(maxWidth, Target.SIZE_ORIGINAL)
-                    requestOptions.downsample(DownsampleStrategy.AT_MOST)
+                    requestOptions
+                        .override(maxWidth, Target.SIZE_ORIGINAL)
+                        .downsample(DownsampleStrategy.AT_MOST)
                 }
+
                 else -> {
                     val percent = settings.getWaterfallPercent().coerceIn(10, 100)
-                    requestOptions.override(Target.SIZE_ORIGINAL)
-                    requestOptions.sizeMultiplier(percent / 100f)
-                    requestOptions.downsample(DownsampleStrategy.AT_MOST)
+                    requestOptions
+                        .override(Target.SIZE_ORIGINAL)
+                        .sizeMultiplier(percent / 100f)
+                        .downsample(DownsampleStrategy.AT_MOST)
                 }
             }
         } else if (limitSize) {
-            // 普通缩略图模式（如文件夹预览）：固定 320x320
-            requestOptions.override(320, 320)
-            requestOptions.downsample(DownsampleStrategy.AT_MOST)
+            requestOptions = requestOptions
+                .override(320, 320)
+                .downsample(DownsampleStrategy.AT_MOST)
         } else {
-            // 全图模式：让 Glide 按目标 View 尺寸解码，避免原图全尺寸解码造成卡顿
-            requestOptions.downsample(DownsampleStrategy.AT_MOST)
+            requestOptions = requestOptions.downsample(DownsampleStrategy.AT_MOST)
         }
 
-        Glide.with(context)
-            .load(imageUri)
-            .apply(requestOptions)
-            .listener(defaultListener("Local", progressBar))
-            .into(imageView)
+        return requestOptions
     }
 
     private fun defaultListener(tag: String, progressBar: ProgressBar?): RequestListener<Drawable> {
@@ -167,7 +146,6 @@ object WebDavImageLoader {
      * 清除图片的 Glide 缓存
      */
     fun clearCache(context: Context) {
-        // 异步清除磁盘缓存，同步清除内存缓存
         @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
         kotlinx.coroutines.GlobalScope.launch(Dispatchers.Main) {
             Glide.get(context).clearMemory()

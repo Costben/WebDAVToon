@@ -220,6 +220,7 @@ class SettingsActivity : AppCompatActivity() {
         dialogBinding.portEdit.setText(settingsManager.getWebDavPort().toString())
         dialogBinding.usernameEdit.setText(settingsManager.getWebDavUsername())
         dialogBinding.passwordEdit.setText(settingsManager.getWebDavPassword())
+        dialogBinding.rememberPasswordCheck.isChecked = settingsManager.isWebDavRememberPassword()
 
         val dialog = MaterialAlertDialogBuilder(this)
             .setTitle(getString(R.string.webdav_config, settingsManager.getCurrentSlot()))
@@ -230,6 +231,7 @@ class SettingsActivity : AppCompatActivity() {
                 settingsManager.setWebDavUrl(dialogBinding.hostEdit.text.toString())
                 settingsManager.setWebDavPort(dialogBinding.portEdit.text.toString().toIntOrNull() ?: 443)
                 settingsManager.setWebDavUsername(dialogBinding.usernameEdit.text.toString())
+                settingsManager.setWebDavRememberPassword(dialogBinding.rememberPasswordCheck.isChecked)
                 settingsManager.setWebDavPassword(dialogBinding.passwordEdit.text.toString())
                 settingsManager.setWebDavEnabled(true)
                 
@@ -261,11 +263,7 @@ class SettingsActivity : AppCompatActivity() {
                     }
                 }
 
-                val endpoint = if (port == 80 || port == 443) {
-                    "$protocol://$host$pathPart"
-                } else {
-                    "$protocol://$host:$port$pathPart"
-                }
+                val endpoint = WebDavEndpointNormalizer.normalize(protocol, "$host$pathPart", port)
 
                 val username = dialogBinding.usernameEdit.text.toString()
                 val password = dialogBinding.passwordEdit.text.toString()

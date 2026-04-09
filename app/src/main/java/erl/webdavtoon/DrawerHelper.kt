@@ -126,6 +126,7 @@ object DrawerHelper {
         dialogBinding.portEdit.setText(settingsManager.getWebDavPort(slot).toString())
         dialogBinding.usernameEdit.setText(settingsManager.getWebDavUsername(slot))
         dialogBinding.passwordEdit.setText(settingsManager.getWebDavPassword(slot))
+        dialogBinding.rememberPasswordCheck.isChecked = settingsManager.isWebDavRememberPassword(slot)
 
         val dialog = MaterialAlertDialogBuilder(activity)
             .setTitle(activity.getString(R.string.webdav_config, slot))
@@ -136,6 +137,7 @@ object DrawerHelper {
                 settingsManager.setWebDavUrl(dialogBinding.hostEdit.text.toString(), slot)
                 settingsManager.setWebDavPort(dialogBinding.portEdit.text.toString().toIntOrNull() ?: 443, slot)
                 settingsManager.setWebDavUsername(dialogBinding.usernameEdit.text.toString(), slot)
+                settingsManager.setWebDavRememberPassword(dialogBinding.rememberPasswordCheck.isChecked, slot)
                 settingsManager.setWebDavPassword(dialogBinding.passwordEdit.text.toString(), slot)
                 settingsManager.setWebDavEnabled(true, slot)
                 
@@ -167,11 +169,7 @@ object DrawerHelper {
                     }
                 }
 
-                val endpoint = if (port == 80 || port == 443) {
-                    "$protocol://$host$pathPart"
-                } else {
-                    "$protocol://$host:$port$pathPart"
-                }
+                val endpoint = WebDavEndpointNormalizer.normalize(protocol, "$host$pathPart", port)
 
                 val username = dialogBinding.usernameEdit.text.toString()
                 val password = dialogBinding.passwordEdit.text.toString()

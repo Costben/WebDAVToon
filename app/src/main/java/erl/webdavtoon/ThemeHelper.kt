@@ -2,9 +2,10 @@ package erl.webdavtoon
 
 import android.app.Activity
 import android.content.Context
-import android.content.res.Configuration
 import android.os.Build
+import androidx.appcompat.view.ContextThemeWrapper
 import com.google.android.material.color.DynamicColors
+import com.google.android.material.color.MaterialColors
 import java.util.Locale
 
 object ThemeHelper {
@@ -98,37 +99,19 @@ object ThemeHelper {
 
     fun getThemeColors(context: Context, themeId: Int): ThemeColors {
         if (themeId == THEME_FOLLOW_DEVICE && DynamicColors.isDynamicColorAvailable()) {
-            // Get current dynamic colors
-            val typedArray = context.obtainStyledAttributes(intArrayOf(
-                com.google.android.material.R.attr.colorPrimary,
-                com.google.android.material.R.attr.colorSecondary,
-                com.google.android.material.R.attr.colorTertiary,
-                com.google.android.material.R.attr.colorSurface
-            ))
-            val colors = ThemeColors(
-                typedArray.getColor(0, 0),
-                typedArray.getColor(1, 0),
-                typedArray.getColor(2, 0),
-                typedArray.getColor(3, 0)
-            )
-            typedArray.recycle()
-            return colors
+            return resolveThemeColors(context)
         }
 
         val themeRes = themeMap[themeId] ?: R.style.Theme_WebDAVToon
-        val typedArray = context.obtainStyledAttributes(themeRes, intArrayOf(
-            com.google.android.material.R.attr.colorPrimary,
-            com.google.android.material.R.attr.colorSecondary,
-            com.google.android.material.R.attr.colorTertiary,
-            com.google.android.material.R.attr.colorSurface
-        ))
-        val colors = ThemeColors(
-            typedArray.getColor(0, 0),
-            typedArray.getColor(1, 0),
-            typedArray.getColor(2, 0),
-            typedArray.getColor(3, 0)
+        return resolveThemeColors(ContextThemeWrapper(context, themeRes))
+    }
+
+    private fun resolveThemeColors(context: Context): ThemeColors {
+        return ThemeColors(
+            primary = MaterialColors.getColor(context, com.google.android.material.R.attr.colorPrimary, 0),
+            secondary = MaterialColors.getColor(context, com.google.android.material.R.attr.colorSecondary, 0),
+            tertiary = MaterialColors.getColor(context, com.google.android.material.R.attr.colorTertiary, 0),
+            surface = MaterialColors.getColor(context, com.google.android.material.R.attr.colorSurface, 0)
         )
-        typedArray.recycle()
-        return colors
     }
 }

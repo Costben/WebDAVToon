@@ -61,6 +61,7 @@
     <string name="port_hint">Port (Default: 443)</string>
     <string name="username_hint">Username</string>
     <string name="password_hint">Password</string>
+    <string name="remember_password">Remember Password</string>
     <string name="testing_connection">Testing connection…</string>
     <string name="connection_test_result">Connection Test Result</string>
     <string name="connection_failed">Connection Failed</string>

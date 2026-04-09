@@ -21,10 +21,13 @@ class WebDAVToonApplication : Application() {
         super.onCreate()
 
         appContext = applicationContext
+        AppSettingsStore.prime(this)
         LogManager.initialize(this)
         AppDatabase.getInstance(this)
+        FavoritePhotoStore.getInstance(this)
         CoroutineScope(Dispatchers.IO).launch {
             ConfigMigration.migrateIfNeeded(this@WebDAVToonApplication)
+            WebDavCredentialMigration.migrateIfNeeded(this@WebDAVToonApplication)
         }
 
         try {
@@ -137,7 +140,7 @@ class MyGlideModule : AppGlideModule() {
 
                 if (settingsManager.isWebDavEnabled()) {
                     val username = settingsManager.getWebDavUsername()
-                    val password = if (settingsManager.isWebDavRememberPassword()) settingsManager.getWebDavPassword() else ""
+                    val password = settingsManager.getWebDavPassword()
 
                     if (username.isNotEmpty() && password.isNotEmpty()) {
                         val credentials = "$username:$password"

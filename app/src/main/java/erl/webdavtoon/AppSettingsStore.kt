@@ -2,21 +2,28 @@ package erl.webdavtoon
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import java.util.concurrent.ConcurrentHashMap
 
-private val Context.dataStore: DataStore<androidx.datastore.preferences.core.Preferences> by preferencesDataStore(
+private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(
     name = "webdavtoon_settings"
 )
 
-class AppSettingsStore(private val context: Context) {
+class AppSettingsStore(context: Context) {
+    private val appContext = context.applicationContext
 
     companion object {
         val GRID_COLUMNS = intPreferencesKey("grid_columns")
@@ -34,53 +41,149 @@ class AppSettingsStore(private val context: Context) {
         val READER_MAX_ZOOM_PERCENT = intPreferencesKey("reader_max_zoom_percent")
         val ROTATION_LOCKED = booleanPreferencesKey("rotation_locked")
         val MIGRATED_TO_DATASTORE = booleanPreferencesKey("migrated_to_datastore")
+        val WEBDAV_SECRET_MIGRATED = booleanPreferencesKey("webdav_secret_migrated")
+
+        private val initLock = Any()
+        private val cache = ConcurrentHashMap<String, Any>()
+        private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+        @Volatile
+        private var initialized = false
+
+        fun prime(context: Context) {
+            ensureInitialized(context.applicationContext)
+        }
+
+        private fun ensureInitialized(context: Context) {
+            if (initialized) return
+            synchronized(initLock) {
+                if (initialized) return
+
+                val snapshot = runBlocking {
+                    context.dataStore.data.first()
+                }
+                updateCache(snapshot)
+
+                scope.launch {
+                    context.dataStore.data.collect { preferences ->
+                        updateCache(preferences)
+                    }
+                }
+
+                initialized = true
+            }
+        }
+
+        private fun updateCache(preferences: Preferences) {
+            cache.clear()
+            preferences.asMap().forEach { (key, value) ->
+                cache[key.name] = value
+            }
+        }
+
+        @Suppress("UNCHECKED_CAST")
+        private fun <T> readCached(key: Preferences.Key<T>, defaultValue: T): T {
+            return cache[key.name] as? T ?: defaultValue
+        }
+
+        private fun <T> writeCached(key: Preferences.Key<T>, value: T) {
+            cache[key.name] = value as Any
+        }
+
+        private fun <T> removeCached(key: Preferences.Key<T>) {
+            cache.remove(key.name)
+        }
     }
 
-    suspend fun getOrDefaultInt(key: androidx.datastore.preferences.core.Preferences.Key<Int>, defaultValue: Int): Int {
-        return context.dataStore.data.map { it[key] ?: defaultValue }.first()
+    init {
+        ensureInitialized(appContext)
     }
 
-    suspend fun putInt(key: androidx.datastore.preferences.core.Preferences.Key<Int>, value: Int) {
-        context.dataStore.edit { it[key] = value }
+    fun getOrDefaultInt(key: Preferences.Key<Int>, defaultValue: Int): Int {
+        return readCached(key, defaultValue)
     }
 
-    suspend fun getOrDefaultString(key: androidx.datastore.preferences.core.Preferences.Key<String>, defaultValue: String): String {
-        return context.dataStore.data.map { it[key] ?: defaultValue }.first()
+    fun putInt(key: Preferences.Key<Int>, value: Int) {
+        writeCached(key, value)
+        scope.launch {
+            appContext.dataStore.edit { it[key] = value }
+        }
     }
 
-    suspend fun putString(key: androidx.datastore.preferences.core.Preferences.Key<String>, value: String) {
-        context.dataStore.edit { it[key] = value }
+    suspend fun putIntSync(key: Preferences.Key<Int>, value: Int) {
+        writeCached(key, value)
+        appContext.dataStore.edit { it[key] = value }
     }
 
-    suspend fun getOrDefaultBoolean(key: androidx.datastore.preferences.core.Preferences.Key<Boolean>, defaultValue: Boolean): Boolean {
-        return context.dataStore.data.map { it[key] ?: defaultValue }.first()
+    fun getOrDefaultString(key: Preferences.Key<String>, defaultValue: String): String {
+        return readCached(key, defaultValue)
     }
 
-    suspend fun putBoolean(key: androidx.datastore.preferences.core.Preferences.Key<Boolean>, value: Boolean) {
-        context.dataStore.edit { it[key] = value }
+    fun putString(key: Preferences.Key<String>, value: String) {
+        writeCached(key, value)
+        scope.launch {
+            appContext.dataStore.edit { it[key] = value }
+        }
     }
 
-    suspend fun <T> remove(key: androidx.datastore.preferences.core.Preferences.Key<T>) {
-        context.dataStore.edit { it.remove(key) }
+    suspend fun putStringSync(key: Preferences.Key<String>, value: String) {
+        writeCached(key, value)
+        appContext.dataStore.edit { it[key] = value }
     }
 
-    suspend fun isMigrated(): Boolean {
-        return context.dataStore.data.map { it[MIGRATED_TO_DATASTORE] ?: false }.first()
+    fun getOrDefaultBoolean(key: Preferences.Key<Boolean>, defaultValue: Boolean): Boolean {
+        return readCached(key, defaultValue)
+    }
+
+    fun putBoolean(key: Preferences.Key<Boolean>, value: Boolean) {
+        writeCached(key, value)
+        scope.launch {
+            appContext.dataStore.edit { it[key] = value }
+        }
+    }
+
+    suspend fun putBooleanSync(key: Preferences.Key<Boolean>, value: Boolean) {
+        writeCached(key, value)
+        appContext.dataStore.edit { it[key] = value }
+    }
+
+    fun <T> remove(key: Preferences.Key<T>) {
+        removeCached(key)
+        scope.launch {
+            appContext.dataStore.edit { it.remove(key) }
+        }
+    }
+
+    suspend fun <T> removeSync(key: Preferences.Key<T>) {
+        removeCached(key)
+        appContext.dataStore.edit { it.remove(key) }
+    }
+
+    fun isMigrated(): Boolean {
+        return getOrDefaultBoolean(MIGRATED_TO_DATASTORE, false)
     }
 
     suspend fun markMigrated() {
-        context.dataStore.edit { it[MIGRATED_TO_DATASTORE] = true }
+        putBooleanSync(MIGRATED_TO_DATASTORE, true)
     }
 
-    fun observeInt(key: androidx.datastore.preferences.core.Preferences.Key<Int>, defaultValue: Int): Flow<Int> {
-        return context.dataStore.data.map { it[key] ?: defaultValue }
+    fun isWebDavSecretMigrated(): Boolean {
+        return getOrDefaultBoolean(WEBDAV_SECRET_MIGRATED, false)
     }
 
-    fun observeString(key: androidx.datastore.preferences.core.Preferences.Key<String>, defaultValue: String): Flow<String> {
-        return context.dataStore.data.map { it[key] ?: defaultValue }
+    suspend fun markWebDavSecretMigrated() {
+        putBooleanSync(WEBDAV_SECRET_MIGRATED, true)
     }
 
-    fun observeBoolean(key: androidx.datastore.preferences.core.Preferences.Key<Boolean>, defaultValue: Boolean): Flow<Boolean> {
-        return context.dataStore.data.map { it[key] ?: defaultValue }
+    fun observeInt(key: Preferences.Key<Int>, defaultValue: Int): Flow<Int> {
+        return appContext.dataStore.data.map { it[key] ?: defaultValue }
+    }
+
+    fun observeString(key: Preferences.Key<String>, defaultValue: String): Flow<String> {
+        return appContext.dataStore.data.map { it[key] ?: defaultValue }
+    }
+
+    fun observeBoolean(key: Preferences.Key<Boolean>, defaultValue: Boolean): Flow<Boolean> {
+        return appContext.dataStore.data.map { it[key] ?: defaultValue }
     }
 }
