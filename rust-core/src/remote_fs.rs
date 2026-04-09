@@ -1,7 +1,9 @@
 use crate::models::{Folder, FolderInspection, Photo, SortOrder};
 use futures::StreamExt;
 use opendal::Operator;
+use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Instant;
 
 #[derive(Clone)]
 pub enum Protocol {
@@ -151,9 +153,9 @@ impl RemoteService {
 
     async fn list_folders_webdav(&self, path: &str) -> Result<Vec<Folder>, String> {
         let op = self.op.as_ref().ok_or("WebDAV not initialized")?;
-        // ... (existing WebDAV logic)
+        let started = Instant::now();
         let mut lister = op.lister(path).await.map_err(|e| e.to_string())?;
-        let mut candidates = Vec::new();
+        let mut candidates = HashMap::<String, FolderAggregate>::new();
 
         while let Some(entry) = lister.next().await {
             let entry = entry.map_err(|e| e.to_string())?;
@@ -162,69 +164,129 @@ impl RemoteService {
             if path_str.contains("__MACOSX") { continue; }
 
             if entry.path().ends_with('/') && entry.path() != path {
-                 candidates.push((entry.path().to_string(), entry.name().to_string()));
+                let key = folder_key(entry.name());
+                if key.is_empty() {
+                    continue;
+                }
+
+                let initial_modified = entry
+                    .metadata()
+                    .last_modified()
+                    .map(|t| t.timestamp() as u64)
+                    .unwrap_or(0);
+
+                candidates.insert(
+                    key,
+                    FolderAggregate {
+                        path: entry.path().to_string(),
+                        name: entry.name().to_string(),
+                        has_sub_folders: false,
+                        preview_uris: Vec::new(),
+                        date_modified: initial_modified,
+                        saw_image: false,
+                    },
+                );
             }
         }
-        
-        let op_clone = op.clone();
-        let base_url = self.base_url.clone();
-        let tasks = futures::stream::iter(candidates)
-            .map(|(folder_path, name)| {
-                let op = op_clone.clone();
-                let base_url = base_url.clone();
-                async move {
-                    if let Some((preview_uris, date_modified)) = Self::check_has_images_webdav(op, &folder_path, &base_url).await {
-                          Some(Folder {
-                            path: folder_path,
-                            name,
-                            is_local: false,
-                            has_sub_folders: true, 
-                            preview_uris,
-                            date_modified,
-                        })
-                    } else {
-                        None
-                    }
-                }
-            })
-            .buffer_unordered(4); 
 
-        let mut folders: Vec<Folder> = tasks.filter_map(|opt| async { opt }).collect().await;
+        if candidates.is_empty() {
+            log::info!(
+                "list_folders_webdav path={} direct_children=0 visible_folders=0 scanned_entries=0 elapsed_ms={}",
+                path,
+                started.elapsed().as_millis()
+            );
+            return Ok(Vec::new());
+        }
+
+        let mut scanned_entries = 0usize;
+        let mut image_entries = 0usize;
+        let mut recursive_lister = op
+            .lister_with(path)
+            .recursive(true)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        while let Some(entry) = recursive_lister.next().await {
+            let entry = entry.map_err(|e| e.to_string())?;
+            let path_str = entry.path();
+            if is_hidden_path(path_str) { continue; }
+            if path_str.contains("__MACOSX") { continue; }
+
+            let Some(relative_path) = relative_path(path, path_str) else {
+                continue;
+            };
+
+            scanned_entries += 1;
+
+            let Some(immediate_child) = immediate_child_name(path, path_str) else {
+                continue;
+            };
+
+            let Some(folder) = candidates.get_mut(&immediate_child) else {
+                continue;
+            };
+
+            if entry.path().ends_with('/') {
+                if relative_path.contains('/') {
+                    folder.has_sub_folders = true;
+                }
+                continue;
+            }
+
+            let metadata = entry.metadata();
+            if metadata.content_length() == 0 {
+                continue;
+            }
+
+            let name = file_name(path_str);
+            if !is_image_file(name) {
+                continue;
+            }
+
+            image_entries += 1;
+            folder.saw_image = true;
+
+            if let Some(last_modified) = metadata.last_modified().map(|t| t.timestamp() as u64) {
+                folder.date_modified = folder.date_modified.max(last_modified);
+            }
+
+            if folder.preview_uris.len() < 4 {
+                let full_uri = format!(
+                    "{}/{}",
+                    self.base_url.trim_end_matches('/'),
+                    entry.path().trim_start_matches('/')
+                );
+                folder.preview_uris.push(full_uri);
+            }
+        }
+
+        let direct_children_count = candidates.len();
+
+        let mut folders: Vec<Folder> = candidates
+            .into_values()
+            .filter(|folder| folder.saw_image)
+            .map(|folder| Folder {
+                path: folder.path,
+                name: folder.name,
+                is_local: false,
+                has_sub_folders: folder.has_sub_folders,
+                preview_uris: folder.preview_uris,
+                date_modified: folder.date_modified,
+            })
+            .collect();
+
         folders.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        log::info!(
+            "list_folders_webdav path={} direct_children={} visible_folders={} scanned_entries={} image_entries={} elapsed_ms={}",
+            path,
+            direct_children_count,
+            folders.len(),
+            scanned_entries,
+            image_entries,
+            started.elapsed().as_millis()
+        );
         Ok(folders)
     }
-
-
-    async fn check_has_images_webdav(op: Arc<Operator>, folder_path: &str, base_url: &str) -> Option<(Vec<String>, u64)> {
-          // Use recursive=true
-          match op.lister_with(folder_path).recursive(true).await {
-              Ok(mut lister) => {
-                  let mut preview_uris = Vec::new();
-                  let mut newest_modified = 0u64;
-                  while let Some(result) = lister.next().await {
-                       if let Ok(entry) = result {
-                           let path_str = entry.path();
-                           if is_hidden_path(path_str) { continue; }
-                           if path_str.contains("__MACOSX") { continue; }
-                            if !entry.path().ends_with('/') {
-                               let metadata = entry.metadata();
-                               if metadata.content_length() == 0 { continue; }
-                               let name = path_str.trim_matches('/').split('/').last().unwrap_or("");
-                               if is_image_file(name) {
-                                    if let Some(last_modified) = metadata.last_modified().map(|t| t.timestamp() as u64) {
-                                        newest_modified = newest_modified.max(last_modified);
-                                    }
-                                    let full_uri = format!("{}/{}", base_url.trim_end_matches('/'), entry.path().trim_start_matches('/'));
-                                    preview_uris.push(full_uri);
-                                }
-                            }
-                        }
-                   }
-                  if !preview_uris.is_empty() { Some((preview_uris, newest_modified)) } else { None }
-              }
-              Err(_) => None
-          }
-     }
 
     pub async fn inspect_folder(&self, folder_path: &str) -> Result<FolderInspection, String> {
         match self.protocol {
@@ -280,6 +342,48 @@ fn is_image_file(name: &str) -> bool {
     lower.ends_with(".jpg") || lower.ends_with(".jpeg") || lower.ends_with(".png") || lower.ends_with(".webp") || lower.ends_with(".gif")
 }
 
+struct FolderAggregate {
+    path: String,
+    name: String,
+    has_sub_folders: bool,
+    preview_uris: Vec<String>,
+    date_modified: u64,
+    saw_image: bool,
+}
+
+fn folder_key(name: &str) -> String {
+    name.trim_matches('/').to_string()
+}
+
+fn file_name(path: &str) -> &str {
+    path.trim_matches('/').split('/').last().unwrap_or("")
+}
+
+fn relative_path(parent_path: &str, entry_path: &str) -> Option<String> {
+    let normalized_entry = entry_path.trim_matches('/');
+    if normalized_entry.is_empty() {
+        return None;
+    }
+
+    let normalized_parent = parent_path.trim_matches('/');
+    if normalized_parent.is_empty() {
+        return Some(normalized_entry.to_string());
+    }
+
+    normalized_entry
+        .strip_prefix(normalized_parent)
+        .and_then(|rest| rest.strip_prefix('/'))
+        .map(|rest| rest.to_string())
+}
+
+fn immediate_child_name(parent_path: &str, entry_path: &str) -> Option<String> {
+    relative_path(parent_path, entry_path)?
+        .split('/')
+        .next()
+        .filter(|segment| !segment.is_empty())
+        .map(str::to_string)
+}
+
 fn sort_photos(photos: &mut Vec<Photo>, order: SortOrder) {
     match order {
         SortOrder::NameAsc => photos.sort_by(|a, b| a.title.to_lowercase().cmp(&b.title.to_lowercase())),
@@ -314,6 +418,20 @@ mod tests {
         assert!(is_image_file("Cover.JPG"));
         assert!(is_image_file("panel.WebP"));
         assert!(!is_image_file("notes.txt"));
+    }
+
+    #[test]
+    fn relative_path_handles_root_and_nested_paths() {
+        assert_eq!(Some("library/chapter01/page01.jpg".to_string()), relative_path("/", "/library/chapter01/page01.jpg"));
+        assert_eq!(Some("chapter01/page01.jpg".to_string()), relative_path("/library", "/library/chapter01/page01.jpg"));
+        assert_eq!(None, relative_path("/library", "/other/chapter01/page01.jpg"));
+    }
+
+    #[test]
+    fn immediate_child_name_returns_first_segment_below_parent() {
+        assert_eq!(Some("library".to_string()), immediate_child_name("/", "/library/chapter01/page01.jpg"));
+        assert_eq!(Some("chapter01".to_string()), immediate_child_name("/library", "/library/chapter01/page01.jpg"));
+        assert_eq!(None, immediate_child_name("/library", "/other/chapter01/page01.jpg"));
     }
 
     #[test]
