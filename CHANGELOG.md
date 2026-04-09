@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.1.4 (2026-04-09)
+
+- Improved WebDAV performance and stability (folder listing, JNI packaging, auth/slot caching).
+- Added waterfall-mode multi-select actions for favorite/unfavorite and delete, with post-action refresh.
+- Cleaned up duplicated unit-test helpers and archived temporary planning/debug documents.
+- Updated CI/release workflow hardening for reliable Android + Rust builds.
+
 ## v1.1.3 (2026-04-01)
 
 - Completed the P0 stabilization pass with DataStore, Room, and ViewModel migration.
