@@ -61,6 +61,7 @@
     <string name="port_hint">端口 (默认: 443)</string>
     <string name="username_hint">用户名</string>
     <string name="password_hint">密码</string>
+    <string name="remember_password">记住密码</string>
     <string name="testing_connection">正在测试连接…</string>
     <string name="connection_test_result">连接测试结果</string>
     <string name="connection_failed">连接失败</string>
@@ -136,4 +137,6 @@
     <string name="reader_max_zoom_summary">最大缩放：%1$d%%</string>
     <string name="reader_max_zoom_dialog_title">设置最大缩放比例</string>
     <string name="reader_max_zoom_hint">输入最大缩放比例（100–500）</string>
+    <string name="rotation_lock">旋转锁定</string>
+    <string name="more">更多</string>
 </resources>

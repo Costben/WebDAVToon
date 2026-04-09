@@ -183,3 +183,67 @@ impl Database {
     }
 
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_db_path(name: &str) -> std::path::PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!("webdavtoon-{name}-{unique}.db"))
+    }
+
+    fn photo(id: &str, title: &str, date_modified: u64) -> Photo {
+        Photo {
+            id: id.to_string(),
+            title: title.to_string(),
+            uri: format!("https://example.com/{id}.jpg"),
+            is_local: false,
+            size: 42,
+            date_modified,
+        }
+    }
+
+    #[test]
+    fn save_and_get_photos_respects_sort_order() {
+        let db_path = temp_db_path("photos");
+        let mut db = Database::open(&db_path).expect("open db");
+
+        db.save_photos(
+            "/library",
+            &[
+                photo("b", "Beta", 2),
+                photo("a", "Alpha", 3),
+                photo("c", "Gamma", 1),
+            ],
+        )
+        .expect("save photos");
+
+        let by_name = db.get_photos("/library", SortOrder::NameAsc).expect("get by name");
+        assert_eq!(vec!["Alpha", "Beta", "Gamma"], by_name.iter().map(|it| it.title.as_str()).collect::<Vec<_>>());
+
+        let by_date = db.get_photos("/library", SortOrder::DateDesc).expect("get by date");
+        assert_eq!(vec!["Alpha", "Beta", "Gamma"], by_date.iter().map(|it| it.title.as_str()).collect::<Vec<_>>());
+
+        let _ = std::fs::remove_file(db_path);
+    }
+
+    #[test]
+    fn delete_photo_removes_cached_row() {
+        let db_path = temp_db_path("delete-photo");
+        let mut db = Database::open(&db_path).expect("open db");
+
+        db.save_photos("/library", &[photo("first", "First", 1), photo("second", "Second", 2)])
+            .expect("save photos");
+        db.delete_photo("first").expect("delete photo");
+
+        let remaining = db.get_photos("/library", SortOrder::NameAsc).expect("get photos");
+        assert_eq!(vec!["Second"], remaining.iter().map(|it| it.title.as_str()).collect::<Vec<_>>());
+
+        let _ = std::fs::remove_file(db_path);
+    }
+}

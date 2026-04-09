@@ -287,3 +287,47 @@ fn sort_photos(photos: &mut Vec<Photo>, order: SortOrder) {
         SortOrder::DateDesc => photos.sort_by(|a, b| b.date_modified.cmp(&a.date_modified)),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn photo(title: &str, date_modified: u64) -> Photo {
+        Photo {
+            id: title.to_string(),
+            title: title.to_string(),
+            uri: format!("https://example.com/{}", title),
+            is_local: false,
+            size: 1,
+            date_modified,
+        }
+    }
+
+    #[test]
+    fn hidden_path_detects_nested_dot_directories() {
+        assert!(is_hidden_path("/visible/.secret/chapter01"));
+        assert!(!is_hidden_path("/visible/chapter01"));
+    }
+
+    #[test]
+    fn image_file_detection_is_case_insensitive() {
+        assert!(is_image_file("Cover.JPG"));
+        assert!(is_image_file("panel.WebP"));
+        assert!(!is_image_file("notes.txt"));
+    }
+
+    #[test]
+    fn sort_photos_supports_all_supported_orders() {
+        let mut by_name_asc = vec![photo("beta", 2), photo("Alpha", 1)];
+        sort_photos(&mut by_name_asc, SortOrder::NameAsc);
+        assert_eq!(vec!["Alpha", "beta"], by_name_asc.iter().map(|it| it.title.as_str()).collect::<Vec<_>>());
+
+        let mut by_name_desc = vec![photo("beta", 2), photo("Alpha", 1)];
+        sort_photos(&mut by_name_desc, SortOrder::NameDesc);
+        assert_eq!(vec!["beta", "Alpha"], by_name_desc.iter().map(|it| it.title.as_str()).collect::<Vec<_>>());
+
+        let mut by_date_desc = vec![photo("older", 1), photo("newer", 5)];
+        sort_photos(&mut by_date_desc, SortOrder::DateDesc);
+        assert_eq!(vec!["newer", "older"], by_date_desc.iter().map(|it| it.title.as_str()).collect::<Vec<_>>());
+    }
+}
