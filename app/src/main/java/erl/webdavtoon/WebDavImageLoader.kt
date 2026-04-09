@@ -21,6 +21,7 @@ import com.bumptech.glide.request.target.Target
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentHashMap
 
 object WebDavImageLoader {
 
@@ -32,6 +33,8 @@ object WebDavImageLoader {
     @Volatile
     private var cachedAuthHeader: String? = null
 
+    private val settingsManagers = ConcurrentHashMap<String, SettingsManager>()
+
     fun loadWebDavImage(
         context: Context,
         imageUri: Uri,
@@ -41,7 +44,7 @@ object WebDavImageLoader {
         isWaterfall: Boolean = false,
         isFolderPreview: Boolean = false
     ) {
-        val settings = SettingsManager(context)
+        val settings = getSettingsManager(context)
         val requestOptions = buildRequestOptions(context, limitSize, isWaterfall, isFolderPreview)
 
         val username = settings.getWebDavUsername()
@@ -146,6 +149,12 @@ object WebDavImageLoader {
         cachedAuthKey = key
         cachedAuthHeader = header
         return header
+    }
+
+    private fun getSettingsManager(context: Context): SettingsManager {
+        val appContext = context.applicationContext
+        val key = appContext.packageName
+        return settingsManagers.getOrPut(key) { SettingsManager(appContext) }
     }
 
     private fun defaultListener(tag: String, progressBar: ProgressBar?): RequestListener<Drawable> {

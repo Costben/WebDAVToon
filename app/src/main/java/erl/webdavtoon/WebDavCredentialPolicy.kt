@@ -48,7 +48,9 @@ class WebDavCredentialPolicy(
             return ""
         }
 
-        return persistentStore.get(slot) ?: ""
+        val persistedPassword = persistentStore.get(slot) ?: return ""
+        sessionStore.put(slot, persistedPassword)
+        return persistedPassword
     }
 
     fun savePassword(slot: Int, rememberPassword: Boolean, password: String) {
