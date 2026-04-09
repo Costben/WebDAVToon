@@ -61,6 +61,7 @@
     <string name="port_hint">端口 (默认: 443)</string>
     <string name="username_hint">用户名</string>
     <string name="password_hint">密码</string>
+    <string name="remember_password">记住密码</string>
     <string name="testing_connection">正在测试连接…</string>
     <string name="connection_test_result">连接测试结果</string>
     <string name="connection_failed">连接失败</string>
@@ -82,9 +83,17 @@
     <string name="local_prefix">本地: %1$b</string>
     <string name="favorite_added">已收藏</string>
     <string name="favorite_removed">已取消收藏</string>
+    <string name="favorite_requires_selection">请先选择图片，再进行收藏</string>
+    <string name="favorite_no_changes">选中的图片无需更新收藏状态</string>
     <string name="download_success">下载成功</string>
     <string name="download_failed">下载失败</string>
     <string name="delete_photo_message">确定要删除这张图片吗？</string>
+    <plurals name="favorite_added_count">
+        <item quantity="other">已收藏 %1$d 张图片</item>
+    </plurals>
+    <plurals name="favorite_removed_count">
+        <item quantity="other">已取消收藏 %1$d 张图片</item>
+    </plurals>
     <string name="switched_server">已切换服务器</string>
     <string name="server_saved">服务器已保存</string>
     <string name="default_server">默认服务器</string>
@@ -136,4 +145,6 @@
     <string name="reader_max_zoom_summary">最大缩放：%1$d%%</string>
     <string name="reader_max_zoom_dialog_title">设置最大缩放比例</string>
     <string name="reader_max_zoom_hint">输入最大缩放比例（100–500）</string>
+    <string name="rotation_lock">旋转锁定</string>
+    <string name="more">更多</string>
 </resources>

@@ -1,5 +1,6 @@
 import java.util.Properties
 import com.nishtahir.CargoExtension
+import org.gradle.api.tasks.PathSensitivity
 
 plugins {
     id("com.android.application")
@@ -26,8 +27,8 @@ android {
         applicationId = "erl.webdavtoon"
         minSdk = 24
         targetSdk = 36
-        versionCode = 11
-        versionName = "1.1.3"
+        versionCode = 12
+        versionName = "1.1.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -81,12 +82,6 @@ android {
         }
     }
 
-    tasks.whenTaskAdded {
-        if (name == "mergeDebugJniLibFolders" || name == "mergeReleaseJniLibFolders") {
-            dependsOn("cargoBuild")
-        }
-    }
-
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
@@ -98,6 +93,22 @@ android {
         viewBinding = true
         buildConfig = true
     }
+}
+
+val rustJniLibDir = layout.buildDirectory.dir("rustJniLibs/android")
+
+tasks.named("preBuild").configure {
+    dependsOn("cargoBuild")
+}
+
+tasks.matching { task ->
+    task.name.startsWith("merge") && task.name.endsWith("JniLibFolders")
+}.configureEach {
+    dependsOn("cargoBuild")
+    inputs.dir(rustJniLibDir)
+        .withPropertyName("rustJniLibDir")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.upToDateWhen { false }
 }
 
 dependencies {

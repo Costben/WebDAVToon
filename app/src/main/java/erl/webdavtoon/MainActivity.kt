@@ -41,6 +41,7 @@ class MainActivity : AppCompatActivity() {
 
     private var currentQuery = MediaQuery()
     private var deleteMenuItem: android.view.MenuItem? = null
+    private var favoriteMenuItem: android.view.MenuItem? = null
 
     private val settingsLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -246,6 +247,9 @@ class MainActivity : AppCompatActivity() {
 
         deleteMenuItem = menu.findItem(R.id.action_delete)
         deleteMenuItem?.isVisible = photoAdapter.isSelectionMode()
+        favoriteMenuItem = menu.findItem(R.id.action_favorite)
+        favoriteMenuItem?.isVisible = photoAdapter.isSelectionMode()
+        favoriteMenuItem?.setIcon(if (isFavorites) R.drawable.ic_star_filled_md3 else R.drawable.ic_star_outlined)
 
         val searchItem = menu.findItem(R.id.action_search)
         val searchView = searchItem?.actionView as? SearchView
@@ -299,6 +303,10 @@ class MainActivity : AppCompatActivity() {
                 deleteSelectedPhotos()
                 true
             }
+            R.id.action_favorite -> {
+                updateSelectedFavorites()
+                true
+            }
             R.id.action_settings -> {
                 settingsLauncher.launch(Intent(this, SettingsActivity::class.java))
                 true
@@ -344,6 +352,7 @@ class MainActivity : AppCompatActivity() {
     private fun updateSelectionTitle(count: Int) {
         if (count < 0) {
             deleteMenuItem?.isVisible = false
+            favoriteMenuItem?.isVisible = false
             val displayTitle = when {
                 isFavorites -> getString(R.string.favorites)
                 folderPath.isEmpty() && !isRemote -> getString(R.string.local_photos)
@@ -356,11 +365,68 @@ class MainActivity : AppCompatActivity() {
             supportActionBar?.title = if (isRecursive && !isFavorites) "$displayTitle ${getString(R.string.all_suffix)}" else displayTitle
         } else {
             deleteMenuItem?.isVisible = true
+            favoriteMenuItem?.isVisible = true
             // Ensure delete icon is red
             deleteMenuItem?.icon?.let { icon ->
                 androidx.core.graphics.drawable.DrawableCompat.setTint(icon, android.graphics.Color.RED)
             }
+            favoriteMenuItem?.setIcon(if (isFavorites) R.drawable.ic_star_filled_md3 else R.drawable.ic_star_outlined)
+            favoriteMenuItem?.icon?.let { icon ->
+                androidx.core.graphics.drawable.DrawableCompat.setTint(
+                    icon,
+                    ContextCompat.getColor(this, R.color.primary)
+                )
+            }
             supportActionBar?.title = if (count == 0) getString(R.string.select_items) else getString(R.string.selected_count, count)
+        }
+    }
+
+    private fun updateSelectedFavorites() {
+        val selectedPhotos = photoAdapter.getSelectedPhotos()
+        if (selectedPhotos.isEmpty()) {
+            android.widget.Toast.makeText(this, getString(R.string.favorite_requires_selection), android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val favoriteIds = selectedPhotos
+            .filter { settingsManager.isPhotoFavorite(it.id) }
+            .mapTo(mutableSetOf()) { it.id }
+        val plan = FavoriteSelectionPlanner.buildPlan(
+            selectedItems = selectedPhotos,
+            favoriteIds = favoriteIds,
+            isFavoritesView = isFavorites,
+            idSelector = { it.id }
+        )
+
+        plan.toAdd.forEach(settingsManager::addFavoritePhoto)
+        plan.toRemove.forEach { settingsManager.removeFavoritePhoto(it.id) }
+
+        when {
+            plan.toAdd.isNotEmpty() -> {
+                android.widget.Toast.makeText(
+                    this,
+                    resources.getQuantityString(R.plurals.favorite_added_count, plan.toAdd.size, plan.toAdd.size),
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            }
+            plan.toRemove.isNotEmpty() -> {
+                android.widget.Toast.makeText(
+                    this,
+                    resources.getQuantityString(R.plurals.favorite_removed_count, plan.toRemove.size, plan.toRemove.size),
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            }
+            else -> {
+                android.widget.Toast.makeText(this, getString(R.string.favorite_no_changes), android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        photoAdapter.setSelectionMode(false)
+        isLongPressSelection = false
+        updateSelectionTitle(-1)
+
+        if (plan.toRemove.isNotEmpty()) {
+            refreshMedia()
         }
     }
 

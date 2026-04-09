@@ -1,6 +1,8 @@
 package erl.webdavtoon
 
 import android.net.Uri
+import android.os.SystemClock
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import uniffi.rust_core.SortOrder
@@ -10,8 +12,12 @@ class RustWebDavPhotoRepository(
     private val settingsManager: SettingsManager
 ) : PhotoRepository {
 
+    companion object {
+        @Volatile
+        private var lastWebDavParams: String? = null
+    }
+
     private val rustRepo = WebDAVToonApplication.rustRepository
-    private var lastWebDavParams: String? = null
 
     override suspend fun queryMediaPage(
         folderPath: String,
@@ -90,6 +96,7 @@ class RustWebDavPhotoRepository(
     override suspend fun getFolders(rootPath: String, forceRefresh: Boolean): List<Folder> = withContext(Dispatchers.IO) {
         val repo = rustRepo ?: return@withContext emptyList()
         initializeWebDavIfNeeded(repo)
+        val startedAt = SystemClock.elapsedRealtime()
 
         try {
             val folders = repo.getFolders(rootPath, forceRefresh)
@@ -105,7 +112,8 @@ class RustWebDavPhotoRepository(
                         isLocal = f.isLocal,
                         photoCount = 0,
                         previewUris = f.previewUris.map { Uri.parse(it) },
-                        hasSubFolders = f.hasSubFolders
+                        hasSubFolders = f.hasSubFolders,
+                        dateModified = f.dateModified.toLong() * 1000
                     )
                 }.toMutableList()
 
@@ -127,10 +135,53 @@ class RustWebDavPhotoRepository(
                     ))
                 }
             }
+            Log.i(
+                "RustWebDavPhotoRepo",
+                "getFolders rootPath=$rootPath forceRefresh=$forceRefresh count=${folders.size} elapsedMs=${SystemClock.elapsedRealtime() - startedAt}"
+            )
             folders
         } catch (e: Exception) {
             android.util.Log.e("RustWebDavPhotoRepo", "Failed to get webdav folders", e)
             emptyList()
+        }
+    }
+
+    suspend fun diagnoseEmptyFolderResult(rootPath: String): String? = withContext(Dispatchers.IO) {
+        if (rootPath != "/") return@withContext null
+
+        val repo = rustRepo ?: return@withContext null
+
+        return@withContext try {
+            val endpoint = settingsManager.getFullWebDavUrl()
+            val username = settingsManager.getWebDavUsername()
+            val password = settingsManager.getWebDavPassword()
+
+            val report = repo.testWebdav(endpoint, username, password)
+            val rootEntries = report.lineSequence()
+                .map { it.trim() }
+                .filter { it.startsWith("- ") }
+                .toList()
+
+            when {
+                rootEntries.isEmpty() -> {
+                    android.util.Log.i(
+                        "RustWebDavPhotoRepo",
+                        "WebDAV root is reachable but returned no entries for endpoint=$endpoint"
+                    )
+                    "WebDAV 连接成功，但当前根目录下没有任何文件夹或文件。"
+                }
+
+                else -> {
+                    android.util.Log.i(
+                        "RustWebDavPhotoRepo",
+                        "WebDAV root has ${rootEntries.size} entries, but none matched visible image-folder rules for endpoint=$endpoint"
+                    )
+                    "WebDAV 连接成功，但当前根目录下没有可显示的图片文件夹。仅显示包含受支持图片（jpg、jpeg、png、webp、gif）的非隐藏文件夹。"
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("RustWebDavPhotoRepo", "Failed to diagnose empty WebDAV folder result", e)
+            null
         }
     }
 
@@ -163,7 +214,7 @@ class RustWebDavPhotoRepository(
             )
             lastWebDavParams = params
         } catch (e: Exception) {
-            android.util.Log.e("RustWebDavPhotoRepo", "Failed to init webdav", e)
+            Log.e("RustWebDavPhotoRepo", "Failed to init webdav", e)
             lastWebDavParams = null
         }
     }

@@ -105,6 +105,8 @@ class SubFolderActivity : AppCompatActivity() {
         binding.recyclerView.layoutManager = GridLayoutManager(this, settingsManager.getGridColumns()).apply {
             isItemPrefetchEnabled = false
         }
+        binding.recyclerView.setHasFixedSize(true)
+        binding.recyclerView.itemAnimator = null
         binding.recyclerView.adapter = adapter
 
         binding.swipeRefreshLayout.setOnRefreshListener {

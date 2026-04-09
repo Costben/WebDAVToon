@@ -1253,19 +1253,17 @@ private class UniffiJnaCleanable(
 // using Android or not.
 // There are further runtime checks to chose the correct implementation
 // of the cleaner.
+// Local Android patch: lint treats java.lang.ref.Cleaner as API 33+, so when
+// regenerating UniFFI bindings keep the SDK gate + RequiresApi annotations
+// below or re-apply an equivalent generated fix.
 private fun UniffiCleaner.Companion.create(): UniffiCleaner =
-    try {
-        // For safety's sake: if the library hasn't been run in android_cleaner = true
-        // mode, but is being run on Android, then we still need to think about
-        // Android API versions.
-        // So we check if java.lang.ref.Cleaner is there, and use that…
-        java.lang.Class.forName("java.lang.ref.Cleaner")
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
         JavaLangRefCleaner()
-    } catch (e: ClassNotFoundException) {
-        // … otherwise, fallback to the JNA cleaner.
+    } else {
         UniffiJnaCleaner()
     }
 
+@androidx.annotation.RequiresApi(android.os.Build.VERSION_CODES.TIRAMISU)
 private class JavaLangRefCleaner : UniffiCleaner {
     val cleaner = java.lang.ref.Cleaner.create()
 
@@ -1273,6 +1271,7 @@ private class JavaLangRefCleaner : UniffiCleaner {
         JavaLangRefCleanable(cleaner.register(value, cleanUpTask))
 }
 
+@androidx.annotation.RequiresApi(android.os.Build.VERSION_CODES.TIRAMISU)
 private class JavaLangRefCleanable(
     val cleanable: java.lang.ref.Cleaner.Cleanable
 ) : UniffiCleaner.Cleanable {
@@ -1503,7 +1502,8 @@ data class Folder (
     var `name`: kotlin.String, 
     var `isLocal`: kotlin.Boolean, 
     var `hasSubFolders`: kotlin.Boolean, 
-    var `previewUris`: List<kotlin.String>
+    var `previewUris`: List<kotlin.String>,
+    var `dateModified`: kotlin.ULong
 ) {
     
     companion object
@@ -1520,6 +1520,7 @@ public object FfiConverterTypeFolder: FfiConverterRustBuffer<Folder> {
             FfiConverterBoolean.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterSequenceString.read(buf),
+            FfiConverterULong.read(buf),
         )
     }
 
@@ -1528,7 +1529,8 @@ public object FfiConverterTypeFolder: FfiConverterRustBuffer<Folder> {
             FfiConverterString.allocationSize(value.`name`) +
             FfiConverterBoolean.allocationSize(value.`isLocal`) +
             FfiConverterBoolean.allocationSize(value.`hasSubFolders`) +
-            FfiConverterSequenceString.allocationSize(value.`previewUris`)
+            FfiConverterSequenceString.allocationSize(value.`previewUris`) +
+            FfiConverterULong.allocationSize(value.`dateModified`)
     )
 
     override fun write(value: Folder, buf: ByteBuffer) {
@@ -1537,6 +1539,7 @@ public object FfiConverterTypeFolder: FfiConverterRustBuffer<Folder> {
             FfiConverterBoolean.write(value.`isLocal`, buf)
             FfiConverterBoolean.write(value.`hasSubFolders`, buf)
             FfiConverterSequenceString.write(value.`previewUris`, buf)
+            FfiConverterULong.write(value.`dateModified`, buf)
     }
 }
 

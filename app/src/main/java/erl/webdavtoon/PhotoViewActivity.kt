@@ -4,10 +4,12 @@ import android.content.Context
 import android.content.DialogInterface
 import android.content.res.Configuration
 import android.os.Bundle
+import android.view.Gravity
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -20,11 +22,16 @@ import android.view.ScaleGestureDetector
 import erl.webdavtoon.databinding.ActivityPhotoViewBinding
 
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 /**
  * Webtoon 浏览模式 Activity
  */
 class PhotoViewActivity : AppCompatActivity() {
+
+    companion object {
+        private const val FAST_SCROLL_HEIGHT_RATIO = 0.67f
+    }
 
     private lateinit var binding: ActivityPhotoViewBinding
     private lateinit var adapter: PhotoDetailAdapter
@@ -165,6 +172,10 @@ class PhotoViewActivity : AppCompatActivity() {
                 }
             }
         })
+
+        binding.root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            updateFastScrollContainerLayout()
+        }
     }
 
     private fun loadReaderZoomSettings() {
@@ -214,6 +225,9 @@ class PhotoViewActivity : AppCompatActivity() {
             // 可滚动的有效高度
             val effectiveHeight = totalHeight - paddingTop - paddingBottom
             val maxScrollY = effectiveHeight - thumbHeight
+            if (maxScrollY <= 0) {
+                return@setOnTouchListener false
+            }
             
             when (event.action) {
                 MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
@@ -260,12 +274,35 @@ class PhotoViewActivity : AppCompatActivity() {
         
         val effectiveHeight = totalHeight - paddingTop - paddingBottom
         val maxScrollY = effectiveHeight - thumbHeight
+        if (maxScrollY <= 0) {
+            binding.fastScrollThumb.y = paddingTop.toFloat()
+            return
+        }
         
         if (totalItems > 1) {
             val percentage = firstVisiblePos.toFloat() / (totalItems - 1)
             binding.fastScrollThumb.y = paddingTop + (percentage * maxScrollY)
         } else {
             binding.fastScrollThumb.y = paddingTop.toFloat()
+        }
+    }
+
+    private fun updateFastScrollContainerLayout() {
+        val rootHeight = binding.root.height
+        if (rootHeight <= 0) return
+
+        val layoutParams = binding.fastScrollContainer.layoutParams as? CoordinatorLayout.LayoutParams ?: return
+        val desiredHeight = (rootHeight * FAST_SCROLL_HEIGHT_RATIO).roundToInt()
+            .coerceAtLeast(binding.fastScrollThumb.height + binding.fastScrollContainer.paddingTop + binding.fastScrollContainer.paddingBottom)
+
+        if (layoutParams.height != desiredHeight || layoutParams.gravity != (Gravity.END or Gravity.CENTER_VERTICAL)) {
+            layoutParams.height = desiredHeight
+            layoutParams.gravity = Gravity.END or Gravity.CENTER_VERTICAL
+            binding.fastScrollContainer.layoutParams = layoutParams
+        }
+
+        if (!isCardMode && !isImmersiveMode && binding.fastScrollContainer.visibility == View.VISIBLE) {
+            binding.fastScrollContainer.post { updateFastScrollThumbPosition() }
         }
     }
 
@@ -340,11 +377,13 @@ class PhotoViewActivity : AppCompatActivity() {
             binding.deleteButton.imageTintList = redTint
             // 更新多选按钮图标颜色为主题色
             binding.selectButton.imageTintList = primaryTint
+            binding.favoriteButton.imageTintList = primaryTint
         } else {
             deleteMenuItem?.isVisible = false
             // 恢复底栏按钮颜色
             binding.deleteButton.imageTintList = defaultTint
             binding.selectButton.imageTintList = defaultTint
+            updateFavoriteButtonState()
             updateCurrentPosition()
         }
     }
@@ -401,17 +440,17 @@ class PhotoViewActivity : AppCompatActivity() {
                 val settingsManager = SettingsManager(this)
                 lifecycleScope.launch {
                     var allSuccess = true
-                    var anySuccess = false
+                    val deletedPhotos = mutableListOf<Photo>()
                     selectedPhotos.forEach { photo ->
                         val success = FileUtils.deleteImage(this@PhotoViewActivity, photo, settingsManager)
                         if (success) {
-                            anySuccess = true
+                            deletedPhotos.add(photo)
                         } else {
                             allSuccess = false
                         }
                     }
 
-                    if (anySuccess) {
+                    if (deletedPhotos.isNotEmpty()) {
                         WebDavImageLoader.clearCache(this@PhotoViewActivity)
                     }
 
@@ -423,12 +462,12 @@ class PhotoViewActivity : AppCompatActivity() {
 
                     // 更新列表并退出多选模式
                     val newPhotos = photos.toMutableList()
-                    newPhotos.removeAll(selectedPhotos)
+                    newPhotos.removeAll(deletedPhotos)
                     photos = newPhotos
                     
                     // 更新缓存和状态，以便 MainActivity 同步更新
                     PhotoCache.setPhotos(newPhotos)
-                    mediaViewModel.removePhotos(selectedPhotos)
+                    mediaViewModel.removePhotos(deletedPhotos)
                     
                     adapter.setPhotos(newPhotos)
                     webtoonAdapter?.setPhotos(newPhotos)
@@ -444,6 +483,10 @@ class PhotoViewActivity : AppCompatActivity() {
                         if (isCardMode) {
                             binding.recyclerView.scrollToPosition(currentIndex)
                         }
+                    }
+
+                    if (deletedPhotos.isNotEmpty()) {
+                        refreshCurrentMediaPage()
                     }
                 }
             }
@@ -527,7 +570,11 @@ class PhotoViewActivity : AppCompatActivity() {
         
         // 收藏按钮点击事件
         binding.favoriteButton.setOnClickListener {
-            toggleFavorite()
+            if (isSelectionMode) {
+                updateSelectedFavorites()
+            } else {
+                Toast.makeText(this, getString(R.string.favorite_requires_selection), Toast.LENGTH_SHORT).show()
+            }
         }
         
         // 下载按钮点击事件
@@ -587,8 +634,10 @@ class PhotoViewActivity : AppCompatActivity() {
         } else {
             // 切换到webtoon模式
             setupWebtoonMode()
+            updateFastScrollContainerLayout()
             if (!isImmersiveMode) {
                 binding.fastScrollContainer.visibility = View.VISIBLE
+                binding.recyclerView.post { updateFastScrollThumbPosition() }
             }
             // 更新webtoon模式适配器数据
             webtoonAdapter?.setPhotos(photos)
@@ -639,6 +688,7 @@ class PhotoViewActivity : AppCompatActivity() {
                     systemBars.bottom
                 )
             }
+            binding.root.post { updateFastScrollContainerLayout() }
             insets
         }
     }
@@ -663,6 +713,7 @@ class PhotoViewActivity : AppCompatActivity() {
             controller.show(WindowInsetsCompat.Type.systemBars())
             binding.appBarLayout.visibility = View.VISIBLE
             binding.bottomAppBar.visibility = View.VISIBLE
+            updateFastScrollContainerLayout()
             if (!isCardMode) {
                 binding.fastScrollContainer.visibility = View.VISIBLE
                 binding.recyclerView.post { updateFastScrollThumbPosition() }
@@ -700,6 +751,22 @@ class PhotoViewActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    private fun refreshCurrentMediaPage() {
+        val state = mediaViewModel.state.value
+        if (state.sessionKey.isEmpty()) return
+
+        MediaManager.refresh(
+            context = this,
+            scope = lifecycleScope,
+            sessionKey = state.sessionKey,
+            folderPath = state.folderPath,
+            isRemote = state.isRemote,
+            isRecursive = state.isRecursive,
+            isFavorites = state.isFavorites,
+            query = state.currentQuery
+        )
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -815,55 +882,76 @@ class PhotoViewActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun toggleFavorite() {
-        if (photos.isEmpty() || currentIndex !in photos.indices) return
-        
-        val photo = photos[currentIndex]
+    private fun updateSelectedFavorites() {
+        val selectedPhotos = if (isCardMode) adapter.getSelectedPhotos() else webtoonAdapter?.getSelectedPhotos() ?: emptyList()
+        if (selectedPhotos.isEmpty()) return
+
         val settingsManager = SettingsManager(this)
-        
-        if (settingsManager.isPhotoFavorite(photo.id)) {
-            // 取消收藏
-            settingsManager.removeFavoritePhoto(photo.id)
-            binding.favoriteButton.setImageResource(R.drawable.ic_star_outlined)
-            Toast.makeText(this, getString(R.string.favorite_removed), Toast.LENGTH_SHORT).show()
-            
-            // 如果是从收藏夹进入的，取消收藏时从当前列表中移除
-            if (isFavorites) {
-                val newPhotos = photos.toMutableList()
-                newPhotos.removeAt(currentIndex)
-                
-                // 更新全局缓存和状态
-                PhotoCache.setPhotos(newPhotos)
-                mediaViewModel.removePhotos(listOf(photo))
-                
-                photos = newPhotos
-                
-                // 更新适配器
-                adapter.setPhotos(photos)
-                webtoonAdapter?.setPhotos(photos)
-                
-                if (photos.isEmpty()) {
-                    finish()
-                } else {
-                    // 调整当前索引
-                    if (currentIndex >= photos.size) {
-                        currentIndex = photos.size - 1
-                    }
-                    // 重新加载当前页面的标题和收藏状态
-                    val currentPhoto = photos[currentIndex]
-                    binding.toolbar.title = currentPhoto.title
-                    updateFavoriteButtonState()
-                    // 滚动到当前位置（对于卡片模式比较重要）
-                    if (isCardMode) {
-                        binding.recyclerView.scrollToPosition(currentIndex)
-                    }
-                }
+        val favoriteIds = selectedPhotos
+            .filter { settingsManager.isPhotoFavorite(it.id) }
+            .mapTo(mutableSetOf()) { it.id }
+        val plan = FavoriteSelectionPlanner.buildPlan(
+            selectedItems = selectedPhotos,
+            favoriteIds = favoriteIds,
+            isFavoritesView = isFavorites,
+            idSelector = { it.id }
+        )
+
+        plan.toAdd.forEach(settingsManager::addFavoritePhoto)
+        plan.toRemove.forEach { settingsManager.removeFavoritePhoto(it.id) }
+
+        when {
+            plan.toAdd.isNotEmpty() -> {
+                Toast.makeText(
+                    this,
+                    resources.getQuantityString(R.plurals.favorite_added_count, plan.toAdd.size, plan.toAdd.size),
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+            plan.toRemove.isNotEmpty() -> {
+                Toast.makeText(
+                    this,
+                    resources.getQuantityString(R.plurals.favorite_removed_count, plan.toRemove.size, plan.toRemove.size),
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+            else -> {
+                Toast.makeText(this, getString(R.string.favorite_no_changes), Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        if (plan.toRemove.isNotEmpty() && isFavorites) {
+            val removedIds = plan.toRemove.mapTo(mutableSetOf()) { it.id }
+            val newPhotos = photos.filterNot { it.id in removedIds }
+
+            PhotoCache.setPhotos(newPhotos)
+            mediaViewModel.removePhotos(plan.toRemove)
+            photos = newPhotos
+
+            adapter.setPhotos(photos)
+            webtoonAdapter?.setPhotos(photos)
+
+            exitSelectionMode()
+            refreshCurrentMediaPage()
+
+            if (photos.isEmpty()) {
+                finish()
+                return
+            }
+
+            if (currentIndex >= photos.size) {
+                currentIndex = photos.size - 1
+            }
+
+            val currentPhoto = photos[currentIndex]
+            binding.toolbar.title = currentPhoto.title
+            updateFavoriteButtonState()
+
+            if (isCardMode) {
+                binding.recyclerView.scrollToPosition(currentIndex)
             }
         } else {
-            // 添加收藏
-            settingsManager.addFavoritePhoto(photo)
-            binding.favoriteButton.setImageResource(R.drawable.ic_star_filled_md3)
-            Toast.makeText(this, getString(R.string.favorite_added), Toast.LENGTH_SHORT).show()
+            exitSelectionMode()
         }
     }
 
@@ -960,6 +1048,7 @@ class PhotoViewActivity : AppCompatActivity() {
                             }
                             // 更新标题
                             binding.toolbar.title = newPhotos[currentIndex].title
+                            refreshCurrentMediaPage()
                         }
                     } else {
                         Toast.makeText(this@PhotoViewActivity, getString(R.string.delete_failed), Toast.LENGTH_SHORT).show()

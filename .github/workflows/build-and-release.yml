@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - hotl/project-health-remediation
     tags:
       - 'v*'
   workflow_dispatch:
@@ -90,6 +91,12 @@ jobs:
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
+
+      - name: Run Quality Gates
+        run: |
+          export ANDROID_NDK_HOME=$ANDROID_NDK_HOME
+          cargo test --manifest-path rust-core/Cargo.toml
+          ./gradlew :app:testDebugUnitTest :app:lintDebug --stacktrace
 
       - name: Build APK
         env:
