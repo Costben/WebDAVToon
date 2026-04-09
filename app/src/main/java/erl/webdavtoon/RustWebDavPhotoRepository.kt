@@ -1,6 +1,8 @@
 package erl.webdavtoon
 
 import android.net.Uri
+import android.os.SystemClock
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import uniffi.rust_core.SortOrder
@@ -10,8 +12,12 @@ class RustWebDavPhotoRepository(
     private val settingsManager: SettingsManager
 ) : PhotoRepository {
 
+    companion object {
+        @Volatile
+        private var lastWebDavParams: String? = null
+    }
+
     private val rustRepo = WebDAVToonApplication.rustRepository
-    private var lastWebDavParams: String? = null
 
     override suspend fun queryMediaPage(
         folderPath: String,
@@ -90,6 +96,7 @@ class RustWebDavPhotoRepository(
     override suspend fun getFolders(rootPath: String, forceRefresh: Boolean): List<Folder> = withContext(Dispatchers.IO) {
         val repo = rustRepo ?: return@withContext emptyList()
         initializeWebDavIfNeeded(repo)
+        val startedAt = SystemClock.elapsedRealtime()
 
         try {
             val folders = repo.getFolders(rootPath, forceRefresh)
@@ -128,6 +135,10 @@ class RustWebDavPhotoRepository(
                     ))
                 }
             }
+            Log.i(
+                "RustWebDavPhotoRepo",
+                "getFolders rootPath=$rootPath forceRefresh=$forceRefresh count=${folders.size} elapsedMs=${SystemClock.elapsedRealtime() - startedAt}"
+            )
             folders
         } catch (e: Exception) {
             android.util.Log.e("RustWebDavPhotoRepo", "Failed to get webdav folders", e)
@@ -203,7 +214,7 @@ class RustWebDavPhotoRepository(
             )
             lastWebDavParams = params
         } catch (e: Exception) {
-            android.util.Log.e("RustWebDavPhotoRepo", "Failed to init webdav", e)
+            Log.e("RustWebDavPhotoRepo", "Failed to init webdav", e)
             lastWebDavParams = null
         }
     }

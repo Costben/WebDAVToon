@@ -2,6 +2,7 @@ use crate::database::Database;
 use crate::models::{Folder, FolderInspection, Photo, SortOrder};
 use crate::remote_fs::RemoteService;
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 use tokio::runtime::Runtime;
 
 #[derive(thiserror::Error, Debug, uniffi::Error)]
@@ -112,7 +113,24 @@ impl Repository {
     }
 
     pub fn get_folders(&self, path: String, force_refresh: bool) -> Result<Vec<Folder>, RepoError> {
-        let _ = force_refresh;
+        if !force_refresh {
+            if let Some(db) = &self.db {
+                if let Ok(db) = db.lock() {
+                    if let Ok(folders) = db.get_folders(&path) {
+                        if !folders.is_empty() {
+                            log::info!(
+                                "get_folders cache hit path={} count={}",
+                                path,
+                                folders.len()
+                            );
+                            return Ok(folders);
+                        }
+                    }
+                }
+            }
+        }
+
+        let started = Instant::now();
         let folders = self.rt.block_on(async {
             if let Some(ref service) = self.remote {
                 service.list_folders(&path).await.map_err(RepoError::Remote)
@@ -126,6 +144,14 @@ impl Repository {
                 let _ = db.save_folders(&path, &folders);
             }
         }
+
+        log::info!(
+            "get_folders remote path={} force_refresh={} count={} elapsed_ms={}",
+            path,
+            force_refresh,
+            folders.len(),
+            started.elapsed().as_millis()
+        );
 
         Ok(folders)
     }

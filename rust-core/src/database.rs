@@ -75,6 +75,8 @@ impl Database {
             [],
         )?;
 
+        self.trim_folder_preview_cache()?;
+
         Ok(())
     }
 
@@ -182,6 +184,99 @@ impl Database {
         tx.commit()
     }
 
+    pub fn get_folders(&self, parent_path: &str) -> Result<Vec<Folder>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT path, name, is_local, has_sub_folders, preview_uris, date_modified
+             FROM folders
+             WHERE parent_path = ?
+             ORDER BY name COLLATE NOCASE ASC",
+        )?;
+
+        let folder_iter = stmt.query_map([parent_path], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, i32>(2)? != 0,
+                row.get::<_, i32>(3)? != 0,
+                row.get::<_, Option<String>>(4)?.unwrap_or_default(),
+                row.get::<_, i64>(5)? as u64,
+            ))
+        })?;
+
+        let mut folders = Vec::new();
+        let mut trimmed_updates = Vec::new();
+        for folder in folder_iter {
+            let (path, name, is_local, has_sub_folders, preview_json, date_modified) = folder?;
+            let preview_uris_full = serde_json::from_str::<Vec<String>>(&preview_json).unwrap_or_default();
+            let preview_uris = preview_uris_full.iter().take(4).cloned().collect::<Vec<_>>();
+
+            if preview_json.len() > 4096 {
+                let trimmed_json = serde_json::to_string(&preview_uris).unwrap_or_default();
+                trimmed_updates.push((path.clone(), trimmed_json));
+            }
+
+            folders.push(Folder {
+                path,
+                name,
+                is_local,
+                has_sub_folders,
+                preview_uris,
+                date_modified,
+            });
+        }
+
+        for (path, trimmed_json) in trimmed_updates {
+            self.conn.execute(
+                "UPDATE folders SET preview_uris = ? WHERE path = ?",
+                params![trimmed_json, path],
+            )?;
+        }
+        Ok(folders)
+    }
+
+    fn trim_folder_preview_cache(&self) -> Result<()> {
+        let oversized_rows = {
+            let mut stmt = self.conn.prepare(
+                "SELECT path, preview_uris
+                 FROM folders
+                 WHERE preview_uris IS NOT NULL
+                   AND LENGTH(preview_uris) > 4096",
+            )?;
+
+            let row_iter = stmt.query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                ))
+            })?;
+
+            let mut rows = Vec::new();
+            for row in row_iter {
+                rows.push(row?);
+            }
+            rows
+        };
+
+        if oversized_rows.is_empty() {
+            return Ok(());
+        }
+
+        for (path, preview_json) in oversized_rows {
+            let trimmed = serde_json::from_str::<Vec<String>>(&preview_json)
+                .unwrap_or_default()
+                .into_iter()
+                .take(4)
+                .collect::<Vec<_>>();
+            let trimmed_json = serde_json::to_string(&trimmed).unwrap_or_default();
+            self.conn.execute(
+                "UPDATE folders SET preview_uris = ? WHERE path = ?",
+                params![trimmed_json, path],
+            )?;
+        }
+
+        Ok(())
+    }
+
 }
 
 #[cfg(test)]
@@ -243,6 +338,46 @@ mod tests {
 
         let remaining = db.get_photos("/library", SortOrder::NameAsc).expect("get photos");
         assert_eq!(vec!["Second"], remaining.iter().map(|it| it.title.as_str()).collect::<Vec<_>>());
+
+        let _ = std::fs::remove_file(db_path);
+    }
+
+    fn folder(path: &str, name: &str, has_sub_folders: bool, preview_uris: &[&str], date_modified: u64) -> Folder {
+        Folder {
+            path: path.to_string(),
+            name: name.to_string(),
+            is_local: false,
+            has_sub_folders,
+            preview_uris: preview_uris.iter().map(|it| it.to_string()).collect(),
+            date_modified,
+        }
+    }
+
+    #[test]
+    fn save_and_get_folders_round_trip_cached_metadata() {
+        let db_path = temp_db_path("folders");
+        let mut db = Database::open(&db_path).expect("open db");
+
+        db.save_folders(
+            "/library",
+            &[
+                folder("/library/beta/", "beta", false, &["https://example.com/beta/1.jpg"], 2),
+                folder(
+                    "/library/alpha/",
+                    "alpha",
+                    true,
+                    &["https://example.com/alpha/1.jpg", "https://example.com/alpha/2.jpg"],
+                    5,
+                ),
+            ],
+        )
+        .expect("save folders");
+
+        let folders = db.get_folders("/library").expect("get folders");
+        assert_eq!(vec!["alpha", "beta"], folders.iter().map(|it| it.name.as_str()).collect::<Vec<_>>());
+        assert_eq!(2, folders[0].preview_uris.len());
+        assert!(folders[0].has_sub_folders);
+        assert_eq!(5, folders[0].date_modified);
 
         let _ = std::fs::remove_file(db_path);
     }
