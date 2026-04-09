@@ -8,6 +8,7 @@ import android.widget.ImageView
 import android.widget.ProgressBar
 import com.bumptech.glide.Glide
 import com.bumptech.glide.Priority
+import com.bumptech.glide.load.DecodeFormat
 import com.bumptech.glide.load.DataSource
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.load.engine.GlideException
@@ -23,25 +24,31 @@ import kotlinx.coroutines.withContext
 
 object WebDavImageLoader {
 
+    private const val FOLDER_PREVIEW_SIZE_PX = 224
+
+    @Volatile
+    private var cachedAuthKey: String? = null
+
+    @Volatile
+    private var cachedAuthHeader: String? = null
+
     fun loadWebDavImage(
         context: Context,
         imageUri: Uri,
         imageView: ImageView,
         progressBar: ProgressBar? = null,
         limitSize: Boolean = true,
-        isWaterfall: Boolean = false
+        isWaterfall: Boolean = false,
+        isFolderPreview: Boolean = false
     ) {
         val settings = SettingsManager(context)
-        val requestOptions = buildRequestOptions(context, limitSize, isWaterfall)
+        val requestOptions = buildRequestOptions(context, limitSize, isWaterfall, isFolderPreview)
 
         val username = settings.getWebDavUsername()
         val password = settings.getWebDavPassword()
 
         val model: Any = if (username.isNotEmpty() && password.isNotEmpty()) {
-            val auth = "Basic " + android.util.Base64.encodeToString(
-                "$username:$password".toByteArray(),
-                android.util.Base64.NO_WRAP
-            )
+            val auth = getCachedAuthHeader(username, password)
             GlideUrl(
                 FileUtils.encodeWebDavUrl(imageUri.toString()),
                 LazyHeaders.Builder().addHeader("Authorization", auth).build()
@@ -63,9 +70,10 @@ object WebDavImageLoader {
         imageView: ImageView,
         progressBar: ProgressBar? = null,
         limitSize: Boolean = true,
-        isWaterfall: Boolean = false
+        isWaterfall: Boolean = false,
+        isFolderPreview: Boolean = false
     ) {
-        val requestOptions = buildRequestOptions(context, limitSize, isWaterfall)
+        val requestOptions = buildRequestOptions(context, limitSize, isWaterfall, isFolderPreview)
 
         Glide.with(context)
             .load(imageUri)
@@ -77,7 +85,8 @@ object WebDavImageLoader {
     private fun buildRequestOptions(
         context: Context,
         limitSize: Boolean,
-        isWaterfall: Boolean
+        isWaterfall: Boolean,
+        isFolderPreview: Boolean
     ): RequestOptions {
         var requestOptions = RequestOptions()
             .diskCacheStrategy(DiskCacheStrategy.ALL)
@@ -86,7 +95,14 @@ object WebDavImageLoader {
             .placeholder(android.R.drawable.ic_menu_gallery)
             .error(android.R.drawable.ic_menu_report_image)
 
-        if (isWaterfall) {
+        if (isFolderPreview) {
+            requestOptions = requestOptions
+                .override(FOLDER_PREVIEW_SIZE_PX, FOLDER_PREVIEW_SIZE_PX)
+                .downsample(DownsampleStrategy.AT_MOST)
+                .format(DecodeFormat.PREFER_RGB_565)
+                .priority(Priority.LOW)
+                .dontAnimate()
+        } else if (isWaterfall) {
             val settings = SettingsManager(context)
             requestOptions = when (settings.getWaterfallQualityMode()) {
                 SettingsManager.WATERFALL_MODE_MAX_WIDTH -> {
@@ -113,6 +129,23 @@ object WebDavImageLoader {
         }
 
         return requestOptions
+    }
+
+    private fun getCachedAuthHeader(username: String, password: String): String {
+        val key = "$username:$password"
+        val currentKey = cachedAuthKey
+        val currentHeader = cachedAuthHeader
+        if (currentKey == key && currentHeader != null) {
+            return currentHeader
+        }
+
+        val header = "Basic " + android.util.Base64.encodeToString(
+            key.toByteArray(),
+            android.util.Base64.NO_WRAP
+        )
+        cachedAuthKey = key
+        cachedAuthHeader = header
+        return header
     }
 
     private fun defaultListener(tag: String, progressBar: ProgressBar?): RequestListener<Drawable> {
@@ -153,5 +186,10 @@ object WebDavImageLoader {
                 Glide.get(context).clearDiskCache()
             }
         }
+    }
+
+    fun clear(imageView: ImageView) {
+        Glide.with(imageView).clear(imageView)
+        imageView.setImageDrawable(null)
     }
 }
