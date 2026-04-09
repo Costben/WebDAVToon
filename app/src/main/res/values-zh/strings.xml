@@ -83,9 +83,17 @@
     <string name="local_prefix">本地: %1$b</string>
     <string name="favorite_added">已收藏</string>
     <string name="favorite_removed">已取消收藏</string>
+    <string name="favorite_requires_selection">请先选择图片，再进行收藏</string>
+    <string name="favorite_no_changes">选中的图片无需更新收藏状态</string>
     <string name="download_success">下载成功</string>
     <string name="download_failed">下载失败</string>
     <string name="delete_photo_message">确定要删除这张图片吗？</string>
+    <plurals name="favorite_added_count">
+        <item quantity="other">已收藏 %1$d 张图片</item>
+    </plurals>
+    <plurals name="favorite_removed_count">
+        <item quantity="other">已取消收藏 %1$d 张图片</item>
+    </plurals>
     <string name="switched_server">已切换服务器</string>
     <string name="server_saved">服务器已保存</string>
     <string name="default_server">默认服务器</string>

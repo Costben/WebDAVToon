@@ -377,11 +377,13 @@ class PhotoViewActivity : AppCompatActivity() {
             binding.deleteButton.imageTintList = redTint
             // 更新多选按钮图标颜色为主题色
             binding.selectButton.imageTintList = primaryTint
+            binding.favoriteButton.imageTintList = primaryTint
         } else {
             deleteMenuItem?.isVisible = false
             // 恢复底栏按钮颜色
             binding.deleteButton.imageTintList = defaultTint
             binding.selectButton.imageTintList = defaultTint
+            updateFavoriteButtonState()
             updateCurrentPosition()
         }
     }
@@ -564,7 +566,11 @@ class PhotoViewActivity : AppCompatActivity() {
         
         // 收藏按钮点击事件
         binding.favoriteButton.setOnClickListener {
-            toggleFavorite()
+            if (isSelectionMode) {
+                updateSelectedFavorites()
+            } else {
+                Toast.makeText(this, getString(R.string.favorite_requires_selection), Toast.LENGTH_SHORT).show()
+            }
         }
         
         // 下载按钮点击事件
@@ -856,55 +862,75 @@ class PhotoViewActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun toggleFavorite() {
-        if (photos.isEmpty() || currentIndex !in photos.indices) return
-        
-        val photo = photos[currentIndex]
+    private fun updateSelectedFavorites() {
+        val selectedPhotos = if (isCardMode) adapter.getSelectedPhotos() else webtoonAdapter?.getSelectedPhotos() ?: emptyList()
+        if (selectedPhotos.isEmpty()) return
+
         val settingsManager = SettingsManager(this)
-        
-        if (settingsManager.isPhotoFavorite(photo.id)) {
-            // 取消收藏
-            settingsManager.removeFavoritePhoto(photo.id)
-            binding.favoriteButton.setImageResource(R.drawable.ic_star_outlined)
-            Toast.makeText(this, getString(R.string.favorite_removed), Toast.LENGTH_SHORT).show()
-            
-            // 如果是从收藏夹进入的，取消收藏时从当前列表中移除
-            if (isFavorites) {
-                val newPhotos = photos.toMutableList()
-                newPhotos.removeAt(currentIndex)
-                
-                // 更新全局缓存和状态
-                PhotoCache.setPhotos(newPhotos)
-                mediaViewModel.removePhotos(listOf(photo))
-                
-                photos = newPhotos
-                
-                // 更新适配器
-                adapter.setPhotos(photos)
-                webtoonAdapter?.setPhotos(photos)
-                
-                if (photos.isEmpty()) {
-                    finish()
-                } else {
-                    // 调整当前索引
-                    if (currentIndex >= photos.size) {
-                        currentIndex = photos.size - 1
-                    }
-                    // 重新加载当前页面的标题和收藏状态
-                    val currentPhoto = photos[currentIndex]
-                    binding.toolbar.title = currentPhoto.title
-                    updateFavoriteButtonState()
-                    // 滚动到当前位置（对于卡片模式比较重要）
-                    if (isCardMode) {
-                        binding.recyclerView.scrollToPosition(currentIndex)
-                    }
-                }
+        val favoriteIds = selectedPhotos
+            .filter { settingsManager.isPhotoFavorite(it.id) }
+            .mapTo(mutableSetOf()) { it.id }
+        val plan = FavoriteSelectionPlanner.buildPlan(
+            selectedItems = selectedPhotos,
+            favoriteIds = favoriteIds,
+            isFavoritesView = isFavorites,
+            idSelector = { it.id }
+        )
+
+        plan.toAdd.forEach(settingsManager::addFavoritePhoto)
+        plan.toRemove.forEach { settingsManager.removeFavoritePhoto(it.id) }
+
+        when {
+            plan.toAdd.isNotEmpty() -> {
+                Toast.makeText(
+                    this,
+                    resources.getQuantityString(R.plurals.favorite_added_count, plan.toAdd.size, plan.toAdd.size),
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+            plan.toRemove.isNotEmpty() -> {
+                Toast.makeText(
+                    this,
+                    resources.getQuantityString(R.plurals.favorite_removed_count, plan.toRemove.size, plan.toRemove.size),
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+            else -> {
+                Toast.makeText(this, getString(R.string.favorite_no_changes), Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        if (plan.toRemove.isNotEmpty() && isFavorites) {
+            val removedIds = plan.toRemove.mapTo(mutableSetOf()) { it.id }
+            val newPhotos = photos.filterNot { it.id in removedIds }
+
+            PhotoCache.setPhotos(newPhotos)
+            mediaViewModel.removePhotos(plan.toRemove)
+            photos = newPhotos
+
+            adapter.setPhotos(photos)
+            webtoonAdapter?.setPhotos(photos)
+
+            exitSelectionMode()
+
+            if (photos.isEmpty()) {
+                finish()
+                return
+            }
+
+            if (currentIndex >= photos.size) {
+                currentIndex = photos.size - 1
+            }
+
+            val currentPhoto = photos[currentIndex]
+            binding.toolbar.title = currentPhoto.title
+            updateFavoriteButtonState()
+
+            if (isCardMode) {
+                binding.recyclerView.scrollToPosition(currentIndex)
             }
         } else {
-            // 添加收藏
-            settingsManager.addFavoritePhoto(photo)
-            binding.favoriteButton.setImageResource(R.drawable.ic_star_filled_md3)
-            Toast.makeText(this, getString(R.string.favorite_added), Toast.LENGTH_SHORT).show()
+            exitSelectionMode()
         }
     }
 
