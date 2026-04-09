@@ -4,10 +4,12 @@ import android.content.Context
 import android.content.DialogInterface
 import android.content.res.Configuration
 import android.os.Bundle
+import android.view.Gravity
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -20,11 +22,16 @@ import android.view.ScaleGestureDetector
 import erl.webdavtoon.databinding.ActivityPhotoViewBinding
 
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 /**
  * Webtoon 浏览模式 Activity
  */
 class PhotoViewActivity : AppCompatActivity() {
+
+    companion object {
+        private const val FAST_SCROLL_HEIGHT_RATIO = 0.67f
+    }
 
     private lateinit var binding: ActivityPhotoViewBinding
     private lateinit var adapter: PhotoDetailAdapter
@@ -165,6 +172,10 @@ class PhotoViewActivity : AppCompatActivity() {
                 }
             }
         })
+
+        binding.root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            updateFastScrollContainerLayout()
+        }
     }
 
     private fun loadReaderZoomSettings() {
@@ -214,6 +225,9 @@ class PhotoViewActivity : AppCompatActivity() {
             // 可滚动的有效高度
             val effectiveHeight = totalHeight - paddingTop - paddingBottom
             val maxScrollY = effectiveHeight - thumbHeight
+            if (maxScrollY <= 0) {
+                return@setOnTouchListener false
+            }
             
             when (event.action) {
                 MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
@@ -260,12 +274,35 @@ class PhotoViewActivity : AppCompatActivity() {
         
         val effectiveHeight = totalHeight - paddingTop - paddingBottom
         val maxScrollY = effectiveHeight - thumbHeight
+        if (maxScrollY <= 0) {
+            binding.fastScrollThumb.y = paddingTop.toFloat()
+            return
+        }
         
         if (totalItems > 1) {
             val percentage = firstVisiblePos.toFloat() / (totalItems - 1)
             binding.fastScrollThumb.y = paddingTop + (percentage * maxScrollY)
         } else {
             binding.fastScrollThumb.y = paddingTop.toFloat()
+        }
+    }
+
+    private fun updateFastScrollContainerLayout() {
+        val rootHeight = binding.root.height
+        if (rootHeight <= 0) return
+
+        val layoutParams = binding.fastScrollContainer.layoutParams as? CoordinatorLayout.LayoutParams ?: return
+        val desiredHeight = (rootHeight * FAST_SCROLL_HEIGHT_RATIO).roundToInt()
+            .coerceAtLeast(binding.fastScrollThumb.height + binding.fastScrollContainer.paddingTop + binding.fastScrollContainer.paddingBottom)
+
+        if (layoutParams.height != desiredHeight || layoutParams.gravity != (Gravity.END or Gravity.CENTER_VERTICAL)) {
+            layoutParams.height = desiredHeight
+            layoutParams.gravity = Gravity.END or Gravity.CENTER_VERTICAL
+            binding.fastScrollContainer.layoutParams = layoutParams
+        }
+
+        if (!isCardMode && !isImmersiveMode && binding.fastScrollContainer.visibility == View.VISIBLE) {
+            binding.fastScrollContainer.post { updateFastScrollThumbPosition() }
         }
     }
 
@@ -587,8 +624,10 @@ class PhotoViewActivity : AppCompatActivity() {
         } else {
             // 切换到webtoon模式
             setupWebtoonMode()
+            updateFastScrollContainerLayout()
             if (!isImmersiveMode) {
                 binding.fastScrollContainer.visibility = View.VISIBLE
+                binding.recyclerView.post { updateFastScrollThumbPosition() }
             }
             // 更新webtoon模式适配器数据
             webtoonAdapter?.setPhotos(photos)
@@ -639,6 +678,7 @@ class PhotoViewActivity : AppCompatActivity() {
                     systemBars.bottom
                 )
             }
+            binding.root.post { updateFastScrollContainerLayout() }
             insets
         }
     }
@@ -663,6 +703,7 @@ class PhotoViewActivity : AppCompatActivity() {
             controller.show(WindowInsetsCompat.Type.systemBars())
             binding.appBarLayout.visibility = View.VISIBLE
             binding.bottomAppBar.visibility = View.VISIBLE
+            updateFastScrollContainerLayout()
             if (!isCardMode) {
                 binding.fastScrollContainer.visibility = View.VISIBLE
                 binding.recyclerView.post { updateFastScrollThumbPosition() }
