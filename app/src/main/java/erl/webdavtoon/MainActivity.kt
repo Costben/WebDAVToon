@@ -425,7 +425,7 @@ class MainActivity : AppCompatActivity() {
         isLongPressSelection = false
         updateSelectionTitle(-1)
 
-        if (plan.toRemove.isNotEmpty() && isFavorites) {
+        if (plan.toRemove.isNotEmpty()) {
             refreshMedia()
         }
     }

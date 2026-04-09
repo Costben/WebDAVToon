@@ -440,17 +440,17 @@ class PhotoViewActivity : AppCompatActivity() {
                 val settingsManager = SettingsManager(this)
                 lifecycleScope.launch {
                     var allSuccess = true
-                    var anySuccess = false
+                    val deletedPhotos = mutableListOf<Photo>()
                     selectedPhotos.forEach { photo ->
                         val success = FileUtils.deleteImage(this@PhotoViewActivity, photo, settingsManager)
                         if (success) {
-                            anySuccess = true
+                            deletedPhotos.add(photo)
                         } else {
                             allSuccess = false
                         }
                     }
 
-                    if (anySuccess) {
+                    if (deletedPhotos.isNotEmpty()) {
                         WebDavImageLoader.clearCache(this@PhotoViewActivity)
                     }
 
@@ -462,12 +462,12 @@ class PhotoViewActivity : AppCompatActivity() {
 
                     // 更新列表并退出多选模式
                     val newPhotos = photos.toMutableList()
-                    newPhotos.removeAll(selectedPhotos)
+                    newPhotos.removeAll(deletedPhotos)
                     photos = newPhotos
                     
                     // 更新缓存和状态，以便 MainActivity 同步更新
                     PhotoCache.setPhotos(newPhotos)
-                    mediaViewModel.removePhotos(selectedPhotos)
+                    mediaViewModel.removePhotos(deletedPhotos)
                     
                     adapter.setPhotos(newPhotos)
                     webtoonAdapter?.setPhotos(newPhotos)
@@ -483,6 +483,10 @@ class PhotoViewActivity : AppCompatActivity() {
                         if (isCardMode) {
                             binding.recyclerView.scrollToPosition(currentIndex)
                         }
+                    }
+
+                    if (deletedPhotos.isNotEmpty()) {
+                        refreshCurrentMediaPage()
                     }
                 }
             }
@@ -749,6 +753,22 @@ class PhotoViewActivity : AppCompatActivity() {
         }
     }
 
+    private fun refreshCurrentMediaPage() {
+        val state = mediaViewModel.state.value
+        if (state.sessionKey.isEmpty()) return
+
+        MediaManager.refresh(
+            context = this,
+            scope = lifecycleScope,
+            sessionKey = state.sessionKey,
+            folderPath = state.folderPath,
+            isRemote = state.isRemote,
+            isRecursive = state.isRecursive,
+            isFavorites = state.isFavorites,
+            query = state.currentQuery
+        )
+    }
+
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         // 在保存状态前确保 currentIndex 是最新的
@@ -912,6 +932,7 @@ class PhotoViewActivity : AppCompatActivity() {
             webtoonAdapter?.setPhotos(photos)
 
             exitSelectionMode()
+            refreshCurrentMediaPage()
 
             if (photos.isEmpty()) {
                 finish()
@@ -1027,6 +1048,7 @@ class PhotoViewActivity : AppCompatActivity() {
                             }
                             // 更新标题
                             binding.toolbar.title = newPhotos[currentIndex].title
+                            refreshCurrentMediaPage()
                         }
                     } else {
                         Toast.makeText(this@PhotoViewActivity, getString(R.string.delete_failed), Toast.LENGTH_SHORT).show()
