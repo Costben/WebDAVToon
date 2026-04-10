@@ -148,13 +148,33 @@ class MainActivity : AppCompatActivity() {
         })
 
         photoAdapter = PhotoAdapter(
-            onPhotoClick = { photos, position ->
+            onPhotoClick = onPhotoClick@{ photos, position ->
                 if (photoAdapter.isSelectionMode()) {
                     photoAdapter.toggleSelection(position)
                 } else {
-                    PhotoCache.setPhotos(photos)
+                    val clicked = photos.getOrNull(position) ?: return@onPhotoClick
+                    if (clicked.mediaType == MediaType.VIDEO) {
+                        if (isAviVideo(clicked.title) || isAviVideo(clicked.imageUri.toString())) {
+                            ExternalVideoOpener.open(this, clicked.imageUri.toString(), clicked.title, !clicked.isLocal, settingsManager)
+                        } else {
+                            val intent = Intent(this, VideoPlayerActivity::class.java).apply {
+                                putExtra("EXTRA_MEDIA_URI", clicked.imageUri.toString())
+                                putExtra("EXTRA_MEDIA_TITLE", clicked.title)
+                                putExtra("EXTRA_IS_REMOTE", !clicked.isLocal)
+                                putExtra("EXTRA_IS_FAVORITES", isFavorites)
+                            }
+                            startActivity(intent)
+                        }
+                        return@onPhotoClick
+                    }
+
+                    val imageOnly = photos.filter { it.mediaType == MediaType.IMAGE }
+                    val imageIndex = imageOnly.indexOfFirst { it.id == clicked.id }
+                    if (imageIndex == -1) return@onPhotoClick
+
+                    PhotoCache.setPhotos(imageOnly)
                     val intent = Intent(this, PhotoViewActivity::class.java).apply {
-                        putExtra("EXTRA_CURRENT_INDEX", position)
+                        putExtra("EXTRA_CURRENT_INDEX", imageIndex)
                         putExtra("EXTRA_IS_FAVORITES", isFavorites)
                     }
                     startActivity(intent)
@@ -234,12 +254,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun hasStoragePermission(): Boolean {
-        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Manifest.permission.READ_MEDIA_IMAGES
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val imageGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED
+            val videoGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_VIDEO) == PackageManager.PERMISSION_GRANTED
+            imageGranted && videoGranted
         } else {
-            Manifest.permission.READ_EXTERNAL_STORAGE
+            ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
         }
-        return ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
     }
 
     override fun onCreateOptionsMenu(menu: android.view.Menu): Boolean {
@@ -425,7 +446,7 @@ class MainActivity : AppCompatActivity() {
         isLongPressSelection = false
         updateSelectionTitle(-1)
 
-        if (plan.toRemove.isNotEmpty()) {
+        if (plan.toAdd.isNotEmpty() || plan.toRemove.isNotEmpty()) {
             refreshMedia()
         }
     }
