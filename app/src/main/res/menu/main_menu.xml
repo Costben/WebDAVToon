@@ -2,6 +2,12 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
+        android:id="@+id/action_info"
+        android:title="@string/photo_details"
+        android:icon="@drawable/ic_info_md3"
+        app:showAsAction="ifRoom"
+        android:visible="false" />
+    <item
         android:id="@+id/action_favorite"
         android:title="@string/favorites"
         android:icon="@drawable/ic_star_outlined"
@@ -11,7 +17,7 @@
         android:id="@+id/action_delete"
         android:title="@string/delete"
         android:icon="@drawable/ic_delete_md3"
-        app:showAsAction="ifRoom"
+        app:showAsAction="never"
         app:iconTint="#FF0000"
         android:visible="false" />
     <item

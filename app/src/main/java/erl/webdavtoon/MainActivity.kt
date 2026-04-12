@@ -5,6 +5,9 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
 import android.view.MotionEvent
 import android.view.View
 import androidx.activity.result.contract.ActivityResultContracts
@@ -40,6 +43,8 @@ class MainActivity : AppCompatActivity() {
     private var scaleDetector: android.view.ScaleGestureDetector? = null
 
     private var currentQuery = MediaQuery()
+    private var optionsMenu: android.view.Menu? = null
+    private var infoMenuItem: android.view.MenuItem? = null
     private var deleteMenuItem: android.view.MenuItem? = null
     private var favoriteMenuItem: android.view.MenuItem? = null
 
@@ -287,7 +292,10 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreateOptionsMenu(menu: android.view.Menu): Boolean {
         menuInflater.inflate(R.menu.main_menu, menu)
+        optionsMenu = menu
 
+        infoMenuItem = menu.findItem(R.id.action_info)
+        infoMenuItem?.isVisible = photoAdapter.isSelectionMode()
         deleteMenuItem = menu.findItem(R.id.action_delete)
         deleteMenuItem?.isVisible = photoAdapter.isSelectionMode()
         favoriteMenuItem = menu.findItem(R.id.action_favorite)
@@ -346,6 +354,10 @@ class MainActivity : AppCompatActivity() {
                 deleteSelectedPhotos()
                 true
             }
+            R.id.action_info -> {
+                showSelectedPhotoDetails()
+                true
+            }
             R.id.action_favorite -> {
                 updateSelectedFavorites()
                 true
@@ -394,8 +406,14 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateSelectionTitle(count: Int) {
         if (count < 0) {
+            infoMenuItem?.isVisible = false
             deleteMenuItem?.isVisible = false
             favoriteMenuItem?.isVisible = false
+            deleteMenuItem?.title = getString(R.string.delete)
+            optionsMenu?.findItem(R.id.action_search)?.isVisible = true
+            optionsMenu?.findItem(R.id.action_settings)?.isVisible = true
+            optionsMenu?.findItem(R.id.action_grid_columns)?.isVisible = true
+            optionsMenu?.findItem(R.id.action_sort_order)?.isVisible = true
             val displayTitle = when {
                 isFavorites -> getString(R.string.favorites)
                 folderPath.isEmpty() && !isRemote -> getString(R.string.local_photos)
@@ -407,12 +425,14 @@ class MainActivity : AppCompatActivity() {
             }
             supportActionBar?.title = if (isRecursive && !isFavorites) "$displayTitle ${getString(R.string.all_suffix)}" else displayTitle
         } else {
+            infoMenuItem?.isVisible = true
             deleteMenuItem?.isVisible = true
             favoriteMenuItem?.isVisible = true
-            // Ensure delete icon is red
-            deleteMenuItem?.icon?.let { icon ->
-                androidx.core.graphics.drawable.DrawableCompat.setTint(icon, android.graphics.Color.RED)
-            }
+            tintDeleteAction()
+            optionsMenu?.findItem(R.id.action_search)?.isVisible = false
+            optionsMenu?.findItem(R.id.action_settings)?.isVisible = false
+            optionsMenu?.findItem(R.id.action_grid_columns)?.isVisible = false
+            optionsMenu?.findItem(R.id.action_sort_order)?.isVisible = false
             favoriteMenuItem?.setIcon(if (isFavorites) R.drawable.ic_star_filled_md3 else R.drawable.ic_star_outlined)
             favoriteMenuItem?.icon?.let { icon ->
                 androidx.core.graphics.drawable.DrawableCompat.setTint(
@@ -471,6 +491,60 @@ class MainActivity : AppCompatActivity() {
         if (plan.toAdd.isNotEmpty() || plan.toRemove.isNotEmpty()) {
             refreshMedia()
         }
+    }
+
+    private fun tintDeleteAction() {
+        val deleteColor = ContextCompat.getColor(this, R.color.primary_red)
+        deleteMenuItem?.icon?.let { icon ->
+            androidx.core.graphics.drawable.DrawableCompat.setTint(icon, deleteColor)
+        }
+        val deleteTitle = SpannableString(getString(R.string.delete)).apply {
+            setSpan(ForegroundColorSpan(deleteColor), 0, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+        deleteMenuItem?.title = deleteTitle
+    }
+
+    private fun showSelectedPhotoDetails() {
+        val selectedPhotos = photoAdapter.getSelectedPhotos()
+        if (selectedPhotos.isEmpty()) return
+
+        if (selectedPhotos.size == 1) {
+            showPhotoDetailsDialog(selectedPhotos.first())
+            return
+        }
+
+        val previewPhotos = selectedPhotos.take(10)
+        val message = buildString {
+            previewPhotos.forEachIndexed { index, photo ->
+                if (index > 0) append("\n\n")
+                append(formatPhotoDetails(photo))
+            }
+            if (selectedPhotos.size > 10) {
+                append("\n\n")
+                append(getString(R.string.photo_details_more_ellipsis))
+            }
+        }
+
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle(getString(R.string.photo_details_selected_title, selectedPhotos.size))
+            .setMessage(message)
+            .setPositiveButton(R.string.ok, null)
+            .show()
+    }
+
+    private fun showPhotoDetailsDialog(photo: Photo) {
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle(R.string.photo_details)
+            .setMessage(formatPhotoDetails(photo))
+            .setPositiveButton(R.string.ok, null)
+            .show()
+    }
+
+    private fun formatPhotoDetails(photo: Photo): String {
+        return getString(R.string.file_name_prefix, photo.title) + "\n" +
+            getString(R.string.file_size_prefix, android.text.format.Formatter.formatFileSize(this, photo.size)) + "\n" +
+            getString(R.string.file_dimension_prefix, photo.width, photo.height) + "\n" +
+            getString(R.string.local_prefix, photo.isLocal)
     }
 
     private fun deleteSelectedPhotos() {
