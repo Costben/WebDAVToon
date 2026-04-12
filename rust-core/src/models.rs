@@ -1,5 +1,17 @@
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, uniffi::Enum)]
+pub enum MediaType {
+    Image,
+    Video,
+}
+
+impl Default for MediaType {
+    fn default() -> Self {
+        MediaType::Image
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, uniffi::Record)]
 pub struct Photo {
     pub id: String,
@@ -8,6 +20,10 @@ pub struct Photo {
     pub is_local: bool,
     pub size: u64,
     pub date_modified: u64,
+    #[serde(default)]
+    pub media_type: MediaType,
+    #[serde(default)]
+    pub duration_ms: Option<u64>,
 }
 
 #[derive(Debug, Clone, uniffi::Record)]

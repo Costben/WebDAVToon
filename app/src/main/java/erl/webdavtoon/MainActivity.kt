@@ -54,6 +54,19 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { result ->
+        val allGranted = result.values.all { it }
+        if (allGranted) {
+            refreshMedia()
+        } else {
+            binding.emptyView.visibility = View.VISIBLE
+            binding.emptyView.text = getString(R.string.storage_permission_required)
+            android.widget.Toast.makeText(this, getString(R.string.storage_permission_required), android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         ThemeHelper.applyTheme(this)
         settingsManager = SettingsManager(this)
@@ -96,9 +109,7 @@ class MainActivity : AppCompatActivity() {
         setupUi()
         observeState()
 
-        if (isRemote || hasStoragePermission()) {
-            refreshMedia()
-        }
+        checkPermissionsAndLoad()
     }
 
     private fun setupUi() {
@@ -148,13 +159,23 @@ class MainActivity : AppCompatActivity() {
         })
 
         photoAdapter = PhotoAdapter(
-            onPhotoClick = { photos, position ->
+            onPhotoClick = onPhotoClick@{ photos, position ->
                 if (photoAdapter.isSelectionMode()) {
                     photoAdapter.toggleSelection(position)
                 } else {
-                    PhotoCache.setPhotos(photos)
+                    val clicked = photos.getOrNull(position) ?: return@onPhotoClick
+                    if (clicked.mediaType == MediaType.VIDEO) {
+                        ExternalVideoOpener.open(this, clicked.imageUri.toString(), clicked.title, !clicked.isLocal, settingsManager)
+                        return@onPhotoClick
+                    }
+
+                    val imageOnly = photos.filter { it.mediaType == MediaType.IMAGE }
+                    val imageIndex = imageOnly.indexOfFirst { it.id == clicked.id }
+                    if (imageIndex == -1) return@onPhotoClick
+
+                    PhotoCache.setPhotos(imageOnly)
                     val intent = Intent(this, PhotoViewActivity::class.java).apply {
-                        putExtra("EXTRA_CURRENT_INDEX", position)
+                        putExtra("EXTRA_CURRENT_INDEX", imageIndex)
                         putExtra("EXTRA_IS_FAVORITES", isFavorites)
                     }
                     startActivity(intent)
@@ -234,12 +255,34 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun hasStoragePermission(): Boolean {
-        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Manifest.permission.READ_MEDIA_IMAGES
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val imageGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED
+            val videoGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_VIDEO) == PackageManager.PERMISSION_GRANTED
+            imageGranted && videoGranted
         } else {
-            Manifest.permission.READ_EXTERNAL_STORAGE
+            ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
         }
-        return ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun checkPermissionsAndLoad() {
+        if (isRemote || isFavorites) {
+            refreshMedia()
+            return
+        }
+
+        val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO)
+        } else {
+            arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+        }
+
+        if (hasStoragePermission()) {
+            refreshMedia()
+        } else {
+            binding.emptyView.visibility = View.VISIBLE
+            binding.emptyView.text = getString(R.string.storage_permission_required)
+            requestPermissionLauncher.launch(permissions)
+        }
     }
 
     override fun onCreateOptionsMenu(menu: android.view.Menu): Boolean {
@@ -425,7 +468,7 @@ class MainActivity : AppCompatActivity() {
         isLongPressSelection = false
         updateSelectionTitle(-1)
 
-        if (plan.toRemove.isNotEmpty()) {
+        if (plan.toAdd.isNotEmpty() || plan.toRemove.isNotEmpty()) {
             refreshMedia()
         }
     }

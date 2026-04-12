@@ -1,9 +1,16 @@
-use crate::models::{Folder, FolderInspection, Photo, SortOrder};
+use crate::models::{Folder, FolderInspection, MediaType, Photo, SortOrder};
 use futures::StreamExt;
 use opendal::Operator;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 use std::time::Instant;
+
+const MAX_PREVIEW_SCAN_FOLDERS: usize = 24;
+const MAX_PREVIEW_SCAN_ENTRIES: usize = 256;
+const MAX_PREVIEW_ROOT_CHILDREN_TO_QUEUE: usize = 24;
+const MAX_CONCURRENT_FOLDER_SCANS: usize = 6;
+const MAX_ON_DEMAND_PREVIEW_SCAN_ENTRIES: usize = 16384;
+const MAX_ON_DEMAND_ROOT_CHILDREN_TO_QUEUE: usize = 2048;
 
 #[derive(Clone)]
 pub enum Protocol {
@@ -23,9 +30,7 @@ impl RemoteService {
             .username(username)
             .password(password);
 
-        let op = Operator::new(builder)
-            .map_err(|e| e.to_string())?
-            .finish();
+        let op = Operator::new(builder).map_err(|e| e.to_string())?.finish();
 
         Ok(Self {
             op: Some(Arc::new(op)),
@@ -38,11 +43,14 @@ impl RemoteService {
         match self.protocol {
             Protocol::WebDav => {
                 if let Some(op) = &self.op {
-                    op.read(path).await.map(|b| b.to_vec()).map_err(|e| e.to_string())
+                    op.read(path)
+                        .await
+                        .map(|b| b.to_vec())
+                        .map_err(|e| e.to_string())
                 } else {
                     Err("WebDAV not initialized".to_string())
                 }
-            },
+            }
         }
     }
 
@@ -54,7 +62,7 @@ impl RemoteService {
                 } else {
                     Err("WebDAV not initialized".to_string())
                 }
-            },
+            }
         }
     }
 
@@ -69,13 +77,17 @@ impl RemoteService {
         let mut names = Vec::new();
         // List root
         let mut lister = op.lister("/").await.map_err(|e| e.to_string())?;
-        
+
         let mut count = 0;
         while let Some(entry_res) = lister.next().await {
-            if count >= 20 { break; } // Limit to 20 items
+            if count >= 20 {
+                break;
+            } // Limit to 20 items
             if let Ok(entry) = entry_res {
                 let name = entry.name().to_string();
-                if name.is_empty() || name == "/" { continue; }
+                if name.is_empty() || name == "/" {
+                    continue;
+                }
                 names.push(name);
                 count += 1;
             }
@@ -83,29 +95,66 @@ impl RemoteService {
         Ok(names)
     }
 
-    pub async fn list_photos(&self, path: &str, sort_order: SortOrder, recursive: bool) -> Result<Vec<Photo>, String> {
+    pub async fn list_photos(
+        &self,
+        path: &str,
+        sort_order: SortOrder,
+        recursive: bool,
+    ) -> Result<Vec<Photo>, String> {
         match self.protocol {
             Protocol::WebDav => self.list_photos_webdav(path, sort_order, recursive).await,
         }
     }
 
-    async fn list_photos_webdav(&self, path: &str, sort_order: SortOrder, recursive: bool) -> Result<Vec<Photo>, String> {
+    async fn list_photos_webdav(
+        &self,
+        path: &str,
+        sort_order: SortOrder,
+        recursive: bool,
+    ) -> Result<Vec<Photo>, String> {
         let op = self.op.as_ref().ok_or("WebDAV not initialized")?;
         let mut photos = Vec::new();
-        
+        let started = Instant::now();
+        let mut scanned_files = 0usize;
+        let mut skipped_unsupported = 0usize;
+        let mut skipped_hidden = 0usize;
+        let mut scanned_directories = 0usize;
+
         if recursive {
-            let mut lister = op.lister_with(path).recursive(true).await.map_err(|e| e.to_string())?;
+            let mut lister = op
+                .lister_with(path)
+                .recursive(true)
+                .await
+                .map_err(|e| e.to_string())?;
             while let Some(entry) = lister.next().await {
                 let entry = entry.map_err(|e| e.to_string())?;
-                if entry.path().ends_with('/') { continue; }
+                if entry.path().ends_with('/') {
+                    scanned_directories += 1;
+                    continue;
+                }
+                scanned_files += 1;
                 let name = entry.name();
-                if is_hidden_path(entry.path()) || !is_image_file(name) { continue; }
-                
+                if is_hidden_path(entry.path()) {
+                    skipped_hidden += 1;
+                    continue;
+                }
+                let Some(media_type) = detect_media_type(name) else {
+                    skipped_unsupported += 1;
+                    continue;
+                };
+
                 let metadata = entry.metadata();
-                let last_modified = metadata.last_modified().map(|t| t.timestamp() as u64).unwrap_or(0);
-                
+                let last_modified = metadata
+                    .last_modified()
+                    .map(|t| t.timestamp() as u64)
+                    .unwrap_or(0);
+
                 if metadata.mode().is_file() {
-                    let full_uri = format!("{}/{}", self.base_url.trim_end_matches('/'), entry.path().trim_start_matches('/'));
+                    let full_uri = format!(
+                        "{}/{}",
+                        self.base_url.trim_end_matches('/'),
+                        entry.path().trim_start_matches('/')
+                    );
                     photos.push(Photo {
                         id: entry.path().to_string(),
                         title: name.to_string(),
@@ -113,6 +162,8 @@ impl RemoteService {
                         is_local: false,
                         size: metadata.content_length(),
                         date_modified: last_modified,
+                        media_type,
+                        duration_ms: None,
                     });
                 }
             }
@@ -120,15 +171,33 @@ impl RemoteService {
             let mut lister = op.lister(path).await.map_err(|e| e.to_string())?;
             while let Some(entry) = lister.next().await {
                 let entry = entry.map_err(|e| e.to_string())?;
-                if entry.path().ends_with('/') { continue; }
+                if entry.path().ends_with('/') {
+                    scanned_directories += 1;
+                    continue;
+                }
+                scanned_files += 1;
                 let name = entry.name();
-                if is_hidden_path(entry.path()) || !is_image_file(name) { continue; }
-                
+                if is_hidden_path(entry.path()) {
+                    skipped_hidden += 1;
+                    continue;
+                }
+                let Some(media_type) = detect_media_type(name) else {
+                    skipped_unsupported += 1;
+                    continue;
+                };
+
                 let metadata = entry.metadata();
-                let last_modified = metadata.last_modified().map(|t| t.timestamp() as u64).unwrap_or(0);
-                
+                let last_modified = metadata
+                    .last_modified()
+                    .map(|t| t.timestamp() as u64)
+                    .unwrap_or(0);
+
                 if metadata.mode().is_file() {
-                    let full_uri = format!("{}/{}", self.base_url.trim_end_matches('/'), entry.path().trim_start_matches('/'));
+                    let full_uri = format!(
+                        "{}/{}",
+                        self.base_url.trim_end_matches('/'),
+                        entry.path().trim_start_matches('/')
+                    );
                     photos.push(Photo {
                         id: entry.path().to_string(),
                         title: name.to_string(),
@@ -136,11 +205,24 @@ impl RemoteService {
                         is_local: false,
                         size: metadata.content_length(),
                         date_modified: last_modified,
+                        media_type,
+                        duration_ms: None,
                     });
                 }
             }
         }
         sort_photos(&mut photos, sort_order);
+        log::info!(
+            "list_photos_webdav path={} recursive={} scanned_directories={} scanned_files={} matched_media={} skipped_hidden={} skipped_unsupported={} elapsed_ms={}",
+            path,
+            recursive,
+            scanned_directories,
+            scanned_files,
+            photos.len(),
+            skipped_hidden,
+            skipped_unsupported,
+            started.elapsed().as_millis()
+        );
         Ok(photos)
     }
 
@@ -150,19 +232,31 @@ impl RemoteService {
         }
     }
 
-
     async fn list_folders_webdav(&self, path: &str) -> Result<Vec<Folder>, String> {
         let op = self.op.as_ref().ok_or("WebDAV not initialized")?;
         let started = Instant::now();
+        log::info!("list_folders_webdav start path={}", path);
         let mut lister = op.lister(path).await.map_err(|e| e.to_string())?;
+        log::info!(
+            "list_folders_webdav lister_ready path={} elapsed_ms={}",
+            path,
+            started.elapsed().as_millis()
+        );
         let mut candidates = HashMap::<String, FolderAggregate>::new();
+        let mut direct_entries = 0usize;
+        let mut direct_files = 0usize;
 
         while let Some(entry) = lister.next().await {
             let entry = entry.map_err(|e| e.to_string())?;
             let path_str = entry.path();
-            if is_hidden_path(path_str) { continue; }
-            if path_str.contains("__MACOSX") { continue; }
+            if is_hidden_path(path_str) {
+                continue;
+            }
+            if path_str.contains("__MACOSX") {
+                continue;
+            }
 
+            direct_entries += 1;
             if entry.path().ends_with('/') && entry.path() != path {
                 let key = folder_key(entry.name());
                 if key.is_empty() {
@@ -183,8 +277,21 @@ impl RemoteService {
                         has_sub_folders: false,
                         preview_uris: Vec::new(),
                         date_modified: initial_modified,
-                        saw_image: false,
+                        saw_media: false,
                     },
+                );
+            } else if !entry.path().ends_with('/') {
+                direct_files += 1;
+            }
+
+            if direct_entries % 256 == 0 {
+                log::info!(
+                    "list_folders_webdav progress path={} direct_entries={} direct_folders={} direct_files={} elapsed_ms={}",
+                    path,
+                    direct_entries,
+                    candidates.len(),
+                    direct_files,
+                    started.elapsed().as_millis()
                 );
             }
         }
@@ -198,73 +305,60 @@ impl RemoteService {
             return Ok(Vec::new());
         }
 
-        let mut scanned_entries = 0usize;
-        let mut image_entries = 0usize;
-        let mut recursive_lister = op
-            .lister_with(path)
-            .recursive(true)
-            .await
-            .map_err(|e| e.to_string())?;
+        let direct_children_count = candidates.len();
+        if direct_children_count > MAX_PREVIEW_SCAN_FOLDERS {
+            let mut folders: Vec<Folder> = candidates
+                .into_values()
+                .map(|folder| Folder {
+                    path: folder.path,
+                    name: folder.name,
+                    is_local: false,
+                    has_sub_folders: true,
+                    preview_uris: Vec::new(),
+                    date_modified: folder.date_modified,
+                })
+                .collect();
 
-        while let Some(entry) = recursive_lister.next().await {
-            let entry = entry.map_err(|e| e.to_string())?;
-            let path_str = entry.path();
-            if is_hidden_path(path_str) { continue; }
-            if path_str.contains("__MACOSX") { continue; }
-
-            let Some(relative_path) = relative_path(path, path_str) else {
-                continue;
-            };
-
-            scanned_entries += 1;
-
-            let Some(immediate_child) = immediate_child_name(path, path_str) else {
-                continue;
-            };
-
-            let Some(folder) = candidates.get_mut(&immediate_child) else {
-                continue;
-            };
-
-            if entry.path().ends_with('/') {
-                if relative_path.contains('/') {
-                    folder.has_sub_folders = true;
-                }
-                continue;
-            }
-
-            let metadata = entry.metadata();
-            if metadata.content_length() == 0 {
-                continue;
-            }
-
-            let name = file_name(path_str);
-            if !is_image_file(name) {
-                continue;
-            }
-
-            image_entries += 1;
-            folder.saw_image = true;
-
-            if let Some(last_modified) = metadata.last_modified().map(|t| t.timestamp() as u64) {
-                folder.date_modified = folder.date_modified.max(last_modified);
-            }
-
-            if folder.preview_uris.len() < 4 {
-                let full_uri = format!(
-                    "{}/{}",
-                    self.base_url.trim_end_matches('/'),
-                    entry.path().trim_start_matches('/')
-                );
-                folder.preview_uris.push(full_uri);
-            }
+            folders.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+            log::info!(
+                "list_folders_webdav fast_path path={} direct_children={} visible_folders={} elapsed_ms={}",
+                path,
+                direct_children_count,
+                folders.len(),
+                started.elapsed().as_millis()
+            );
+            return Ok(folders);
         }
 
-        let direct_children_count = candidates.len();
+        let mut scanned_entries = 0usize;
+        let mut media_entries = 0usize;
+        let op = Arc::clone(op);
+        let mut scanned_candidates = Vec::with_capacity(direct_children_count);
+        let mut scans = futures::stream::iter(candidates.into_values().map(|folder| {
+            let op = Arc::clone(&op);
+            async move {
+                let scan = self
+                    .scan_folder_preview_webdav(op.as_ref(), &folder.path)
+                    .await?;
+                Ok::<_, String>((folder, scan))
+            }
+        }))
+        .buffer_unordered(MAX_CONCURRENT_FOLDER_SCANS);
 
-        let mut folders: Vec<Folder> = candidates
-            .into_values()
-            .filter(|folder| folder.saw_image)
+        while let Some(result) = scans.next().await {
+            let (mut folder, scan) = result?;
+            folder.has_sub_folders = scan.has_sub_folders;
+            folder.preview_uris = scan.preview_uris;
+            folder.saw_media = scan.saw_media || scan.truncated;
+            folder.date_modified = folder.date_modified.max(scan.date_modified);
+            scanned_entries += scan.scanned_entries;
+            media_entries += scan.media_entries;
+            scanned_candidates.push(folder);
+        }
+
+        let mut folders: Vec<Folder> = scanned_candidates
+            .into_iter()
+            .filter(|folder| folder.saw_media)
             .map(|folder| Folder {
                 path: folder.path,
                 name: folder.name,
@@ -277,15 +371,113 @@ impl RemoteService {
 
         folders.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
         log::info!(
-            "list_folders_webdav path={} direct_children={} visible_folders={} scanned_entries={} image_entries={} elapsed_ms={}",
+            "list_folders_webdav path={} direct_children={} visible_folders={} scanned_entries={} media_entries={} elapsed_ms={}",
             path,
             direct_children_count,
             folders.len(),
             scanned_entries,
-            image_entries,
+            media_entries,
             started.elapsed().as_millis()
         );
         Ok(folders)
+    }
+
+    async fn scan_folder_preview_webdav(
+        &self,
+        op: &Operator,
+        folder_path: &str,
+    ) -> Result<FolderScanResult, String> {
+        let mut result = FolderScanResult::default();
+        let mut queue = VecDeque::new();
+        let mut contributed_video_children = HashSet::new();
+        let mut queued_root_children = 0usize;
+        queue.push_back(folder_path.to_string());
+
+        while let Some(current_folder) = queue.pop_front() {
+            let mut lister = op
+                .lister(&current_folder)
+                .await
+                .map_err(|e| e.to_string())?;
+
+            while let Some(entry) = lister.next().await {
+                let entry = entry.map_err(|e| e.to_string())?;
+                let path_str = entry.path();
+                if is_hidden_path(path_str) || path_str.contains("__MACOSX") {
+                    continue;
+                }
+
+                result.scanned_entries += 1;
+                if result.scanned_entries >= MAX_PREVIEW_SCAN_ENTRIES {
+                    result.truncated = true;
+                    break;
+                }
+
+                if path_str.ends_with('/') {
+                    if path_str == current_folder {
+                        continue;
+                    }
+
+                    if current_folder == folder_path {
+                        result.has_sub_folders = true;
+                    }
+
+                    if result.preview_uris.len() < 4 {
+                        if current_folder == folder_path {
+                            if queued_root_children >= MAX_PREVIEW_ROOT_CHILDREN_TO_QUEUE {
+                                result.truncated = true;
+                                continue;
+                            }
+                            queued_root_children += 1;
+                        }
+                        queue.push_back(path_str.to_string());
+                    }
+                    continue;
+                }
+
+                let metadata = entry.metadata();
+                if !metadata.mode().is_file() {
+                    continue;
+                }
+
+                let name = file_name(path_str);
+                let Some(media_type) = detect_media_type(name) else {
+                    continue;
+                };
+
+                result.saw_media = true;
+                result.media_entries += 1;
+
+                if let Some(last_modified) = metadata.last_modified().map(|t| t.timestamp() as u64)
+                {
+                    result.date_modified = result.date_modified.max(last_modified);
+                }
+
+                if result.preview_uris.len() < 4 {
+                    if let Some(child_key) = preview_dedupe_key(folder_path, path_str, media_type) {
+                        if !contributed_video_children.insert(child_key) {
+                            continue;
+                        }
+                    }
+
+                    let full_uri = format!(
+                        "{}/{}",
+                        self.base_url.trim_end_matches('/'),
+                        path_str.trim_start_matches('/')
+                    );
+                    result.preview_uris.push(full_uri);
+
+                    if result.preview_uris.len() >= 4 {
+                        break;
+                    }
+                }
+            }
+
+            if result.preview_uris.len() >= 4 || result.truncated {
+                break;
+            }
+        }
+
+        Ok(result)
     }
 
     pub async fn inspect_folder(&self, folder_path: &str) -> Result<FolderInspection, String> {
@@ -296,50 +488,158 @@ impl RemoteService {
 
     async fn inspect_folder_webdav(&self, folder_path: &str) -> Result<FolderInspection, String> {
         let op = self.op.as_ref().ok_or("WebDAV not initialized")?;
-        let base_url = &self.base_url;
-        let mut has_sub_folders = false;
-        let mut preview_uris = Vec::new();
-        
-        if let Ok(mut lister) = op.lister_with(folder_path).recursive(true).await {
-             let mut checks = 0;
-             while let Some(Ok(entry)) = lister.next().await {
-                 if checks >= 50 { 
-                     if !has_sub_folders { has_sub_folders = true; }
-                     break; 
-                 }
-                 checks += 1;
-                 
-                 let path_str = entry.path();
-                 if is_hidden_path(path_str) { continue; }
-                 
-                 if entry.path().ends_with('/') && entry.path() != folder_path {
-                     has_sub_folders = true;
-                 }
-                 
-                 let name = path_str.trim_matches('/').split('/').last().unwrap_or("");
-                 if !entry.path().ends_with('/') && is_image_file(name) {
-                     let full_uri = format!("{}/{}", base_url.trim_end_matches('/'), entry.path().trim_start_matches('/'));
-                     if preview_uris.len() < 4 {
-                        preview_uris.push(full_uri);
-                     }
-                 }
-                 if has_sub_folders && preview_uris.len() >= 4 { break; }
-             }
+        let started = Instant::now();
+        let scan = self
+            .scan_folder_preview_webdav_on_demand(op.as_ref(), folder_path)
+            .await?;
+        log::info!(
+            "inspect_folder_webdav path={} previews={} has_sub_folders={} scanned_entries={} media_entries={} truncated={} elapsed_ms={}",
+            folder_path,
+            scan.preview_uris.len(),
+            scan.has_sub_folders,
+            scan.scanned_entries,
+            scan.media_entries,
+            scan.truncated,
+            started.elapsed().as_millis()
+        );
+        Ok(FolderInspection {
+            has_sub_folders: scan.has_sub_folders || scan.truncated,
+            preview_uris: scan.preview_uris,
+        })
+    }
+
+    async fn scan_folder_preview_webdav_on_demand(
+        &self,
+        op: &Operator,
+        folder_path: &str,
+    ) -> Result<FolderScanResult, String> {
+        let mut result = FolderScanResult::default();
+        let mut queue = VecDeque::new();
+        let mut contributed_video_children = HashSet::new();
+        let mut queued_root_children = 0usize;
+        queue.push_back(folder_path.to_string());
+
+        while let Some(current_folder) = queue.pop_front() {
+            let mut lister = op
+                .lister(&current_folder)
+                .await
+                .map_err(|e| e.to_string())?;
+
+            while let Some(entry) = lister.next().await {
+                let entry = entry.map_err(|e| e.to_string())?;
+                let path_str = entry.path();
+                if is_hidden_path(path_str) || path_str.contains("__MACOSX") {
+                    continue;
+                }
+
+                if path_str.ends_with('/') {
+                    if path_str == current_folder {
+                        continue;
+                    }
+
+                    if current_folder == folder_path {
+                        result.has_sub_folders = true;
+                    }
+
+                    if result.preview_uris.len() < 4 {
+                        if current_folder == folder_path {
+                            if queued_root_children >= MAX_ON_DEMAND_ROOT_CHILDREN_TO_QUEUE {
+                                continue;
+                            }
+                            queued_root_children += 1;
+                        }
+                        queue.push_back(path_str.to_string());
+                    }
+                    continue;
+                }
+
+                result.scanned_entries += 1;
+                if result.scanned_entries >= MAX_ON_DEMAND_PREVIEW_SCAN_ENTRIES {
+                    result.truncated = true;
+                    break;
+                }
+
+                let metadata = entry.metadata();
+                if !metadata.mode().is_file() {
+                    continue;
+                }
+
+                let name = file_name(path_str);
+                let Some(media_type) = detect_media_type(name) else {
+                    continue;
+                };
+
+                result.saw_media = true;
+                result.media_entries += 1;
+
+                if let Some(last_modified) = metadata.last_modified().map(|t| t.timestamp() as u64)
+                {
+                    result.date_modified = result.date_modified.max(last_modified);
+                }
+
+                if let Some(child_key) = preview_dedupe_key(folder_path, path_str, media_type) {
+                    if !contributed_video_children.insert(child_key) {
+                        continue;
+                    }
+                }
+
+                let full_uri = format!(
+                    "{}/{}",
+                    self.base_url.trim_end_matches('/'),
+                    path_str.trim_start_matches('/')
+                );
+                result.preview_uris.push(full_uri);
+
+                if result.preview_uris.len() >= 4 {
+                    break;
+                }
+            }
+
+            if result.preview_uris.len() >= 4 || result.truncated {
+                break;
+            }
         }
-        Ok(FolderInspection { has_sub_folders, preview_uris })
+
+        Ok(result)
     }
 }
 
 fn is_hidden_path(path: &str) -> bool {
-    path
-        .trim_matches('/')
+    path.trim_matches('/')
         .split('/')
         .any(|s| s.len() > 1 && s.starts_with('.'))
 }
 
-fn is_image_file(name: &str) -> bool {
-    let lower = name.to_lowercase();
-    lower.ends_with(".jpg") || lower.ends_with(".jpeg") || lower.ends_with(".png") || lower.ends_with(".webp") || lower.ends_with(".gif")
+fn detect_media_type(name: &str) -> Option<MediaType> {
+    let lower = name.to_ascii_lowercase();
+    if lower.ends_with(".jpg")
+        || lower.ends_with(".jpeg")
+        || lower.ends_with(".png")
+        || lower.ends_with(".webp")
+        || lower.ends_with(".gif")
+        || lower.ends_with(".bmp")
+        || lower.ends_with(".heic")
+        || lower.ends_with(".heif")
+    {
+        return Some(MediaType::Image);
+    }
+
+    if lower.ends_with(".mp4")
+        || lower.ends_with(".mkv")
+        || lower.ends_with(".mov")
+        || lower.ends_with(".avi")
+        || lower.ends_with(".webm")
+        || lower.ends_with(".m4v")
+        || lower.ends_with(".3gp")
+        || lower.ends_with(".ts")
+        || lower.ends_with(".m2ts")
+        || lower.ends_with(".wmv")
+        || lower.ends_with(".asf")
+    {
+        return Some(MediaType::Video);
+    }
+
+    None
 }
 
 struct FolderAggregate {
@@ -348,7 +648,18 @@ struct FolderAggregate {
     has_sub_folders: bool,
     preview_uris: Vec<String>,
     date_modified: u64,
-    saw_image: bool,
+    saw_media: bool,
+}
+
+#[derive(Default)]
+struct FolderScanResult {
+    has_sub_folders: bool,
+    preview_uris: Vec<String>,
+    date_modified: u64,
+    saw_media: bool,
+    truncated: bool,
+    scanned_entries: usize,
+    media_entries: usize,
 }
 
 fn folder_key(name: &str) -> String {
@@ -384,10 +695,25 @@ fn immediate_child_name(parent_path: &str, entry_path: &str) -> Option<String> {
         .map(str::to_string)
 }
 
+fn preview_dedupe_key(
+    parent_path: &str,
+    entry_path: &str,
+    media_type: MediaType,
+) -> Option<String> {
+    match media_type {
+        MediaType::Video => immediate_child_name(parent_path, entry_path),
+        MediaType::Image => None,
+    }
+}
+
 fn sort_photos(photos: &mut Vec<Photo>, order: SortOrder) {
     match order {
-        SortOrder::NameAsc => photos.sort_by(|a, b| a.title.to_lowercase().cmp(&b.title.to_lowercase())),
-        SortOrder::NameDesc => photos.sort_by(|a, b| b.title.to_lowercase().cmp(&a.title.to_lowercase())),
+        SortOrder::NameAsc => {
+            photos.sort_by(|a, b| a.title.to_lowercase().cmp(&b.title.to_lowercase()))
+        }
+        SortOrder::NameDesc => {
+            photos.sort_by(|a, b| b.title.to_lowercase().cmp(&a.title.to_lowercase()))
+        }
         SortOrder::DateDesc => photos.sort_by(|a, b| b.date_modified.cmp(&a.date_modified)),
     }
 }
@@ -404,6 +730,8 @@ mod tests {
             is_local: false,
             size: 1,
             date_modified,
+            media_type: MediaType::Image,
+            duration_ms: None,
         }
     }
 
@@ -414,38 +742,94 @@ mod tests {
     }
 
     #[test]
-    fn image_file_detection_is_case_insensitive() {
-        assert!(is_image_file("Cover.JPG"));
-        assert!(is_image_file("panel.WebP"));
-        assert!(!is_image_file("notes.txt"));
+    fn media_file_detection_supports_images_and_videos() {
+        assert_eq!(Some(MediaType::Image), detect_media_type("Cover.JPG"));
+        assert_eq!(Some(MediaType::Image), detect_media_type("panel.WebP"));
+        assert_eq!(Some(MediaType::Video), detect_media_type("clip.MP4"));
+        assert_eq!(Some(MediaType::Video), detect_media_type("movie.mkv"));
+        assert_eq!(Some(MediaType::Video), detect_media_type("movie.WMV"));
+        assert_eq!(Some(MediaType::Video), detect_media_type("stream.asf"));
+        assert_eq!(None, detect_media_type("notes.txt"));
     }
 
     #[test]
     fn relative_path_handles_root_and_nested_paths() {
-        assert_eq!(Some("library/chapter01/page01.jpg".to_string()), relative_path("/", "/library/chapter01/page01.jpg"));
-        assert_eq!(Some("chapter01/page01.jpg".to_string()), relative_path("/library", "/library/chapter01/page01.jpg"));
-        assert_eq!(None, relative_path("/library", "/other/chapter01/page01.jpg"));
+        assert_eq!(
+            Some("library/chapter01/page01.jpg".to_string()),
+            relative_path("/", "/library/chapter01/page01.jpg")
+        );
+        assert_eq!(
+            Some("chapter01/page01.jpg".to_string()),
+            relative_path("/library", "/library/chapter01/page01.jpg")
+        );
+        assert_eq!(
+            None,
+            relative_path("/library", "/other/chapter01/page01.jpg")
+        );
     }
 
     #[test]
     fn immediate_child_name_returns_first_segment_below_parent() {
-        assert_eq!(Some("library".to_string()), immediate_child_name("/", "/library/chapter01/page01.jpg"));
-        assert_eq!(Some("chapter01".to_string()), immediate_child_name("/library", "/library/chapter01/page01.jpg"));
-        assert_eq!(None, immediate_child_name("/library", "/other/chapter01/page01.jpg"));
+        assert_eq!(
+            Some("library".to_string()),
+            immediate_child_name("/", "/library/chapter01/page01.jpg")
+        );
+        assert_eq!(
+            Some("chapter01".to_string()),
+            immediate_child_name("/library", "/library/chapter01/page01.jpg")
+        );
+        assert_eq!(
+            None,
+            immediate_child_name("/library", "/other/chapter01/page01.jpg")
+        );
+    }
+
+    #[test]
+    fn preview_dedupe_key_only_applies_to_videos() {
+        assert_eq!(
+            None,
+            preview_dedupe_key(
+                "/library",
+                "/library/chapter01/page01.jpg",
+                MediaType::Image
+            )
+        );
+        assert_eq!(
+            Some("chapter01".to_string()),
+            preview_dedupe_key("/library", "/library/chapter01/clip.mp4", MediaType::Video)
+        );
     }
 
     #[test]
     fn sort_photos_supports_all_supported_orders() {
         let mut by_name_asc = vec![photo("beta", 2), photo("Alpha", 1)];
         sort_photos(&mut by_name_asc, SortOrder::NameAsc);
-        assert_eq!(vec!["Alpha", "beta"], by_name_asc.iter().map(|it| it.title.as_str()).collect::<Vec<_>>());
+        assert_eq!(
+            vec!["Alpha", "beta"],
+            by_name_asc
+                .iter()
+                .map(|it| it.title.as_str())
+                .collect::<Vec<_>>()
+        );
 
         let mut by_name_desc = vec![photo("beta", 2), photo("Alpha", 1)];
         sort_photos(&mut by_name_desc, SortOrder::NameDesc);
-        assert_eq!(vec!["beta", "Alpha"], by_name_desc.iter().map(|it| it.title.as_str()).collect::<Vec<_>>());
+        assert_eq!(
+            vec!["beta", "Alpha"],
+            by_name_desc
+                .iter()
+                .map(|it| it.title.as_str())
+                .collect::<Vec<_>>()
+        );
 
         let mut by_date_desc = vec![photo("older", 1), photo("newer", 5)];
         sort_photos(&mut by_date_desc, SortOrder::DateDesc);
-        assert_eq!(vec!["newer", "older"], by_date_desc.iter().map(|it| it.title.as_str()).collect::<Vec<_>>());
+        assert_eq!(
+            vec!["newer", "older"],
+            by_date_desc
+                .iter()
+                .map(|it| it.title.as_str())
+                .collect::<Vec<_>>()
+        );
     }
 }

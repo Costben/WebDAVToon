@@ -27,12 +27,17 @@ impl Repository {
             .enable_all()
             .build()
             .expect("Failed to create Tokio runtime");
-            
-        let db = Database::open(&db_path).ok().map(|d| Arc::new(Mutex::new(d)));
+
+        let db = Database::open(&db_path)
+            .ok()
+            .map(|d| Arc::new(Mutex::new(d)));
         if db.is_none() {
-            log::warn!("Failed to open database at {}, running in memory-only mode", db_path);
+            log::warn!(
+                "Failed to open database at {}, running in memory-only mode",
+                db_path
+            );
         }
-        
+
         Self {
             remote: None,
             db,
@@ -40,7 +45,12 @@ impl Repository {
         }
     }
 
-    pub fn init_webdav(&mut self, endpoint: String, username: String, password: String) -> Result<(), RepoError> {
+    pub fn init_webdav(
+        &mut self,
+        endpoint: String,
+        username: String,
+        password: String,
+    ) -> Result<(), RepoError> {
         let service = RemoteService::new_webdav(&endpoint, &username, &password)
             .map_err(RepoError::Remote)?;
         self.remote = Some(service);
@@ -52,7 +62,9 @@ impl Repository {
             if let Some(ref service) = self.remote {
                 service.read_file(&path).await.map_err(RepoError::Remote)
             } else {
-                Err(RepoError::Config("Remote service not initialized".to_string()))
+                Err(RepoError::Config(
+                    "Remote service not initialized".to_string(),
+                ))
             }
         })
     }
@@ -60,23 +72,34 @@ impl Repository {
     pub fn delete_photo(&self, path: String) -> Result<(), RepoError> {
         self.rt.block_on(async {
             if let Some(ref service) = self.remote {
-                service.delete_file(&path).await.map_err(RepoError::Remote)?;
-                
+                service
+                    .delete_file(&path)
+                    .await
+                    .map_err(RepoError::Remote)?;
+
                 // Clear from cache if exists
                 if let Some(db) = &self.db {
                     if let Ok(mut db) = db.lock() {
                         let _ = db.delete_photo(&path);
                     }
                 }
-                
+
                 Ok(())
             } else {
-                Err(RepoError::Config("Remote service not initialized".to_string()))
+                Err(RepoError::Config(
+                    "Remote service not initialized".to_string(),
+                ))
             }
         })
     }
 
-    pub fn get_photos(&self, path: String, sort_order: SortOrder, force_refresh: bool, recursive: bool) -> Result<Vec<Photo>, RepoError> {
+    pub fn get_photos(
+        &self,
+        path: String,
+        sort_order: SortOrder,
+        force_refresh: bool,
+        recursive: bool,
+    ) -> Result<Vec<Photo>, RepoError> {
         // 1. Try to load from cache first if not forcing refresh
         // Note: Caching recursive results might be tricky, for now we only cache flat lists or rethink caching strategy
         if !force_refresh && !recursive {
@@ -94,9 +117,14 @@ impl Repository {
         // 2. Load from Remote
         let photos = self.rt.block_on(async {
             if let Some(ref service) = self.remote {
-                service.list_photos(&path, sort_order.clone(), recursive).await.map_err(RepoError::Remote)
+                service
+                    .list_photos(&path, sort_order.clone(), recursive)
+                    .await
+                    .map_err(RepoError::Remote)
             } else {
-                Err(RepoError::Config("Remote service not initialized".to_string()))
+                Err(RepoError::Config(
+                    "Remote service not initialized".to_string(),
+                ))
             }
         })?;
 
@@ -135,7 +163,9 @@ impl Repository {
             if let Some(ref service) = self.remote {
                 service.list_folders(&path).await.map_err(RepoError::Remote)
             } else {
-                Err(RepoError::Config("Remote service not initialized".to_string()))
+                Err(RepoError::Config(
+                    "Remote service not initialized".to_string(),
+                ))
             }
         })?;
 
@@ -159,20 +189,30 @@ impl Repository {
     pub fn inspect_folder(&self, path: String) -> Result<FolderInspection, RepoError> {
         self.rt.block_on(async {
             if let Some(ref service) = self.remote.as_ref() {
-                service.inspect_folder(&path).await.map_err(RepoError::Remote)
+                service
+                    .inspect_folder(&path)
+                    .await
+                    .map_err(RepoError::Remote)
             } else {
-                Err(RepoError::Config("Remote service not initialized".to_string()))
+                Err(RepoError::Config(
+                    "Remote service not initialized".to_string(),
+                ))
             }
         })
     }
 
-    pub fn test_webdav(&self, endpoint: String, username: String, password: String) -> Result<String, RepoError> {
+    pub fn test_webdav(
+        &self,
+        endpoint: String,
+        username: String,
+        password: String,
+    ) -> Result<String, RepoError> {
         self.rt.block_on(async {
             let service = RemoteService::new_webdav(&endpoint, &username, &password)
                 .map_err(RepoError::Remote)?;
-            
+
             let names = service.list_root_names().await.map_err(RepoError::Remote)?;
-            
+
             let mut report = String::from("Connection Successful!\n\nRoot contents (first 20):\n");
             for name in names {
                 report.push_str(&format!("- {}\n", name));

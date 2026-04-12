@@ -729,9 +729,6 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 
 
 
-
-
-
 // A JNA Library to expose the extern-C FFI definitions.
 // This is an implementation detail which will be called internally by the public API.
 
@@ -757,6 +754,8 @@ internal interface UniffiLib : Library {
     ): Unit
     fun uniffi_rust_core_fn_constructor_rustrepository_new(`dbPath`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Pointer
+    fun uniffi_rust_core_fn_method_rustrepository_delete_photo(`ptr`: Pointer,`path`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
     fun uniffi_rust_core_fn_method_rustrepository_get_folders(`ptr`: Pointer,`path`: RustBuffer.ByValue,`forceRefresh`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_rust_core_fn_method_rustrepository_get_photos(`ptr`: Pointer,`path`: RustBuffer.ByValue,`sortOrder`: RustBuffer.ByValue,`forceRefresh`: Byte,`recursive`: Byte,uniffi_out_err: UniffiRustCallStatus, 
@@ -889,6 +888,8 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_rust_core_checksum_func_init_logger(
     ): Short
+    fun uniffi_rust_core_checksum_method_rustrepository_delete_photo(
+    ): Short
     fun uniffi_rust_core_checksum_method_rustrepository_get_folders(
     ): Short
     fun uniffi_rust_core_checksum_method_rustrepository_get_photos(
@@ -924,6 +925,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_rust_core_checksum_func_init_logger() != 19108.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_rust_core_checksum_method_rustrepository_delete_photo() != 34856.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_rust_core_checksum_method_rustrepository_get_folders() != 19671.toShort()) {
@@ -1253,31 +1257,42 @@ private class UniffiJnaCleanable(
 // using Android or not.
 // There are further runtime checks to chose the correct implementation
 // of the cleaner.
-// Local Android patch: lint treats java.lang.ref.Cleaner as API 33+, so when
-// regenerating UniFFI bindings keep the SDK gate + RequiresApi annotations
-// below or re-apply an equivalent generated fix.
 private fun UniffiCleaner.Companion.create(): UniffiCleaner =
-    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+    try {
+        // For safety's sake: if the library hasn't been run in android_cleaner = true
+        // mode, but is being run on Android, then we still need to think about
+        // Android API versions. So we check if java.lang.ref.Cleaner is there,
+        // and use that via reflection to avoid API 33 compile-time lint failures.
+        java.lang.Class.forName("java.lang.ref.Cleaner")
         JavaLangRefCleaner()
-    } else {
+    } catch (e: ClassNotFoundException) {
+        // Otherwise, fallback to the JNA cleaner.
         UniffiJnaCleaner()
     }
 
-@androidx.annotation.RequiresApi(android.os.Build.VERSION_CODES.TIRAMISU)
 private class JavaLangRefCleaner : UniffiCleaner {
-    val cleaner = java.lang.ref.Cleaner.create()
+    private val cleanerClass = java.lang.Class.forName("java.lang.ref.Cleaner")
+    private val cleaner = cleanerClass.getMethod("create").invoke(null)
+    private val registerMethod = cleanerClass.getMethod(
+        "register",
+        Any::class.java,
+        Runnable::class.java
+    )
 
     override fun register(value: Any, cleanUpTask: Runnable): UniffiCleaner.Cleanable =
-        JavaLangRefCleanable(cleaner.register(value, cleanUpTask))
+        JavaLangRefCleanable(requireNotNull(registerMethod.invoke(cleaner, value, cleanUpTask)))
 }
 
-@androidx.annotation.RequiresApi(android.os.Build.VERSION_CODES.TIRAMISU)
 private class JavaLangRefCleanable(
-    val cleanable: java.lang.ref.Cleaner.Cleanable
+    private val cleanable: Any
 ) : UniffiCleaner.Cleanable {
-    override fun clean() = cleanable.clean()
+    override fun clean() {
+        cleanable.javaClass.getMethod("clean").invoke(cleanable)
+    }
 }
 public interface RustRepositoryInterface {
+    
+    fun `deletePhoto`(`path`: kotlin.String)
     
     fun `getFolders`(`path`: kotlin.String, `forceRefresh`: kotlin.Boolean): List<Folder>
     
@@ -1381,6 +1396,18 @@ open class RustRepository: Disposable, AutoCloseable, RustRepositoryInterface {
             UniffiLib.INSTANCE.uniffi_rust_core_fn_clone_rustrepository(pointer!!, status)
         }
     }
+
+    
+    @Throws(WebDavToonException::class)override fun `deletePhoto`(`path`: kotlin.String)
+        = 
+    callWithPointer {
+    uniffiRustCallWithError(WebDavToonException) { _status ->
+    UniffiLib.INSTANCE.uniffi_rust_core_fn_method_rustrepository_delete_photo(
+        it, FfiConverterString.lower(`path`),_status)
+}
+    }
+    
+    
 
     
     @Throws(WebDavToonException::class)override fun `getFolders`(`path`: kotlin.String, `forceRefresh`: kotlin.Boolean): List<Folder> {
@@ -1495,14 +1522,12 @@ public object FfiConverterTypeRustRepository: FfiConverter<RustRepository, Point
     }
 }
 
-
-
 data class Folder (
     var `path`: kotlin.String, 
     var `name`: kotlin.String, 
     var `isLocal`: kotlin.Boolean, 
     var `hasSubFolders`: kotlin.Boolean, 
-    var `previewUris`: List<kotlin.String>,
+    var `previewUris`: List<kotlin.String>, 
     var `dateModified`: kotlin.ULong
 ) {
     
@@ -1583,7 +1608,9 @@ data class Photo (
     var `uri`: kotlin.String, 
     var `isLocal`: kotlin.Boolean, 
     var `size`: kotlin.ULong, 
-    var `dateModified`: kotlin.ULong
+    var `dateModified`: kotlin.ULong, 
+    var `mediaType`: MediaType, 
+    var `durationMs`: kotlin.ULong?
 ) {
     
     companion object
@@ -1601,6 +1628,8 @@ public object FfiConverterTypePhoto: FfiConverterRustBuffer<Photo> {
             FfiConverterBoolean.read(buf),
             FfiConverterULong.read(buf),
             FfiConverterULong.read(buf),
+            FfiConverterTypeMediaType.read(buf),
+            FfiConverterOptionalULong.read(buf),
         )
     }
 
@@ -1610,7 +1639,9 @@ public object FfiConverterTypePhoto: FfiConverterRustBuffer<Photo> {
             FfiConverterString.allocationSize(value.`uri`) +
             FfiConverterBoolean.allocationSize(value.`isLocal`) +
             FfiConverterULong.allocationSize(value.`size`) +
-            FfiConverterULong.allocationSize(value.`dateModified`)
+            FfiConverterULong.allocationSize(value.`dateModified`) +
+            FfiConverterTypeMediaType.allocationSize(value.`mediaType`) +
+            FfiConverterOptionalULong.allocationSize(value.`durationMs`)
     )
 
     override fun write(value: Photo, buf: ByteBuffer) {
@@ -1620,8 +1651,40 @@ public object FfiConverterTypePhoto: FfiConverterRustBuffer<Photo> {
             FfiConverterBoolean.write(value.`isLocal`, buf)
             FfiConverterULong.write(value.`size`, buf)
             FfiConverterULong.write(value.`dateModified`, buf)
+            FfiConverterTypeMediaType.write(value.`mediaType`, buf)
+            FfiConverterOptionalULong.write(value.`durationMs`, buf)
     }
 }
+
+
+
+
+enum class MediaType {
+    
+    IMAGE,
+    VIDEO;
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMediaType: FfiConverterRustBuffer<MediaType> {
+    override fun read(buf: ByteBuffer) = try {
+        MediaType.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: MediaType) = 4UL
+
+    override fun write(value: MediaType, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
 
 
 
@@ -1841,6 +1904,38 @@ public object FfiConverterTypeWebDavToonError : FfiConverterRustBuffer<WebDavToo
 /**
  * @suppress
  */
+public object FfiConverterOptionalULong: FfiConverterRustBuffer<kotlin.ULong?> {
+    override fun read(buf: ByteBuffer): kotlin.ULong? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterULong.read(buf)
+    }
+
+    override fun allocationSize(value: kotlin.ULong?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterULong.allocationSize(value)
+        }
+    }
+
+    override fun write(value: kotlin.ULong?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterULong.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceString: FfiConverterRustBuffer<List<kotlin.String>> {
     override fun read(buf: ByteBuffer): List<kotlin.String> {
         val len = buf.getInt()
@@ -1934,5 +2029,6 @@ public object FfiConverterSequenceTypePhoto: FfiConverterRustBuffer<List<Photo>>
 }
     
     
+
 
 
