@@ -2,6 +2,7 @@ package erl.webdavtoon
 
 import android.os.Bundle
 import android.text.InputType
+import android.content.res.Configuration
 import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.Toast
@@ -31,7 +32,8 @@ class SettingsActivity : AppCompatActivity() {
 
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
         window.navigationBarColor = android.graphics.Color.TRANSPARENT
-        androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightNavigationBars = true
+        androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
+            .isAppearanceLightNavigationBars = !isNightModeActive()
 
         binding = ActivitySettingsMd3Binding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -57,6 +59,11 @@ class SettingsActivity : AppCompatActivity() {
         } else {
             requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         }
+    }
+
+    private fun isNightModeActive(): Boolean {
+        val nightModeFlags = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+        return nightModeFlags == Configuration.UI_MODE_NIGHT_YES
     }
 
     override fun onCreateOptionsMenu(menu: android.view.Menu): Boolean {
