@@ -19,6 +19,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
@@ -28,6 +29,7 @@ import androidx.media3.ui.R as Media3UiR
 import androidx.media3.ui.TimeBar
 import erl.webdavtoon.databinding.ActivityVideoPlayerBinding
 
+@UnstableApi
 class VideoPlayerActivity : AppCompatActivity() {
 
     companion object {
