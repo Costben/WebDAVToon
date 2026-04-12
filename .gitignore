@@ -65,6 +65,5 @@ build_report.txt
 /webdavtoon-debug.apk
 
 # Agent / HOTL execution docs
-/AGENTS.md
 /hotl-workflow-*.md
 /docs/plans/
