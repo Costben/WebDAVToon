@@ -18,7 +18,7 @@
         app:show_rewind_button="true"
         app:show_shuffle_button="false"
         app:show_subtitle_button="false"
-        app:show_timeout="1800"
+        app:show_timeout="3500"
         app:show_vr_button="false"
         app:use_controller="true"
         app:layout_constraintBottom_toBottomOf="parent"
@@ -49,6 +49,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:background="@drawable/bg_player_hint_bubble"
+        android:layout_marginBottom="116dp"
         android:paddingStart="16dp"
         android:paddingTop="10dp"
         android:paddingEnd="16dp"
@@ -60,18 +61,19 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_bias="1" />
 
     <ImageButton
         android:id="@+id/centerPlayPauseButton"
         android:layout_width="64dp"
         android:layout_height="64dp"
         android:background="@drawable/bg_player_circle_button"
-        android:contentDescription="@string/video_autoplay"
+        android:layout_marginBottom="52dp"
+        android:contentDescription="@string/exo_controls_play_description"
         android:padding="16dp"
-        android:src="@drawable/ic_pause"
+        android:src="@drawable/ic_play_arrow"
         android:tint="@android:color/white"
-        app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />

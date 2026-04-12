@@ -39,10 +39,19 @@ class SettingsManager(context: Context) {
         const val KEY_WATERFALL_PERCENT = "waterfall_percent"
         const val KEY_WATERFALL_MAX_WIDTH = "waterfall_max_width"
         const val KEY_READER_MAX_ZOOM_PERCENT = "reader_max_zoom_percent"
+        const val KEY_VIDEO_AUTOPLAY = "video_autoplay"
+        const val KEY_VIDEO_DECODER = "video_decoder"
+        const val KEY_VIDEO_EXTERNAL_PLAYER_MODE = "video_external_player_mode"
+        const val KEY_VIDEO_GESTURE_ENABLED = "video_gesture_enabled"
+        const val KEY_VIDEO_DOUBLE_TAP_SEEK_SECONDS = "video_double_tap_seek_seconds"
         const val KEY_ROTATION_LOCKED = "rotation_locked"
 
         const val WATERFALL_MODE_PERCENT = "percent"
         const val WATERFALL_MODE_MAX_WIDTH = "max_width"
+        const val VIDEO_DECODER_AUTO = "auto"
+        const val VIDEO_EXTERNAL_PLAYER_MODE_SYSTEM_DEFAULT = "system_default"
+        const val VIDEO_EXTERNAL_PLAYER_MODE_CHOOSER = "chooser"
+        const val VIDEO_DOUBLE_TAP_SEEK_DEFAULT_SECONDS = 10
 
         const val SORT_NAME_ASC = 0
         const val SORT_NAME_DESC = 1
@@ -97,6 +106,66 @@ class SettingsManager(context: Context) {
 
     fun setReaderMaxZoomPercent(percent: Int) =
         appSettings.putInt(AppSettingsStore.READER_MAX_ZOOM_PERCENT, percent)
+
+    fun isVideoAutoplayEnabled(): Boolean =
+        appSettings.getOrDefaultBoolean(AppSettingsStore.VIDEO_AUTOPLAY, true)
+
+    fun setVideoAutoplayEnabled(enabled: Boolean) =
+        appSettings.putBoolean(AppSettingsStore.VIDEO_AUTOPLAY, enabled)
+
+    fun getVideoDecoder(): String =
+        appSettings.getOrDefaultString(AppSettingsStore.VIDEO_DECODER, VIDEO_DECODER_AUTO)
+
+    fun setVideoDecoder(decoder: String) =
+        appSettings.putString(AppSettingsStore.VIDEO_DECODER, decoder)
+
+    fun getVideoExternalPlayerMode(): String =
+        appSettings.getOrDefaultString(
+            AppSettingsStore.VIDEO_EXTERNAL_PLAYER_MODE,
+            VIDEO_EXTERNAL_PLAYER_MODE_SYSTEM_DEFAULT
+        ).let { mode ->
+            when (mode) {
+                VIDEO_EXTERNAL_PLAYER_MODE_SYSTEM_DEFAULT,
+                VIDEO_EXTERNAL_PLAYER_MODE_CHOOSER -> mode
+                else -> VIDEO_EXTERNAL_PLAYER_MODE_SYSTEM_DEFAULT
+            }
+        }
+
+    fun setVideoExternalPlayerMode(mode: String) =
+        appSettings.putString(
+            AppSettingsStore.VIDEO_EXTERNAL_PLAYER_MODE,
+            when (mode) {
+                VIDEO_EXTERNAL_PLAYER_MODE_SYSTEM_DEFAULT,
+                VIDEO_EXTERNAL_PLAYER_MODE_CHOOSER -> mode
+                else -> VIDEO_EXTERNAL_PLAYER_MODE_SYSTEM_DEFAULT
+            }
+        )
+
+    fun isVideoGestureEnabled(): Boolean =
+        appSettings.getOrDefaultBoolean(AppSettingsStore.VIDEO_GESTURE_ENABLED, true)
+
+    fun setVideoGestureEnabled(enabled: Boolean) =
+        appSettings.putBoolean(AppSettingsStore.VIDEO_GESTURE_ENABLED, enabled)
+
+    fun getVideoDoubleTapSeekSeconds(): Int =
+        appSettings.getOrDefaultInt(
+            AppSettingsStore.VIDEO_DOUBLE_TAP_SEEK_SECONDS,
+            VIDEO_DOUBLE_TAP_SEEK_DEFAULT_SECONDS
+        ).let { seconds ->
+            when (seconds) {
+                5, 10, 15 -> seconds
+                else -> VIDEO_DOUBLE_TAP_SEEK_DEFAULT_SECONDS
+            }
+        }
+
+    fun setVideoDoubleTapSeekSeconds(seconds: Int) =
+        appSettings.putInt(
+            AppSettingsStore.VIDEO_DOUBLE_TAP_SEEK_SECONDS,
+            when (seconds) {
+                5, 10, 15 -> seconds
+                else -> VIDEO_DOUBLE_TAP_SEEK_DEFAULT_SECONDS
+            }
+        )
 
     fun isRotationLocked(): Boolean =
         appSettings.getOrDefaultBoolean(AppSettingsStore.ROTATION_LOCKED, false)

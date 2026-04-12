@@ -145,26 +145,56 @@ class PhotoAdapter(
                 binding.checkIcon.visibility = View.GONE
             }
 
-            if (photo.isLocal) {
-                WebDavImageLoader.loadLocalImage(
-                    binding.imageView.context,
-                    photo.imageUri,
-                    binding.imageView,
-                    limitSize = false,
-                    isWaterfall = true
-                )
+            val isVideo = photo.mediaType == MediaType.VIDEO
+            val durationText = formatVideoDuration(photo.durationMs)
+            binding.videoIndicator.visibility = if (isVideo) View.VISIBLE else View.GONE
+            binding.videoDurationTextView.visibility = if (isVideo && durationText.isNotEmpty()) View.VISIBLE else View.GONE
+            binding.videoDurationTextView.text = durationText
+
+            if (isVideo) {
+                binding.imageView.scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                binding.imageView.adjustViewBounds = true
+                if (photo.isLocal) {
+                    WebDavImageLoader.loadLocalVideoThumbnail(
+                        binding.imageView.context,
+                        photo.imageUri,
+                        binding.imageView,
+                        isFolderPreview = false
+                    )
+                } else {
+                    WebDavImageLoader.loadWebDavVideoThumbnail(
+                        binding.imageView.context,
+                        photo.imageUri,
+                        binding.imageView,
+                        isFolderPreview = false
+                    )
+                }
             } else {
-                WebDavImageLoader.loadWebDavImage(
-                    binding.imageView.context,
-                    photo.imageUri,
-                    binding.imageView,
-                    limitSize = false,
-                    isWaterfall = true
-                )
+                if (photo.isLocal) {
+                    WebDavImageLoader.loadLocalImage(
+                        binding.imageView.context,
+                        photo.imageUri,
+                        binding.imageView,
+                        limitSize = false,
+                        isWaterfall = true
+                    )
+                } else {
+                    WebDavImageLoader.loadWebDavImage(
+                        binding.imageView.context,
+                        photo.imageUri,
+                        binding.imageView,
+                        limitSize = false,
+                        isWaterfall = true
+                    )
+                }
             }
             
             if (isImmersiveMode && isSingleColumn) {
                 binding.imageView.scaleType = android.widget.ImageView.ScaleType.FIT_XY
+                binding.imageView.adjustViewBounds = false
+            } else if (isVideo) {
+                binding.imageView.scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                binding.imageView.adjustViewBounds = true
             } else {
                 binding.imageView.scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
                 binding.imageView.adjustViewBounds = true

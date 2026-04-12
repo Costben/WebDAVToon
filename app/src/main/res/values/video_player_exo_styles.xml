@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="WebDAVToon.ExoControls.Button.Bottom.PlayPause" parent="@style/ExoStyledControls.Button.Bottom">
+        <item name="android:src">@drawable/exo_styled_controls_play</item>
+        <item name="android:contentDescription">@string/exo_controls_play_description</item>
+    </style>
+
+    <style name="WebDAVToon.ExoControls.Button.Bottom.Rewind" parent="@style/ExoStyledControls.Button.Bottom">
+        <item name="android:src">@drawable/exo_styled_controls_simple_rewind</item>
+        <item name="android:contentDescription">@string/exo_controls_rewind_description</item>
+    </style>
+
+    <style name="WebDAVToon.ExoControls.Button.Bottom.FastForward" parent="@style/ExoStyledControls.Button.Bottom">
+        <item name="android:src">@drawable/exo_styled_controls_simple_fastforward</item>
+        <item name="android:contentDescription">@string/exo_controls_fastforward_description</item>
+    </style>
+
+    <style name="WebDAVToon.ExoControls.Button.Bottom.Previous" parent="@style/ExoStyledControls.Button.Bottom">
+        <item name="android:src">@drawable/exo_styled_controls_previous</item>
+        <item name="android:contentDescription">@string/exo_controls_previous_description</item>
+    </style>
+
+    <style name="WebDAVToon.ExoControls.Button.Bottom.Next" parent="@style/ExoStyledControls.Button.Bottom">
+        <item name="android:src">@drawable/exo_styled_controls_next</item>
+        <item name="android:contentDescription">@string/exo_controls_next_description</item>
+    </style>
+
+</resources>

@@ -76,17 +76,25 @@ class FavoritePhotoStore private constructor(context: Context) {
         folderPath = folderPath
     )
 
-    private fun FavoritePhotoEntity.toPhoto(): Photo = Photo(
-        id = id,
-        imageUri = Uri.parse(imageUri),
-        title = title,
-        width = width,
-        height = height,
-        isLocal = isLocal,
-        dateModified = dateModified,
-        size = size,
-        folderPath = folderPath
-    )
+    private fun FavoritePhotoEntity.toPhoto(): Photo {
+        val uri = Uri.parse(imageUri)
+        val mediaType = detectMediaTypeByName(title)
+            ?: detectMediaTypeByUri(uri)
+            ?: MediaType.IMAGE
+
+        return Photo(
+            id = id,
+            imageUri = uri,
+            title = title,
+            width = width,
+            height = height,
+            isLocal = isLocal,
+            dateModified = dateModified,
+            size = size,
+            folderPath = folderPath,
+            mediaType = mediaType
+        )
+    }
 
     companion object {
         @Volatile
