@@ -36,7 +36,9 @@ object WebDavImageLoader {
 
     private const val FOLDER_PREVIEW_SIZE_PX = 160
     private const val NORMAL_VIDEO_PREVIEW_SIZE_PX = 320
-    private const val REMOTE_AVI_CACHE_BYTES = 24L * 1024L * 1024L
+    private const val DEFAULT_REMOTE_VIDEO_SOURCE_CACHE_BYTES = 64L * 1024L * 1024L
+    private const val AVI_REMOTE_VIDEO_SOURCE_CACHE_BYTES = 8L * 1024L * 1024L
+    private const val VIDEO_BITMAP_CACHE_VERSION = 5
     private val remoteVideoThumbCache = object : LruCache<String, Bitmap>(24) {}
     private val localVideoThumbCache = object : LruCache<String, Bitmap>(24) {}
 
@@ -75,20 +77,21 @@ object WebDavImageLoader {
         isFolderPreview: Boolean = false
     ) {
         val encodedUrl = FileUtils.encodeWebDavUrl(videoUri.toString())
-        val cacheKey = buildString {
-            append(encodedUrl)
-            append("#")
-            append(if (isFolderPreview) "folder" else "normal")
-        }
+        val cacheKey = buildVideoBitmapCacheKey(encodedUrl, isFolderPreview)
         imageView.tag = cacheKey
         progressBar?.visibility = View.VISIBLE
 
         remoteVideoThumbCache.get(cacheKey)?.let { cached ->
-            android.util.Log.d("WebDavImageLoader", "WebDAV-Video cache hit: $encodedUrl")
-            imageView.setImageBitmap(cached)
-            imageView.scaleType = ImageView.ScaleType.CENTER_CROP
-            progressBar?.visibility = View.GONE
-            return
+            if (cached.isLikelyBlankVideoThumbnail()) {
+                android.util.Log.i("WebDavImageLoader", "Discarded blank cached WebDAV thumbnail: $encodedUrl")
+                remoteVideoThumbCache.remove(cacheKey)
+            } else {
+                android.util.Log.d("WebDavImageLoader", "WebDAV-Video cache hit: $encodedUrl")
+                applyVideoThumbnailDisplayMode(imageView, isFolderPreview)
+                imageView.setImageBitmap(cached)
+                progressBar?.visibility = View.GONE
+                return
+            }
         }
 
         val settings = getSettingsManager(context)
@@ -121,7 +124,7 @@ object WebDavImageLoader {
                     if (diskCached == null) {
                         saveCachedVideoBitmap(context, cacheKey, bitmap)
                     }
-                    imageView.scaleType = ImageView.ScaleType.CENTER_CROP
+                    applyVideoThumbnailDisplayMode(imageView, isFolderPreview)
                     imageView.setImageBitmap(bitmap)
                     android.util.Log.i("WebDavImageLoader", "WebDAV-Video thumbnail success: $encodedUrl")
                 } else {
@@ -157,19 +160,20 @@ object WebDavImageLoader {
         progressBar: ProgressBar? = null,
         isFolderPreview: Boolean = false
     ) {
-        val cacheKey = buildString {
-            append(videoUri)
-            append("#")
-            append(if (isFolderPreview) "folder" else "normal")
-        }
+        val cacheKey = buildVideoBitmapCacheKey(videoUri.toString(), isFolderPreview)
         imageView.tag = cacheKey
         progressBar?.visibility = View.VISIBLE
 
         localVideoThumbCache.get(cacheKey)?.let { cached ->
-            imageView.setImageBitmap(cached)
-            imageView.scaleType = ImageView.ScaleType.CENTER_CROP
-            progressBar?.visibility = View.GONE
-            return
+            if (cached.isLikelyBlankVideoThumbnail()) {
+                android.util.Log.i("WebDavImageLoader", "Discarded blank cached local thumbnail: $videoUri")
+                localVideoThumbCache.remove(cacheKey)
+            } else {
+                applyVideoThumbnailDisplayMode(imageView, isFolderPreview)
+                imageView.setImageBitmap(cached)
+                progressBar?.visibility = View.GONE
+                return
+            }
         }
 
         @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
@@ -187,7 +191,7 @@ object WebDavImageLoader {
                     if (diskCached == null) {
                         saveCachedVideoBitmap(context, cacheKey, bitmap)
                     }
-                    imageView.scaleType = ImageView.ScaleType.CENTER_CROP
+                    applyVideoThumbnailDisplayMode(imageView, isFolderPreview)
                     imageView.setImageBitmap(bitmap)
                 } else {
                     android.util.Log.w("WebDavImageLoader", "Local-Video thumbnail fallback placeholder: $videoUri")
@@ -204,19 +208,24 @@ object WebDavImageLoader {
         isFolderPreview: Boolean
     ): Bitmap? {
         val frameTimeUs = if (isFolderPreview) 0L else 1_000_000L
-        val isAvi = isAviVideo(encodedUrl)
+        val sourceExtension = normalizedVideoSourceExtension(encodedUrl)
+        val requiresCachedFallback = requiresCachedVideoThumbnailFallback(encodedUrl)
 
-        val primary = if (isAvi) {
+        val primary = if (requiresCachedFallback) {
             tryExtractWithFfmpegRetriever(
                 dataSourceLabel = encodedUrl,
-                frameTimeUs = frameTimeUs
+                frameTimeUs = frameTimeUs,
+                sourceExtension = sourceExtension,
+                isFolderPreview = isFolderPreview
             ) { retriever ->
                 retriever.setDataSource(encodedUrl, headers)
             }
         } else {
             tryExtractWithPlatformRetriever(
                 dataSourceLabel = encodedUrl,
-                frameTimeUs = frameTimeUs
+                frameTimeUs = frameTimeUs,
+                sourceExtension = sourceExtension,
+                isFolderPreview = isFolderPreview
             ) { retriever ->
                 retriever.setDataSource(encodedUrl, headers)
             }
@@ -224,30 +233,34 @@ object WebDavImageLoader {
 
         val fallback = if (primary != null) {
             null
-        } else if (isAvi) {
-            tryExtractFromCachedRemoteAvi(
+        } else if (requiresCachedFallback) {
+            tryExtractFromCachedRemoteVideo(
                 context = context,
                 dataSourceLabel = encodedUrl,
                 headers = headers,
-                frameTimeUs = frameTimeUs
+                frameTimeUs = frameTimeUs,
+                sourceExtension = sourceExtension,
+                isFolderPreview = isFolderPreview
             ) ?: tryExtractWithPlatformRetriever(
                 dataSourceLabel = encodedUrl,
-                frameTimeUs = frameTimeUs
+                frameTimeUs = frameTimeUs,
+                sourceExtension = sourceExtension,
+                isFolderPreview = isFolderPreview
             ) { retriever ->
                 retriever.setDataSource(encodedUrl, headers)
             }
         } else {
             tryExtractWithFfmpegRetriever(
                 dataSourceLabel = encodedUrl,
-                frameTimeUs = frameTimeUs
+                frameTimeUs = frameTimeUs,
+                sourceExtension = sourceExtension,
+                isFolderPreview = isFolderPreview
             ) { retriever ->
                 retriever.setDataSource(encodedUrl, headers)
             }
         }
 
-        return (primary ?: fallback)?.let { frame ->
-            normalizeVideoThumbnail(frame, isFolderPreview)
-        }
+        return primary ?: fallback
     }
 
     private fun extractLocalVideoThumbnail(
@@ -257,19 +270,24 @@ object WebDavImageLoader {
     ): Bitmap? {
         val dataSourceLabel = videoUri.toString()
         val frameTimeUs = if (isFolderPreview) 0L else 1_000_000L
-        val isAvi = isAviVideo(dataSourceLabel)
+        val sourceExtension = normalizedVideoSourceExtension(dataSourceLabel)
+        val requiresCachedFallback = requiresCachedVideoThumbnailFallback(dataSourceLabel)
 
-        val primary = if (isAvi) {
+        val primary = if (requiresCachedFallback) {
             tryExtractWithFfmpegRetriever(
                 dataSourceLabel = dataSourceLabel,
-                frameTimeUs = frameTimeUs
+                frameTimeUs = frameTimeUs,
+                sourceExtension = sourceExtension,
+                isFolderPreview = isFolderPreview
             ) { retriever ->
                 configureLocalFfmpegDataSource(context, videoUri, retriever)
             }
         } else {
             tryExtractWithPlatformRetriever(
                 dataSourceLabel = dataSourceLabel,
-                frameTimeUs = frameTimeUs
+                frameTimeUs = frameTimeUs,
+                sourceExtension = sourceExtension,
+                isFolderPreview = isFolderPreview
             ) { retriever ->
                 retriever.setDataSource(context, videoUri)
             }
@@ -277,32 +295,35 @@ object WebDavImageLoader {
 
         val fallback = if (primary != null) {
             null
-        } else if (isAvi) {
-            tryExtractFromCachedLocalAvi(
+        } else if (requiresCachedFallback) {
+            tryExtractFromCachedLocalVideo(
                 context = context,
                 videoUri = videoUri,
                 dataSourceLabel = dataSourceLabel,
-                frameTimeUs = frameTimeUs
+                frameTimeUs = frameTimeUs,
+                sourceExtension = sourceExtension,
+                isFolderPreview = isFolderPreview
             ) ?: tryExtractWithPlatformRetriever(
                 dataSourceLabel = dataSourceLabel,
-                frameTimeUs = frameTimeUs
+                frameTimeUs = frameTimeUs,
+                sourceExtension = sourceExtension,
+                isFolderPreview = isFolderPreview
             ) { retriever ->
                 retriever.setDataSource(context, videoUri)
             }
         } else {
             tryExtractWithFfmpegRetriever(
                 dataSourceLabel = dataSourceLabel,
-                frameTimeUs = frameTimeUs
+                frameTimeUs = frameTimeUs,
+                sourceExtension = sourceExtension,
+                isFolderPreview = isFolderPreview
             ) { retriever ->
                 configureLocalFfmpegDataSource(context, videoUri, retriever)
             }
         }
 
-        return (primary ?: fallback)?.let { frame ->
-            normalizeVideoThumbnail(frame, isFolderPreview)
-        }
+        return primary ?: fallback
     }
-
 
     private fun configureLocalFfmpegDataSource(
         context: Context,
@@ -318,31 +339,39 @@ object WebDavImageLoader {
         retriever.setDataSource(context, videoUri)
     }
 
-    private fun tryExtractFromCachedRemoteAvi(
+    private fun tryExtractFromCachedRemoteVideo(
         context: Context,
         dataSourceLabel: String,
         headers: Map<String, String>,
-        frameTimeUs: Long
+        frameTimeUs: Long,
+        sourceExtension: String,
+        isFolderPreview: Boolean
     ): Bitmap? {
-        val cachedFile = cacheRemoteVideoLocally(context, dataSourceLabel, headers) ?: return null
+        val cachedFile = cacheRemoteVideoLocally(context, dataSourceLabel, headers, sourceExtension) ?: return null
         return tryExtractWithFfmpegRetriever(
             dataSourceLabel = "${dataSourceLabel}#cached",
-            frameTimeUs = frameTimeUs
+            frameTimeUs = frameTimeUs,
+            sourceExtension = sourceExtension,
+            isFolderPreview = isFolderPreview
         ) { retriever ->
             retriever.setDataSource(cachedFile.absolutePath)
         }
     }
 
-    private fun tryExtractFromCachedLocalAvi(
+    private fun tryExtractFromCachedLocalVideo(
         context: Context,
         videoUri: Uri,
         dataSourceLabel: String,
-        frameTimeUs: Long
+        frameTimeUs: Long,
+        sourceExtension: String,
+        isFolderPreview: Boolean
     ): Bitmap? {
-        val cachedFile = cacheLocalVideoLocally(context, videoUri) ?: return null
+        val cachedFile = cacheLocalVideoLocally(context, videoUri, sourceExtension) ?: return null
         return tryExtractWithFfmpegRetriever(
             dataSourceLabel = "${dataSourceLabel}#cached",
-            frameTimeUs = frameTimeUs
+            frameTimeUs = frameTimeUs,
+            sourceExtension = sourceExtension,
+            isFolderPreview = isFolderPreview
         ) { retriever ->
             retriever.setDataSource(cachedFile.absolutePath)
         }
@@ -351,12 +380,14 @@ object WebDavImageLoader {
     private fun cacheRemoteVideoLocally(
         context: Context,
         encodedUrl: String,
-        headers: Map<String, String>
+        headers: Map<String, String>,
+        sourceExtension: String
     ): File? {
         return try {
-            val cacheFile = prepareVideoCacheFile(context, encodedUrl, "avi")
-            if (cacheFile.exists() && cacheFile.length() in 1..REMOTE_AVI_CACHE_BYTES) {
-                android.util.Log.i("WebDavImageLoader", "Reusing cached remote AVI: ${cacheFile.absolutePath}")
+            val cacheFile = prepareVideoCacheFile(context, encodedUrl, sourceExtension)
+            val maxBytes = videoSourceCacheBytesForExtension(sourceExtension)
+            if (cacheFile.exists() && cacheFile.length() in 1..maxBytes) {
+                android.util.Log.i("WebDavImageLoader", "Reusing cached remote video source: ${cacheFile.absolutePath}")
                 return cacheFile
             }
             if (cacheFile.exists()) {
@@ -364,7 +395,7 @@ object WebDavImageLoader {
             }
 
             val requestBuilder = okhttp3.Request.Builder().url(encodedUrl)
-                .header("Range", "bytes=0-${REMOTE_AVI_CACHE_BYTES - 1}")
+                .header("Range", "bytes=0-${maxBytes - 1}")
             headers.forEach { (key, value) -> requestBuilder.header(key, value) }
             val client = okhttp3.OkHttpClient.Builder()
                 .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
@@ -372,26 +403,26 @@ object WebDavImageLoader {
                 .build()
             client.newCall(requestBuilder.build()).execute().use { response ->
                 if (!response.isSuccessful) {
-                    android.util.Log.w("WebDavImageLoader", "Remote AVI cache download failed: code=${response.code} url=$encodedUrl")
+                    android.util.Log.w("WebDavImageLoader", "Remote video source cache download failed: code=${response.code} url=$encodedUrl")
                     return null
                 }
                 val body = response.body ?: return null
                 cacheFile.parentFile?.mkdirs()
                 body.byteStream().use { input ->
                     FileOutputStream(cacheFile).use { output ->
-                        copyStreamWithLimit(input, output, REMOTE_AVI_CACHE_BYTES)
+                        copyStreamWithLimit(input, output, maxBytes)
                     }
                 }
             }
-            android.util.Log.i("WebDavImageLoader", "Cached remote AVI for thumbnail: ${cacheFile.absolutePath} size=${cacheFile.length()}")
+            android.util.Log.i("WebDavImageLoader", "Cached remote video source for thumbnail: ${cacheFile.absolutePath} size=${cacheFile.length()}")
             cacheFile
         } catch (t: Throwable) {
-            android.util.Log.e("WebDavImageLoader", "Failed caching remote AVI locally: $encodedUrl", t)
+            android.util.Log.e("WebDavImageLoader", "Failed caching remote video source locally: $encodedUrl", t)
             null
         }
     }
 
-    private fun cacheLocalVideoLocally(context: Context, videoUri: Uri): File? {
+    private fun cacheLocalVideoLocally(context: Context, videoUri: Uri, sourceExtension: String): File? {
         return try {
             if (videoUri.scheme.equals("file", ignoreCase = true)) {
                 val path = videoUri.path
@@ -400,24 +431,37 @@ object WebDavImageLoader {
                 }
             }
 
-            val cacheFile = prepareVideoCacheFile(context, videoUri.toString(), "avi")
+            val cacheFile = prepareVideoCacheFile(context, videoUri.toString(), sourceExtension)
+            val maxBytes = videoSourceCacheBytesForExtension(sourceExtension)
             if (cacheFile.exists() && cacheFile.length() > 0L) {
-                android.util.Log.i("WebDavImageLoader", "Reusing cached local AVI: ${cacheFile.absolutePath}")
+                android.util.Log.i("WebDavImageLoader", "Reusing cached local video source: ${cacheFile.absolutePath}")
                 return cacheFile
             }
 
             context.contentResolver.openInputStream(videoUri)?.use { input ->
                 cacheFile.parentFile?.mkdirs()
                 FileOutputStream(cacheFile).use { output ->
-                    input.copyTo(output)
+                    copyStreamWithLimit(input, output, maxBytes)
                 }
             } ?: return null
 
-            android.util.Log.i("WebDavImageLoader", "Cached local AVI for thumbnail: ${cacheFile.absolutePath} size=${cacheFile.length()}")
+            android.util.Log.i("WebDavImageLoader", "Cached local video source for thumbnail: ${cacheFile.absolutePath} size=${cacheFile.length()}")
             cacheFile
         } catch (t: Throwable) {
-            android.util.Log.e("WebDavImageLoader", "Failed caching local AVI locally: $videoUri", t)
+            android.util.Log.e("WebDavImageLoader", "Failed caching local video source locally: $videoUri", t)
             null
+        }
+    }
+
+    private fun normalizedVideoSourceExtension(nameOrUri: String): String {
+        return videoExtensionOf(nameOrUri)?.takeIf { it.all(Char::isLetterOrDigit) } ?: "video"
+    }
+
+    private fun videoSourceCacheBytesForExtension(sourceExtension: String): Long {
+        return if (sourceExtension.equals("avi", ignoreCase = true)) {
+            AVI_REMOTE_VIDEO_SOURCE_CACHE_BYTES
+        } else {
+            DEFAULT_REMOTE_VIDEO_SOURCE_CACHE_BYTES
         }
     }
 
@@ -433,6 +477,19 @@ object WebDavImageLoader {
         return File(dir, "${md5(key)}.jpg")
     }
 
+    private fun buildVideoBitmapCacheKey(
+        source: String,
+        isFolderPreview: Boolean
+    ): String {
+        return buildString {
+            append(source)
+            append("#")
+            append(if (isFolderPreview) "folder" else "normal")
+            append("#v")
+            append(VIDEO_BITMAP_CACHE_VERSION)
+        }
+    }
+
     private fun md5(value: String): String {
         val digest = MessageDigest.getInstance("MD5").digest(value.toByteArray())
         return digest.joinToString("") { "%02x".format(it) }
@@ -442,7 +499,16 @@ object WebDavImageLoader {
         return try {
             val cacheFile = prepareBitmapCacheFile(context, cacheKey)
             if (!cacheFile.exists() || cacheFile.length() <= 0L) return null
-            BitmapFactory.decodeFile(cacheFile.absolutePath)?.also {
+            BitmapFactory.decodeFile(cacheFile.absolutePath)?.takeIf { bitmap ->
+                if (!bitmap.isLikelyBlankVideoThumbnail()) {
+                    true
+                } else {
+                    android.util.Log.i("WebDavImageLoader", "Discarded blank video bitmap disk cache: $cacheKey")
+                    runCatching { cacheFile.delete() }
+                    runCatching { bitmap.recycle() }
+                    false
+                }
+            }?.also {
                 android.util.Log.d("WebDavImageLoader", "Video bitmap disk cache hit: $cacheKey")
             }
         } catch (t: Throwable) {
@@ -484,14 +550,40 @@ object WebDavImageLoader {
     private inline fun tryExtractWithPlatformRetriever(
         dataSourceLabel: String,
         frameTimeUs: Long,
+        sourceExtension: String,
+        isFolderPreview: Boolean,
         configure: (MediaMetadataRetriever) -> Unit
     ): Bitmap? {
         return try {
             val retriever = MediaMetadataRetriever()
             try {
                 configure(retriever)
-                val frame = retriever.getFrameAtTime(frameTimeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-                frame?.let { normalizeVideoThumbnail(it, isFolderPreview = frameTimeUs == 0L) }
+                val durationMs = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
+                val candidateTimes = VideoThumbnailHeuristics.candidateFrameTimesUs(
+                    requestedTimeUs = frameTimeUs,
+                    durationMs = durationMs,
+                    sourceExtension = sourceExtension,
+                    isFolderPreview = isFolderPreview
+                )
+                val preferSyncOnly = VideoThumbnailHeuristics.shouldPreferSyncFrameSearch(
+                    sourceExtension = sourceExtension,
+                    isFolderPreview = isFolderPreview
+                )
+
+                for (candidateTimeUs in candidateTimes) {
+                    retriever.getFrameAtTime(candidateTimeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                        ?.takeIfUsableVideoFrame(dataSourceLabel, candidateTimeUs, sourceExtension, isFolderPreview, "platform-sync")
+                        ?.let { return it }
+                }
+
+                if (!preferSyncOnly) {
+                    for (candidateTimeUs in candidateTimes) {
+                        retriever.getFrameAtTime(candidateTimeUs, MediaMetadataRetriever.OPTION_CLOSEST)
+                            ?.takeIfUsableVideoFrame(dataSourceLabel, candidateTimeUs, sourceExtension, isFolderPreview, "platform-closest")
+                            ?.let { return it }
+                    }
+                }
+                null
             } finally {
                 runCatching { retriever.release() }
             }
@@ -504,13 +596,40 @@ object WebDavImageLoader {
     private inline fun tryExtractWithFfmpegRetriever(
         dataSourceLabel: String,
         frameTimeUs: Long,
+        sourceExtension: String,
+        isFolderPreview: Boolean,
         configure: (FFmpegMediaMetadataRetriever) -> Unit
     ): Bitmap? {
         return try {
             val retriever = FFmpegMediaMetadataRetriever()
             try {
                 configure(retriever)
-                retriever.getFrameAtTime(frameTimeUs, FFmpegMediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                val durationMs = retriever.extractMetadata(FFmpegMediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
+                val candidateTimes = VideoThumbnailHeuristics.candidateFrameTimesUs(
+                    requestedTimeUs = frameTimeUs,
+                    durationMs = durationMs,
+                    sourceExtension = sourceExtension,
+                    isFolderPreview = isFolderPreview
+                )
+                val preferSyncOnly = VideoThumbnailHeuristics.shouldPreferSyncFrameSearch(
+                    sourceExtension = sourceExtension,
+                    isFolderPreview = isFolderPreview
+                )
+
+                for (candidateTimeUs in candidateTimes) {
+                    retriever.getFrameAtTime(candidateTimeUs, FFmpegMediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                        ?.takeIfUsableVideoFrame(dataSourceLabel, candidateTimeUs, sourceExtension, isFolderPreview, "ffmpeg-sync")
+                        ?.let { return it }
+                }
+
+                if (!preferSyncOnly) {
+                    for (candidateTimeUs in candidateTimes) {
+                        retriever.getFrameAtTime(candidateTimeUs, FFmpegMediaMetadataRetriever.OPTION_CLOSEST)
+                            ?.takeIfUsableVideoFrame(dataSourceLabel, candidateTimeUs, sourceExtension, isFolderPreview, "ffmpeg-closest")
+                            ?.let { return it }
+                    }
+                }
+                null
             } finally {
                 runCatching { retriever.release() }
             }
@@ -520,9 +639,51 @@ object WebDavImageLoader {
         }
     }
 
+    private fun Bitmap.takeIfUsableVideoFrame(
+        dataSourceLabel: String,
+        candidateTimeUs: Long,
+        sourceExtension: String,
+        isFolderPreview: Boolean,
+        extractionMode: String
+    ): Bitmap? {
+        val normalized = normalizeVideoThumbnail(this, isFolderPreview)
+        if (normalized !== this) {
+            runCatching { recycle() }
+        }
+
+        val acceptAviFirstFrameDirectly =
+            sourceExtension.equals("avi", ignoreCase = true) && candidateTimeUs == 0L
+
+        if (acceptAviFirstFrameDirectly) {
+            android.util.Log.i(
+                "WebDavImageLoader",
+                "Accepted AVI first frame source=$dataSourceLabel timeUs=$candidateTimeUs mode=$extractionMode"
+            )
+            return normalized
+        }
+
+        if (!normalized.isLikelyBlankVideoThumbnail()) {
+            android.util.Log.i(
+                "WebDavImageLoader",
+                "Accepted video frame source=$dataSourceLabel timeUs=$candidateTimeUs mode=$extractionMode"
+            )
+            return normalized
+        }
+
+        android.util.Log.i(
+            "WebDavImageLoader",
+            "Rejected blank-like video frame source=$dataSourceLabel timeUs=$candidateTimeUs"
+        )
+        runCatching { normalized.recycle() }
+        return null
+    }
+
     private fun normalizeVideoThumbnail(source: Bitmap, isFolderPreview: Boolean): Bitmap {
-        val targetSize = if (isFolderPreview) FOLDER_PREVIEW_SIZE_PX else NORMAL_VIDEO_PREVIEW_SIZE_PX
-        return cropCenterSquare(source, targetSize)
+        return if (isFolderPreview) {
+            cropCenterSquare(source, FOLDER_PREVIEW_SIZE_PX)
+        } else {
+            scaleBitmapPreservingAspectRatio(source, NORMAL_VIDEO_PREVIEW_SIZE_PX)
+        }
     }
 
     private fun buildRequestOptions(
@@ -543,8 +704,7 @@ object WebDavImageLoader {
                 .override(FOLDER_PREVIEW_SIZE_PX, FOLDER_PREVIEW_SIZE_PX)
                 .downsample(DownsampleStrategy.AT_MOST)
                 .format(DecodeFormat.PREFER_RGB_565)
-                .priority(Priority.NORMAL)
-                .timeout(3_000)
+                .priority(Priority.HIGH)
                 .dontAnimate()
         } else if (isWaterfall) {
             val settings = SettingsManager(context)
@@ -623,6 +783,30 @@ object WebDavImageLoader {
             cropped
         } else {
             Bitmap.createScaledBitmap(cropped, targetSize, targetSize, true)
+        }
+    }
+
+    private fun scaleBitmapPreservingAspectRatio(source: Bitmap, maxDimension: Int): Bitmap {
+        val width = source.width
+        val height = source.height
+        if (width <= 0 || height <= 0) return source
+
+        val longestEdge = maxOf(width, height)
+        if (longestEdge <= maxDimension) return source
+
+        val scale = maxDimension.toFloat() / longestEdge.toFloat()
+        val targetWidth = maxOf(1, (width * scale).toInt())
+        val targetHeight = maxOf(1, (height * scale).toInt())
+        if (targetWidth == width && targetHeight == height) return source
+
+        return Bitmap.createScaledBitmap(source, targetWidth, targetHeight, true)
+    }
+
+    private fun applyVideoThumbnailDisplayMode(imageView: ImageView, isFolderPreview: Boolean) {
+        imageView.scaleType = if (isFolderPreview) {
+            ImageView.ScaleType.CENTER_CROP
+        } else {
+            ImageView.ScaleType.FIT_CENTER
         }
     }
 

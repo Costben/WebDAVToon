@@ -54,6 +54,19 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { result ->
+        val allGranted = result.values.all { it }
+        if (allGranted) {
+            refreshMedia()
+        } else {
+            binding.emptyView.visibility = View.VISIBLE
+            binding.emptyView.text = getString(R.string.storage_permission_required)
+            android.widget.Toast.makeText(this, getString(R.string.storage_permission_required), android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         ThemeHelper.applyTheme(this)
         settingsManager = SettingsManager(this)
@@ -96,9 +109,7 @@ class MainActivity : AppCompatActivity() {
         setupUi()
         observeState()
 
-        if (isRemote || hasStoragePermission()) {
-            refreshMedia()
-        }
+        checkPermissionsAndLoad()
     }
 
     private fun setupUi() {
@@ -154,17 +165,7 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     val clicked = photos.getOrNull(position) ?: return@onPhotoClick
                     if (clicked.mediaType == MediaType.VIDEO) {
-                        if (isAviVideo(clicked.title) || isAviVideo(clicked.imageUri.toString())) {
-                            ExternalVideoOpener.open(this, clicked.imageUri.toString(), clicked.title, !clicked.isLocal, settingsManager)
-                        } else {
-                            val intent = Intent(this, VideoPlayerActivity::class.java).apply {
-                                putExtra("EXTRA_MEDIA_URI", clicked.imageUri.toString())
-                                putExtra("EXTRA_MEDIA_TITLE", clicked.title)
-                                putExtra("EXTRA_IS_REMOTE", !clicked.isLocal)
-                                putExtra("EXTRA_IS_FAVORITES", isFavorites)
-                            }
-                            startActivity(intent)
-                        }
+                        ExternalVideoOpener.open(this, clicked.imageUri.toString(), clicked.title, !clicked.isLocal, settingsManager)
                         return@onPhotoClick
                     }
 
@@ -260,6 +261,27 @@ class MainActivity : AppCompatActivity() {
             imageGranted && videoGranted
         } else {
             ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+        }
+    }
+
+    private fun checkPermissionsAndLoad() {
+        if (isRemote || isFavorites) {
+            refreshMedia()
+            return
+        }
+
+        val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO)
+        } else {
+            arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+        }
+
+        if (hasStoragePermission()) {
+            refreshMedia()
+        } else {
+            binding.emptyView.visibility = View.VISIBLE
+            binding.emptyView.text = getString(R.string.storage_permission_required)
+            requestPermissionLauncher.launch(permissions)
         }
     }
 

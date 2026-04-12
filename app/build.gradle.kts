@@ -1,6 +1,7 @@
 import java.util.Properties
 import com.nishtahir.CargoExtension
 import org.gradle.api.tasks.PathSensitivity
+import org.gradle.api.tasks.Copy
 
 plugins {
     id("com.android.application")
@@ -27,8 +28,8 @@ android {
         applicationId = "erl.webdavtoon"
         minSdk = 24
         targetSdk = 36
-        versionCode = 12
-        versionName = "1.1.4"
+        versionCode = 13
+        versionName = "1.1.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -109,6 +110,27 @@ tasks.matching { task ->
         .withPropertyName("rustJniLibDir")
         .withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.upToDateWhen { false }
+}
+
+val exportedDebugApk = rootProject.layout.projectDirectory.file("webdavtoon-debug.apk")
+
+val exportDebugApkToRoot = tasks.register("exportDebugApkToRoot") {
+    val sourceApk = layout.buildDirectory.file("outputs/apk/debug/app-debug.apk")
+    inputs.file(sourceApk)
+    outputs.file(exportedDebugApk)
+    doNotTrackState("Copies the built debug APK into the project root for user download.")
+
+    doLast {
+        copy {
+            from(sourceApk)
+            into(rootProject.layout.projectDirectory)
+            rename { "webdavtoon-debug.apk" }
+        }
+    }
+}
+
+tasks.matching { it.name == "assembleDebug" }.configureEach {
+    finalizedBy(exportDebugApkToRoot)
 }
 
 dependencies {
