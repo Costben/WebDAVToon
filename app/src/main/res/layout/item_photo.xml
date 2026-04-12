@@ -62,7 +62,7 @@
             android:layout_margin="6dp"
             android:padding="2dp"
             android:src="@drawable/ic_play_arrow"
-            android:tint="@android:color/white"
+            app:tint="@android:color/white"
             android:background="@android:color/transparent"
             android:visibility="gone"
             app:layout_constraintTop_toTopOf="@id/imageView"

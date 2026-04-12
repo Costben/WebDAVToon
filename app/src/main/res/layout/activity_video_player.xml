@@ -73,7 +73,7 @@
         android:contentDescription="@string/exo_controls_play_description"
         android:padding="16dp"
         android:src="@drawable/ic_play_arrow"
-        android:tint="@android:color/white"
+        app:tint="@android:color/white"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
@@ -101,7 +101,7 @@
             android:contentDescription="@string/cancel"
             android:padding="8dp"
             android:src="@drawable/ic_arrow_back"
-            android:tint="@android:color/white" />
+            app:tint="@android:color/white" />
 
         <TextView
             android:id="@+id/titleText"
@@ -123,7 +123,7 @@
             android:contentDescription="@string/video_rotate_landscape"
             android:padding="8dp"
             android:src="@drawable/ic_screen_rotation"
-            android:tint="@android:color/white" />
+            app:tint="@android:color/white" />
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
