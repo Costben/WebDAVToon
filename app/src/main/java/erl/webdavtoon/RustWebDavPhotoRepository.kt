@@ -5,6 +5,7 @@ import android.os.SystemClock
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import uniffi.rust_core.MediaType as RustMediaType
 import uniffi.rust_core.SortOrder
 import java.util.Locale
 
@@ -12,9 +13,22 @@ class RustWebDavPhotoRepository(
     private val settingsManager: SettingsManager
 ) : PhotoRepository {
 
+    data class RemoteFolderPreview(
+        val hasSubFolders: Boolean,
+        val previewUris: List<Uri>
+    )
+
     companion object {
         @Volatile
         private var lastWebDavParams: String? = null
+
+        @Volatile
+        private var previewRustRepo: uniffi.rust_core.RustRepository? = null
+
+        @Volatile
+        private var lastPreviewWebDavParams: String? = null
+
+        private val previewRepoLock = Any()
     }
 
     private val rustRepo = WebDAVToonApplication.rustRepository
@@ -70,21 +84,28 @@ class RustWebDavPhotoRepository(
 
         try {
             repo.getPhotos(folderPath, fetchSortOrder, forceRefresh, recursive).map { p ->
+                val mediaUri = Uri.parse(p.uri)
                 val parentPath = if (p.uri.contains("/")) {
                     p.uri.substringBeforeLast("/")
                 } else {
                     ""
                 }
+                val mediaType = when (p.mediaType) {
+                    RustMediaType.VIDEO -> MediaType.VIDEO
+                    RustMediaType.IMAGE -> MediaType.IMAGE
+                }
                 Photo(
                     id = p.id,
-                    imageUri = Uri.parse(p.uri),
+                    imageUri = mediaUri,
                     title = p.title,
                     width = 0,
                     height = 0,
                     isLocal = p.isLocal,
                     dateModified = p.dateModified.toLong() * 1000,
                     size = p.size.toLong(),
-                    folderPath = parentPath
+                    folderPath = parentPath,
+                    mediaType = mediaType,
+                    durationMs = p.durationMs?.toLong()
                 )
             }
         } catch (e: Exception) {
@@ -117,24 +138,6 @@ class RustWebDavPhotoRepository(
                     )
                 }.toMutableList()
 
-            // Handle mixed content: if subfolders exist, also check for direct photos
-            if (folders.isNotEmpty() && rootPath != "/") {
-                val directPhotos = repo.getPhotos(rootPath, SortOrder.DATE_DESC, false, false)
-                if (directPhotos.isNotEmpty()) {
-                    val photoCount = directPhotos.size
-                    val previewUris = directPhotos.take(4).map { Uri.parse(it.uri) }
-                    val dateModified = directPhotos.maxOfOrNull { it.dateModified.toLong() * 1000 } ?: 0L
-                    folders.add(0, Folder(
-                        path = "virtual://internal_photos?path=$rootPath",
-                        name = "Internal Photos ($photoCount)",
-                        isLocal = false,
-                        photoCount = photoCount,
-                        previewUris = previewUris,
-                        hasSubFolders = false,
-                        dateModified = dateModified
-                    ))
-                }
-            }
             Log.i(
                 "RustWebDavPhotoRepo",
                 "getFolders rootPath=$rootPath forceRefresh=$forceRefresh count=${folders.size} elapsedMs=${SystemClock.elapsedRealtime() - startedAt}"
@@ -203,25 +206,77 @@ class RustWebDavPhotoRepository(
     }
 
     private fun initializeWebDavIfNeeded(repo: uniffi.rust_core.RustRepository) {
+        initializeWebDavIfNeeded(repo, isPreviewRepo = false)
+    }
+
+    private fun initializeWebDavIfNeeded(
+        repo: uniffi.rust_core.RustRepository,
+        isPreviewRepo: Boolean
+    ) {
         try {
             val params = "${settingsManager.getFullWebDavUrl()}|${settingsManager.getWebDavUsername()}"
-            if (params == lastWebDavParams) return
+            val cachedParams = if (isPreviewRepo) lastPreviewWebDavParams else lastWebDavParams
+            if (params == cachedParams) return
 
             repo.initWebdav(
                 settingsManager.getFullWebDavUrl(),
                 settingsManager.getWebDavUsername(),
                 settingsManager.getWebDavPassword()
             )
-            lastWebDavParams = params
+            if (isPreviewRepo) {
+                lastPreviewWebDavParams = params
+            } else {
+                lastWebDavParams = params
+            }
         } catch (e: Exception) {
             Log.e("RustWebDavPhotoRepo", "Failed to init webdav", e)
-            lastWebDavParams = null
+            if (isPreviewRepo) {
+                lastPreviewWebDavParams = null
+            } else {
+                lastWebDavParams = null
+            }
+        }
+    }
+
+    private fun getPreviewRustRepo(): uniffi.rust_core.RustRepository? {
+        previewRustRepo?.let { return it }
+
+        val appContext = runCatching { WebDAVToonApplication.appContext }.getOrNull() ?: return null
+        synchronized(previewRepoLock) {
+            previewRustRepo?.let { return it }
+            val dbPath = appContext.getDatabasePath("rust_core_preview.db").absolutePath
+            return try {
+                uniffi.rust_core.RustRepository(dbPath).also { previewRustRepo = it }
+            } catch (e: Exception) {
+                Log.e("RustWebDavPhotoRepo", "Failed to create preview rust repo", e)
+                null
+            }
         }
     }
 
     suspend fun testWebDavConnection(endpoint: String, username: String, password: String): String = withContext(Dispatchers.IO) {
         val repo = rustRepo ?: throw IllegalStateException("Repository not initialized")
         repo.testWebdav(endpoint, username, password)
+    }
+
+    suspend fun inspectFolder(folderPath: String): RemoteFolderPreview? = withContext(Dispatchers.IO) {
+        val repo = getPreviewRustRepo() ?: rustRepo ?: return@withContext null
+        initializeWebDavIfNeeded(repo, isPreviewRepo = repo !== rustRepo)
+
+        return@withContext try {
+            val inspection = repo.inspectFolder(folderPath)
+            Log.i(
+                "RustWebDavPhotoRepo",
+                "inspectFolder path=$folderPath previews=${inspection.previewUris.size} hasSubFolders=${inspection.hasSubFolders}"
+            )
+            RemoteFolderPreview(
+                hasSubFolders = inspection.hasSubFolders,
+                previewUris = inspection.previewUris.map(Uri::parse)
+            )
+        } catch (e: Exception) {
+            Log.e("RustWebDavPhotoRepo", "Failed to inspect folder preview: $folderPath", e)
+            null
+        }
     }
 
     override suspend fun deletePhoto(photo: Photo): Boolean = withContext(Dispatchers.IO) {

@@ -18,7 +18,9 @@
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
             app:title="@string/settings"
-            app:navigationIcon="@drawable/ic_arrow_back" />
+            app:titleTextColor="?android:attr/textColorPrimary"
+            app:navigationIcon="@drawable/ic_arrow_back"
+            app:navigationIconTint="?android:attr/textColorPrimary" />
 
     </com.google.android.material.appbar.AppBarLayout>
 
@@ -142,6 +144,46 @@
             <include layout="@layout/item_setting" android:id="@+id/setting_sort_order" />
             <include layout="@layout/item_setting" android:id="@+id/setting_thumbnail_quality" />
             <include layout="@layout/item_setting" android:id="@+id/setting_reader_max_zoom" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="8dp"
+                android:background="?android:attr/listDivider" />
+
+            <!-- Video Settings -->
+            <TextView
+                android:id="@+id/video_settings_title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="16dp"
+                android:paddingTop="24dp"
+                android:paddingEnd="16dp"
+                android:paddingBottom="8dp"
+                android:text="@string/video_settings"
+                android:textColor="?attr/colorPrimary"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <include
+                android:id="@+id/setting_video_autoplay"
+                layout="@layout/item_setting" />
+
+            <include
+                android:id="@+id/setting_video_external_mode"
+                layout="@layout/item_setting" />
+
+            <include
+                android:id="@+id/setting_video_decoder"
+                layout="@layout/item_setting" />
+
+            <include
+                android:id="@+id/setting_video_gestures"
+                layout="@layout/item_setting" />
+
+            <include
+                android:id="@+id/setting_video_double_tap_seek"
+                layout="@layout/item_setting" />
 
             <View
                 android:layout_width="match_parent"

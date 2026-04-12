@@ -1,12 +1,17 @@
 package erl.webdavtoon
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -33,6 +38,16 @@ class SubFolderActivity : AppCompatActivity() {
         if (result.resultCode == RESULT_OK) {
             loadFolders()
         }
+    }
+
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { result ->
+        val allGranted = result.values.all { it }
+        if (!allGranted) {
+            android.widget.Toast.makeText(this, getString(R.string.storage_permission_required), android.widget.Toast.LENGTH_LONG).show()
+        }
+        loadFolders()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -63,7 +78,7 @@ class SubFolderActivity : AppCompatActivity() {
         isWebDav = intent.getBooleanExtra("EXTRA_IS_WEBDAV", false)
 
         setupUI()
-        loadFolders()
+        checkPermissionsAndLoad()
     }
 
     private fun setupUI() {
@@ -99,6 +114,9 @@ class SubFolderActivity : AppCompatActivity() {
                     supportActionBar?.title = originalTitle
                 }
                 invalidateOptionsMenu()
+            },
+            onRemotePreviewNeeded = { folder ->
+                resolveRemotePreview(folder)
             }
         )
 
@@ -156,49 +174,39 @@ class SubFolderActivity : AppCompatActivity() {
             return
         }
 
-        // If folder.hasSubFolders is true, pre-check content to avoid white flash
-        binding.toolbarProgressBar.visibility = View.VISIBLE
-        lifecycleScope.launch {
-            try {
-                val repository: PhotoRepository = if (!folder.isLocal) {
-                    RustWebDavPhotoRepository(settingsManager)
-                } else {
-                    LocalPhotoRepository(this@SubFolderActivity)
-                }
+        val intent = Intent(this, SubFolderActivity::class.java).apply {
+            putExtra("EXTRA_FOLDER_PATH", realPath)
+            putExtra("EXTRA_IS_WEBDAV", !folder.isLocal)
+        }
+        startActivity(intent)
+    }
 
-                val subFolders = withContext(Dispatchers.IO) {
-                    repository.getFolders(realPath, false).filterNot { f ->
-                        !f.isLocal && (f.name.startsWith(".") || f.path.trim('/').split('/').any { it.startsWith(".") })
-                    }
-                }
+    private fun hasStoragePermission(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val imageGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED
+            val videoGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_VIDEO) == PackageManager.PERMISSION_GRANTED
+            imageGranted && videoGranted
+        } else {
+            ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+        }
+    }
 
-                if (subFolders.isEmpty()) {
-                    // No visible subfolders found, go directly to MainActivity
-                    val intent = Intent(this@SubFolderActivity, MainActivity::class.java).apply {
-                        putExtra("EXTRA_FOLDER_PATH", realPath)
-                        putExtra("EXTRA_IS_WEBDAV", !folder.isLocal)
-                        putExtra("EXTRA_RECURSIVE", false)
-                    }
-                    startActivity(intent)
-                } else {
-                    // Subfolders (or mixed content virtual folder) exist, go to SubFolderActivity (recursive)
-                    val intent = Intent(this@SubFolderActivity, SubFolderActivity::class.java).apply {
-                        putExtra("EXTRA_FOLDER_PATH", realPath)
-                        putExtra("EXTRA_IS_WEBDAV", !folder.isLocal)
-                    }
-                    startActivity(intent)
-                }
-            } catch (e: Exception) {
-                android.util.Log.e("SubFolderActivity", "Folder pre-check failed", e)
-                // Fallback: try entering SubFolderActivity anyway
-                val intent = Intent(this@SubFolderActivity, SubFolderActivity::class.java).apply {
-                    putExtra("EXTRA_FOLDER_PATH", realPath)
-                    putExtra("EXTRA_IS_WEBDAV", !folder.isLocal)
-                }
-                startActivity(intent)
-            } finally {
-                binding.toolbarProgressBar.visibility = View.GONE
-            }
+    private fun checkPermissionsAndLoad() {
+        if (isWebDav) {
+            loadFolders()
+            return
+        }
+
+        val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO)
+        } else {
+            arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+        }
+
+        if (hasStoragePermission()) {
+            loadFolders()
+        } else {
+            requestPermissionLauncher.launch(permissions)
         }
     }
 
@@ -359,6 +367,7 @@ class SubFolderActivity : AppCompatActivity() {
         if (!binding.swipeRefreshLayout.isRefreshing) {
             binding.toolbarProgressBar.visibility = View.VISIBLE
         }
+        val startedAt = SystemClock.elapsedRealtime()
 
         lifecycleScope.launch {
             val allFolders = mutableListOf<Folder>()
@@ -374,6 +383,10 @@ class SubFolderActivity : AppCompatActivity() {
                 }
 
                 if (folders.isEmpty()) {
+                    android.util.Log.i(
+                        "SubFolderActivity",
+                        "loadFolders path=$folderPath forceRefresh=$forceRefresh empty=true elapsedMs=${SystemClock.elapsedRealtime() - startedAt}"
+                    )
                     val intent = Intent(this@SubFolderActivity, MainActivity::class.java).apply {
                         putExtra("EXTRA_FOLDER_PATH", folderPath)
                         putExtra("EXTRA_IS_WEBDAV", isWebDav)
@@ -387,6 +400,10 @@ class SubFolderActivity : AppCompatActivity() {
                 allFolders.addAll(folders)
                 currentAllFolders = allFolders.toList()
                 applyFilterAndSort()
+                android.util.Log.i(
+                    "SubFolderActivity",
+                    "loadFolders path=$folderPath forceRefresh=$forceRefresh count=${allFolders.size} elapsedMs=${SystemClock.elapsedRealtime() - startedAt}"
+                )
             } catch (e: Exception) {
                 android.util.Log.e("SubFolderActivity", "Folders load failed", e)
             }
@@ -394,6 +411,28 @@ class SubFolderActivity : AppCompatActivity() {
             // adapter.setFolders(allFolders) - Removed, handled by applyFilterAndSort
             binding.toolbarProgressBar.visibility = View.GONE
             binding.swipeRefreshLayout.isRefreshing = false
+        }
+    }
+
+    private fun resolveRemotePreview(folder: Folder) {
+        if (folder.isLocal || folder.previewUris.isNotEmpty()) return
+
+        lifecycleScope.launch {
+            val preview = RustWebDavPhotoRepository(settingsManager).inspectFolder(folder.path) ?: return@launch
+            val updatedPreviewUris = if (preview.previewUris.isNotEmpty()) preview.previewUris else folder.previewUris
+
+            currentAllFolders = currentAllFolders.map { current ->
+                if (current.path == folder.path) {
+                    current.copy(
+                        previewUris = updatedPreviewUris,
+                        hasSubFolders = preview.hasSubFolders
+                    )
+                } else {
+                    current
+                }
+            }
+
+            adapter.updateFolderPreview(folder.path, updatedPreviewUris, preview.hasSubFolders)
         }
     }
 }

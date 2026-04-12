@@ -5,6 +5,7 @@ import android.net.Uri
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.SystemClock
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
@@ -32,13 +33,13 @@ class FolderViewActivity : AppCompatActivity() {
     private var currentSearchKeyword: String = ""
 
     private val requestPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        if (isGranted) {
-            loadFolders()
-        } else {
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { result ->
+        val allGranted = result.values.all { it }
+        if (!allGranted) {
             Toast.makeText(this, getString(R.string.storage_permission_required), Toast.LENGTH_LONG).show()
         }
+        loadFolders()
     }
 
     private val settingsLauncher = registerForActivityResult(
@@ -101,32 +102,26 @@ class FolderViewActivity : AppCompatActivity() {
     }
 
     private fun hasStoragePermission(): Boolean {
-        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Manifest.permission.READ_MEDIA_IMAGES
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val imageGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES) == PackageManager.PERMISSION_GRANTED
+            val videoGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_VIDEO) == PackageManager.PERMISSION_GRANTED
+            imageGranted && videoGranted
         } else {
-            Manifest.permission.READ_EXTERNAL_STORAGE
+            ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
         }
-        return ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
     }
 
     private fun checkPermissionsAndLoad() {
-        val isRemoteEnabled = settingsManager.isWebDavEnabled()
-
-        if (isRemoteEnabled) {
-            loadFolders()
-            return
-        }
-
-        val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Manifest.permission.READ_MEDIA_IMAGES
+        val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO)
         } else {
-            Manifest.permission.READ_EXTERNAL_STORAGE
+            arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
         }
 
         if (hasStoragePermission()) {
             loadFolders()
         } else {
-            requestPermissionLauncher.launch(permission)
+            requestPermissionLauncher.launch(permissions)
         }
     }
 
@@ -145,68 +140,33 @@ class FolderViewActivity : AppCompatActivity() {
         }
 
         if (folder.path == "virtual://local_root") {
-            val intent = Intent(this, SubFolderActivity::class.java).apply {
-                putExtra("EXTRA_FOLDER_PATH", "")
-                putExtra("EXTRA_IS_WEBDAV", false)
-            }
-            startActivity(intent)
+            openSubFolder("", false)
             return
         }
 
         if (isInternalPhotos || !folder.hasSubFolders) {
-            val intent = Intent(this, MainActivity::class.java).apply {
-                putExtra("EXTRA_FOLDER_PATH", realPath)
-                putExtra("EXTRA_IS_WEBDAV", !folder.isLocal)
-                putExtra("EXTRA_RECURSIVE", false)
-            }
-            startActivity(intent)
+            openPhotoList(realPath, !folder.isLocal)
             return
         }
 
-        // If folder.hasSubFolders is true, pre-check content to avoid white flash
-        binding.toolbarProgressBar.visibility = View.VISIBLE
-        lifecycleScope.launch {
-            try {
-                val repository: PhotoRepository = if (!folder.isLocal) {
-                    RustWebDavPhotoRepository(settingsManager)
-                } else {
-                    LocalPhotoRepository(this@FolderViewActivity)
-                }
+        openSubFolder(realPath, !folder.isLocal)
+    }
 
-                val subFolders = withContext(Dispatchers.IO) {
-                    repository.getFolders(realPath, false).filterNot { f ->
-                        !f.isLocal && (f.name.startsWith(".") || f.path.trim('/').split('/').any { it.startsWith(".") })
-                    }
-                }
-
-                if (subFolders.isEmpty()) {
-                    // No visible subfolders found, go directly to MainActivity
-                    val intent = Intent(this@FolderViewActivity, MainActivity::class.java).apply {
-                        putExtra("EXTRA_FOLDER_PATH", realPath)
-                        putExtra("EXTRA_IS_WEBDAV", !folder.isLocal)
-                        putExtra("EXTRA_RECURSIVE", false)
-                    }
-                    startActivity(intent)
-                } else {
-                    // Subfolders (or mixed content virtual folder) exist, go to SubFolderActivity
-                    val intent = Intent(this@FolderViewActivity, SubFolderActivity::class.java).apply {
-                        putExtra("EXTRA_FOLDER_PATH", realPath)
-                        putExtra("EXTRA_IS_WEBDAV", !folder.isLocal)
-                    }
-                    startActivity(intent)
-                }
-            } catch (e: Exception) {
-                android.util.Log.e("FolderViewActivity", "Folder pre-check failed", e)
-                // Fallback: try entering SubFolderActivity anyway
-                val intent = Intent(this@FolderViewActivity, SubFolderActivity::class.java).apply {
-                    putExtra("EXTRA_FOLDER_PATH", realPath)
-                    putExtra("EXTRA_IS_WEBDAV", !folder.isLocal)
-                }
-                startActivity(intent)
-            } finally {
-                binding.progressBar.visibility = View.GONE
-            }
+    private fun openPhotoList(path: String, isWebDav: Boolean) {
+        val intent = Intent(this, MainActivity::class.java).apply {
+            putExtra("EXTRA_FOLDER_PATH", path)
+            putExtra("EXTRA_IS_WEBDAV", isWebDav)
+            putExtra("EXTRA_RECURSIVE", false)
         }
+        startActivity(intent)
+    }
+
+    private fun openSubFolder(path: String, isWebDav: Boolean) {
+        val intent = Intent(this, SubFolderActivity::class.java).apply {
+            putExtra("EXTRA_FOLDER_PATH", path)
+            putExtra("EXTRA_IS_WEBDAV", isWebDav)
+        }
+        startActivity(intent)
     }
 
     private fun setupUI() {
@@ -225,13 +185,17 @@ class FolderViewActivity : AppCompatActivity() {
                     supportActionBar?.title = getString(R.string.app_name)
                 }
                 invalidateOptionsMenu()
+            },
+            onRemotePreviewNeeded = { folder ->
+                resolveRemotePreview(folder)
             }
         )
 
         binding.recyclerView.layoutManager = GridLayoutManager(this, settingsManager.getGridColumns()).apply {
-            isItemPrefetchEnabled = false
+            isItemPrefetchEnabled = true
         }
         binding.recyclerView.setHasFixedSize(true)
+        binding.recyclerView.setItemViewCacheSize(24)
         binding.recyclerView.itemAnimator = null
         binding.recyclerView.adapter = adapter
 
@@ -424,6 +388,7 @@ class FolderViewActivity : AppCompatActivity() {
 
     private fun loadFolders(forceRefresh: Boolean = false) {
         FolderState.setLoading()
+        val startedAt = SystemClock.elapsedRealtime()
 
         lifecycleScope.launch {
             try {
@@ -477,10 +442,36 @@ class FolderViewActivity : AppCompatActivity() {
 
                 currentAllFolders = allFolders
                 applyFilterAndSort()
+                android.util.Log.i(
+                    "FolderViewActivity",
+                    "loadFolders forceRefresh=$forceRefresh count=${allFolders.size} elapsedMs=${SystemClock.elapsedRealtime() - startedAt}"
+                )
             } catch (e: Exception) {
                 android.util.Log.e("FolderViewActivity", "Remote folders load failed: ${e.message}", e)
                 FolderState.setError(e.message ?: "Folder load failed")
             }
+        }
+    }
+
+    private fun resolveRemotePreview(folder: Folder) {
+        if (folder.isLocal || folder.previewUris.isNotEmpty()) return
+
+        lifecycleScope.launch {
+            val preview = RustWebDavPhotoRepository(settingsManager).inspectFolder(folder.path) ?: return@launch
+            val updatedPreviewUris = if (preview.previewUris.isNotEmpty()) preview.previewUris else folder.previewUris
+
+            currentAllFolders = currentAllFolders.map { current ->
+                if (current.path == folder.path) {
+                    current.copy(
+                        previewUris = updatedPreviewUris,
+                        hasSubFolders = preview.hasSubFolders
+                    )
+                } else {
+                    current
+                }
+            }
+
+            adapter.updateFolderPreview(folder.path, updatedPreviewUris, preview.hasSubFolders)
         }
     }
 }

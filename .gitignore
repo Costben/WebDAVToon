@@ -54,3 +54,12 @@ keystore/signing.properties
 build_log.txt
 build_trace.log
 build_report.txt
+
+# Local reference repositories
+/reference/
+
+# Local debugging / ADB artifacts
+/.artifacts/
+
+# Root-level exported debug APK copy
+/webdavtoon-debug.apk

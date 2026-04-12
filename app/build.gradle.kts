@@ -1,6 +1,7 @@
 import java.util.Properties
 import com.nishtahir.CargoExtension
 import org.gradle.api.tasks.PathSensitivity
+import org.gradle.api.tasks.Copy
 
 plugins {
     id("com.android.application")
@@ -12,7 +13,7 @@ plugins {
 extensions.configure<CargoExtension> {
     module = "../rust-core"
     libname = "rust_core"
-    targets = listOf("arm", "arm64", "x86", "x86_64")
+    targets = listOf("arm64")
     profile = "release"
     pythonCommand = "python3"
     apiLevel = 24
@@ -27,8 +28,8 @@ android {
         applicationId = "erl.webdavtoon"
         minSdk = 24
         targetSdk = 36
-        versionCode = 12
-        versionName = "1.1.4"
+        versionCode = 13
+        versionName = "1.1.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -36,7 +37,7 @@ android {
         }
         
         ndk {
-            abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64"))
+            abiFilters.addAll(listOf("arm64-v8a"))
         }
     }
 
@@ -111,6 +112,27 @@ tasks.matching { task ->
     outputs.upToDateWhen { false }
 }
 
+val exportedDebugApk = rootProject.layout.projectDirectory.file("webdavtoon-debug.apk")
+
+val exportDebugApkToRoot = tasks.register("exportDebugApkToRoot") {
+    val sourceApk = layout.buildDirectory.file("outputs/apk/debug/app-debug.apk")
+    inputs.file(sourceApk)
+    outputs.file(exportedDebugApk)
+    doNotTrackState("Copies the built debug APK into the project root for user download.")
+
+    doLast {
+        copy {
+            from(sourceApk)
+            into(rootProject.layout.projectDirectory)
+            rename { "webdavtoon-debug.apk" }
+        }
+    }
+}
+
+tasks.matching { it.name == "assembleDebug" }.configureEach {
+    finalizedBy(exportDebugApkToRoot)
+}
+
 dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.appcompat:appcompat:1.6.1")
@@ -139,6 +161,10 @@ dependencies {
 
     implementation("com.github.chrisbanes:PhotoView:2.3.0")
     implementation("com.google.code.gson:gson:2.10.1")
+    implementation("androidx.media3:media3-exoplayer:1.5.1")
+    implementation("androidx.media3:media3-ui:1.5.1")
+    implementation("com.github.wseemann:FFmpegMediaMetadataRetriever-core:1.0.19")
+    implementation("com.github.wseemann:FFmpegMediaMetadataRetriever-native:1.0.19")
 
     implementation("net.java.dev.jna:jna:5.14.0@aar")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
@@ -147,3 +173,4 @@ dependencies {
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
 }
+

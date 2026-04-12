@@ -2,6 +2,7 @@ package erl.webdavtoon
 
 import android.os.Bundle
 import android.text.InputType
+import android.content.res.Configuration
 import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.Toast
@@ -31,7 +32,8 @@ class SettingsActivity : AppCompatActivity() {
 
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
         window.navigationBarColor = android.graphics.Color.TRANSPARENT
-        androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightNavigationBars = true
+        androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
+            .isAppearanceLightNavigationBars = !isNightModeActive()
 
         binding = ActivitySettingsMd3Binding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -57,6 +59,11 @@ class SettingsActivity : AppCompatActivity() {
         } else {
             requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         }
+    }
+
+    private fun isNightModeActive(): Boolean {
+        val nightModeFlags = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+        return nightModeFlags == Configuration.UI_MODE_NIGHT_YES
     }
 
     override fun onCreateOptionsMenu(menu: android.view.Menu): Boolean {
@@ -140,6 +147,35 @@ class SettingsActivity : AppCompatActivity() {
             root.setOnClickListener { showReaderMaxZoomDialog() }
         }
 
+        binding.settingVideoAutoplay.apply {
+            title.text = getString(R.string.video_autoplay)
+            root.setOnClickListener { showVideoAutoplayDialog() }
+            root.visibility = View.GONE
+        }
+
+        binding.settingVideoExternalMode.apply {
+            title.text = getString(R.string.video_external_player_mode)
+            root.setOnClickListener { showVideoExternalPlayerModeDialog() }
+        }
+
+        binding.settingVideoDecoder.apply {
+            title.text = getString(R.string.video_decoder)
+            root.setOnClickListener { showVideoDecoderDialog() }
+            root.visibility = View.GONE
+        }
+
+        binding.settingVideoGestures.apply {
+            title.text = getString(R.string.video_gestures)
+            root.setOnClickListener { showVideoGesturesDialog() }
+            root.visibility = View.GONE
+        }
+
+        binding.settingVideoDoubleTapSeek.apply {
+            title.text = getString(R.string.video_double_tap_seek_interval)
+            root.setOnClickListener { showVideoDoubleTapSeekDialog() }
+            root.visibility = View.GONE
+        }
+
         binding.settingClearCache.apply {
             title.text = getString(R.string.clear_cache)
             summary.text = getString(R.string.clear_cache_summary)
@@ -202,6 +238,46 @@ class SettingsActivity : AppCompatActivity() {
             R.string.reader_max_zoom_summary,
             settingsManager.getReaderMaxZoomPercent().coerceIn(100, 500)
         )
+
+        binding.settingVideoAutoplay.title.text = getString(R.string.video_autoplay)
+        binding.settingVideoAutoplay.summary.text =
+            if (settingsManager.isVideoAutoplayEnabled()) {
+                getString(R.string.video_autoplay_on)
+            } else {
+                getString(R.string.video_autoplay_off)
+            }
+        binding.settingVideoAutoplay.root.visibility = View.GONE
+
+        binding.settingVideoExternalMode.title.text = getString(R.string.video_external_player_mode)
+        binding.settingVideoExternalMode.summary.text = when (settingsManager.getVideoExternalPlayerMode()) {
+            SettingsManager.VIDEO_EXTERNAL_PLAYER_MODE_CHOOSER ->
+                getString(R.string.video_external_player_mode_chooser)
+            else ->
+                getString(R.string.video_external_player_mode_system_default)
+        }
+
+        binding.settingVideoDecoder.title.text = getString(R.string.video_decoder)
+        binding.settingVideoDecoder.summary.text = when (settingsManager.getVideoDecoder()) {
+            SettingsManager.VIDEO_DECODER_AUTO -> getString(R.string.video_decoder_auto)
+            else -> getString(R.string.video_decoder_auto)
+        }
+        binding.settingVideoDecoder.root.visibility = View.GONE
+
+        binding.settingVideoGestures.title.text = getString(R.string.video_gestures)
+        binding.settingVideoGestures.summary.text =
+            if (settingsManager.isVideoGestureEnabled()) {
+                getString(R.string.video_gestures_summary)
+            } else {
+                getString(R.string.video_autoplay_off)
+            }
+        binding.settingVideoGestures.root.visibility = View.GONE
+
+        binding.settingVideoDoubleTapSeek.title.text = getString(R.string.video_double_tap_seek_interval)
+        binding.settingVideoDoubleTapSeek.summary.text = getString(
+            R.string.video_double_tap_seek_summary,
+            settingsManager.getVideoDoubleTapSeekSeconds()
+        )
+        binding.settingVideoDoubleTapSeek.root.visibility = View.GONE
 
         binding.settingAbout.title.text = getString(R.string.about)
         binding.settingAbout.summary.text = "v${BuildConfig.VERSION_NAME}"
@@ -504,6 +580,104 @@ class SettingsActivity : AppCompatActivity() {
                     settingsManager.setReaderMaxZoomPercent(percent)
                     refreshUi()
                 }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun showVideoAutoplayDialog() {
+        val options = arrayOf(
+            getString(R.string.video_autoplay_on),
+            getString(R.string.video_autoplay_off)
+        )
+        val current = if (settingsManager.isVideoAutoplayEnabled()) 0 else 1
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.video_autoplay)
+            .setSingleChoiceItems(options, current) { dialog, which ->
+                settingsManager.setVideoAutoplayEnabled(which == 0)
+                refreshUi()
+                dialog.dismiss()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun showVideoDecoderDialog() {
+        val options = arrayOf(getString(R.string.video_decoder_auto))
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.video_decoder)
+            .setSingleChoiceItems(options, 0) { dialog, _ ->
+                settingsManager.setVideoDecoder(SettingsManager.VIDEO_DECODER_AUTO)
+                refreshUi()
+                dialog.dismiss()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .setNeutralButton(R.string.detail) { _, _ ->
+                Toast.makeText(this, getString(R.string.video_setting_placeholder), Toast.LENGTH_SHORT).show()
+            }
+            .show()
+    }
+
+    private fun showVideoExternalPlayerModeDialog() {
+        val options = arrayOf(
+            getString(R.string.video_external_player_mode_system_default),
+            getString(R.string.video_external_player_mode_chooser)
+        )
+        val current = when (settingsManager.getVideoExternalPlayerMode()) {
+            SettingsManager.VIDEO_EXTERNAL_PLAYER_MODE_CHOOSER -> 1
+            else -> 0
+        }
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.video_external_player_mode)
+            .setSingleChoiceItems(options, current) { dialog, which ->
+                settingsManager.setVideoExternalPlayerMode(
+                    if (which == 1) {
+                        SettingsManager.VIDEO_EXTERNAL_PLAYER_MODE_CHOOSER
+                    } else {
+                        SettingsManager.VIDEO_EXTERNAL_PLAYER_MODE_SYSTEM_DEFAULT
+                    }
+                )
+                refreshUi()
+                dialog.dismiss()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun showVideoGesturesDialog() {
+        val options = arrayOf(
+            getString(R.string.video_autoplay_on),
+            getString(R.string.video_autoplay_off)
+        )
+        val current = if (settingsManager.isVideoGestureEnabled()) 0 else 1
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.video_gestures)
+            .setSingleChoiceItems(options, current) { dialog, which ->
+                settingsManager.setVideoGestureEnabled(which == 0)
+                refreshUi()
+                dialog.dismiss()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun showVideoDoubleTapSeekDialog() {
+        val seekSecondsOptions = intArrayOf(5, 10, 15)
+        val labels = seekSecondsOptions.map { seconds ->
+            getString(R.string.video_double_tap_seek_summary, seconds)
+        }.toTypedArray()
+        val current = seekSecondsOptions.indexOf(settingsManager.getVideoDoubleTapSeekSeconds()).coerceAtLeast(0)
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.video_double_tap_seek_interval)
+            .setSingleChoiceItems(labels, current) { dialog, which ->
+                settingsManager.setVideoDoubleTapSeekSeconds(seekSecondsOptions[which])
+                refreshUi()
+                dialog.dismiss()
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
