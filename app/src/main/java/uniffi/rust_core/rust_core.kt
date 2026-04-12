@@ -729,11 +729,6 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 
 
 
-
-
-
-
-
 // A JNA Library to expose the extern-C FFI definitions.
 // This is an implementation detail which will be called internally by the public API.
 
@@ -1266,26 +1261,34 @@ private fun UniffiCleaner.Companion.create(): UniffiCleaner =
     try {
         // For safety's sake: if the library hasn't been run in android_cleaner = true
         // mode, but is being run on Android, then we still need to think about
-        // Android API versions.
-        // So we check if java.lang.ref.Cleaner is there, and use that…
+        // Android API versions. So we check if java.lang.ref.Cleaner is there,
+        // and use that via reflection to avoid API 33 compile-time lint failures.
         java.lang.Class.forName("java.lang.ref.Cleaner")
         JavaLangRefCleaner()
     } catch (e: ClassNotFoundException) {
-        // … otherwise, fallback to the JNA cleaner.
+        // Otherwise, fallback to the JNA cleaner.
         UniffiJnaCleaner()
     }
 
 private class JavaLangRefCleaner : UniffiCleaner {
-    val cleaner = java.lang.ref.Cleaner.create()
+    private val cleanerClass = java.lang.Class.forName("java.lang.ref.Cleaner")
+    private val cleaner = cleanerClass.getMethod("create").invoke(null)
+    private val registerMethod = cleanerClass.getMethod(
+        "register",
+        Any::class.java,
+        Runnable::class.java
+    )
 
     override fun register(value: Any, cleanUpTask: Runnable): UniffiCleaner.Cleanable =
-        JavaLangRefCleanable(cleaner.register(value, cleanUpTask))
+        JavaLangRefCleanable(requireNotNull(registerMethod.invoke(cleaner, value, cleanUpTask)))
 }
 
 private class JavaLangRefCleanable(
-    val cleanable: java.lang.ref.Cleaner.Cleanable
+    private val cleanable: Any
 ) : UniffiCleaner.Cleanable {
-    override fun clean() = cleanable.clean()
+    override fun clean() {
+        cleanable.javaClass.getMethod("clean").invoke(cleanable)
+    }
 }
 public interface RustRepositoryInterface {
     
@@ -1518,8 +1521,6 @@ public object FfiConverterTypeRustRepository: FfiConverter<RustRepository, Point
         buf.putLong(Pointer.nativeValue(lower(value)))
     }
 }
-
-
 
 data class Folder (
     var `path`: kotlin.String, 
@@ -2028,5 +2029,6 @@ public object FfiConverterSequenceTypePhoto: FfiConverterRustBuffer<List<Photo>>
 }
     
     
+
 
 
