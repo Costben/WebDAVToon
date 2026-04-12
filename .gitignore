@@ -63,3 +63,8 @@ build_report.txt
 
 # Root-level exported debug APK copy
 /webdavtoon-debug.apk
+
+# Agent / HOTL execution docs
+/AGENTS.md
+/hotl-workflow-*.md
+/docs/plans/
