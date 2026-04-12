@@ -1,69 +1,74 @@
-# Gradle
-.gradle/
-.gradle-home/
-build/
-app/build/
+# Local Android / ADB environment
+.adbhome/
+.android/
 local.properties
 
-# Android
+# Gradle / Kotlin build outputs
+.gradle/
+.gradle-home/
+.kotlin/
+build/
+app/build/
+.externalNativeBuild/
+.cxx/
+
+# Android build artifacts
 *.apk
 *.ap_
 *.dex
 *.class
-/captures
-.externalNativeBuild
-.cxx
-crash.log
-*.log
+/captures/
+app/src/main/jniLibs/
 
-# Rust
-/target/
-/rust-core/target/
+# Rust build outputs
+target/
+rust-core/target/
 **/target/
 rust-core/uniffi-bindgen
 rust-core/uniffi-bindgen.exe
 rust-core/src/uniffi_rust_core.kt
 rust-core/src/librust_core.so
-**/rust-core/target/
-**/rust-core/target/**
 
-# IDE
+# IDE / editor files
 .idea/
 .vscode/
 *.iml
 .DS_Store
+*.swp
+*.swo
+*.tmp
+*.bak
+*.orig
+*.rej
 
-# Trae
+# Local tool directories
 .trae/
+.codebuddy/
 
-# Temp
+# Local debug / test artifacts
+.artifacts/
 ui.xml
 ui_home.xml
 tmp_x86_64_librust_core.so
 test_ignore/
-.codebuddy/
-
-# Generated JNI libs
-app/src/main/jniLibs/
+crash.log
+*.log
 build_output.txt
-
-# Keystore and build secrets
-keystore/release.jks
-keystore/signing.properties
-*.jks
 build_log.txt
 build_trace.log
 build_report.txt
 
-# Local reference repositories
-/reference/
+# Signing materials / secrets
+keystore/release.jks
+keystore/signing.properties
+*.jks
 
-# Local debugging / ADB artifacts
-/.artifacts/
+# Local reference / scratch content
+reference/
 
-# Root-level exported debug APK copy
+# Root-level exported APK copy
 /webdavtoon-debug.apk
 
-# Agent / HOTL execution docs
+# Local-only agent / HOTL docs
 /hotl-workflow-*.md
 /docs/plans/
