@@ -42,12 +42,6 @@
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize" />
 
         <activity
-            android:name=".VideoPlayerActivity"
-            android:exported="true"
-            android:screenOrientation="portrait"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize" />
-            
-        <activity
             android:name=".SettingsActivity"
             android:exported="false"
             android:screenOrientation="portrait"
