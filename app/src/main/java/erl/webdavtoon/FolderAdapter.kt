@@ -26,25 +26,52 @@ class FolderAdapter(
     }
 
     fun setFolders(newFolders: List<Folder>) {
-        if (folders == newFolders) return
+        val previousByPath = folders.associateBy { it.path }
+        val mergedFolders = newFolders.map { incoming ->
+            val previous = previousByPath[incoming.path]
+            if (previous != null && incoming.previewUris.isEmpty() && previous.previewUris.isNotEmpty()) {
+                incoming.copy(previewUris = previous.previewUris)
+            } else {
+                incoming
+            }
+        }
+
+        val previewlessPaths = mergedFolders
+            .asSequence()
+            .filter { !it.isLocal && it.previewUris.isEmpty() }
+            .map { it.path }
+            .toSet()
+
+        if (folders == mergedFolders) {
+            folders = mergedFolders
+            selectedFolderPaths.retainAll(folders.map { it.path }.toSet())
+            requestedPreviewPaths.retainAll(folders.map { it.path }.toSet())
+            requestedPreviewPaths.removeAll(previewlessPaths)
+            if (folders.isNotEmpty()) {
+                notifyItemRangeChanged(0, folders.size)
+            }
+            onSelectionChanged(selectedFolderPaths.size)
+            return
+        }
 
         val diffResult = DiffUtil.calculateDiff(object : DiffUtil.Callback() {
             override fun getOldListSize(): Int = folders.size
 
-            override fun getNewListSize(): Int = newFolders.size
+            override fun getNewListSize(): Int = mergedFolders.size
 
             override fun areItemsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
-                return folders[oldItemPosition].path == newFolders[newItemPosition].path
+                return folders[oldItemPosition].path == mergedFolders[newItemPosition].path
             }
 
             override fun areContentsTheSame(oldItemPosition: Int, newItemPosition: Int): Boolean {
-                return folders[oldItemPosition] == newFolders[newItemPosition]
+                return folders[oldItemPosition] == mergedFolders[newItemPosition]
             }
         })
 
-        folders = newFolders
+        folders = mergedFolders
         selectedFolderPaths.retainAll(folders.map { it.path }.toSet())
         requestedPreviewPaths.retainAll(folders.map { it.path }.toSet())
+        requestedPreviewPaths.removeAll(previewlessPaths)
         if (selectedFolderPaths.isEmpty() && isSelectionMode) {
             isSelectionMode = false
         }
@@ -147,6 +174,7 @@ class FolderAdapter(
     override fun onBindViewHolder(holder: FolderViewHolder, position: Int) {
         val folder = folders[position]
         holder.bind(folder, selectedFolderPaths.contains(folder.path))
+        maybeRequestRemotePreview(position)
     }
 
     override fun onViewAttachedToWindow(holder: FolderViewHolder) {

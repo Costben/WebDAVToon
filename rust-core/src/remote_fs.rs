@@ -466,9 +466,6 @@ impl RemoteService {
                     );
                     result.preview_uris.push(full_uri);
 
-                    if result.preview_uris.len() >= 4 {
-                        break;
-                    }
                 }
             }
 
@@ -590,9 +587,6 @@ impl RemoteService {
                 );
                 result.preview_uris.push(full_uri);
 
-                if result.preview_uris.len() >= 4 {
-                    break;
-                }
             }
 
             if result.preview_uris.len() >= 4 || result.truncated {
