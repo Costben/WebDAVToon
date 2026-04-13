@@ -148,24 +148,8 @@
     <string name="reader_max_zoom_dialog_title">设置最大缩放比例</string>
     <string name="reader_max_zoom_hint">输入最大缩放比例（100–500）</string>
     <string name="rotation_lock">旋转锁定</string>
-    <string name="more">更多</string>
-    <string name="video_rotate_landscape">切换横屏</string>
-    <string name="video_rotate_portrait">恢复竖屏</string>
-    <string name="video_playback_failed">视频播放失败</string>
-    <string name="video_settings">视频</string>
-    <string name="video_autoplay">自动播放视频</string>
-    <string name="video_autoplay_on">已开启</string>
-    <string name="video_autoplay_off">已关闭</string>
-    <string name="video_decoder">首选解码器</string>
-    <string name="video_decoder_auto">自动（Media3 默认）</string>
-    <string name="video_gestures">播放器手势控制</string>
-    <string name="video_gestures_summary">已启用（进度 / 亮度 / 音量）</string>
-    <string name="video_setting_placeholder">该设置预留给后续版本。</string>
-    <string name="video_external_player_mode">外部播放器模式</string>
+    <string name="more">更多</string>    <string name="video_settings">视频</string>    <string name="video_external_player_mode">外部播放器模式</string>
     <string name="video_external_player_mode_system_default">默认外部播放器</string>
-    <string name="video_external_player_mode_chooser">每次询问</string>
-    <string name="video_double_tap_seek_interval">双击快进/快退时长</string>
-    <string name="video_double_tap_seek_summary">%1$d 秒</string>
-</resources>
+    <string name="video_external_player_mode_chooser">每次询问</string></resources>
 
 

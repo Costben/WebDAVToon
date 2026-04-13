@@ -545,11 +545,11 @@ class PhotoViewActivity : AppCompatActivity() {
 
     private fun setupBottomBar() {
         // 设置线性 (Outlined) 风格图标
-        binding.detailButton.setImageResource(R.drawable.ic_info_outlined)
-        binding.favoriteButton.setImageResource(R.drawable.ic_star_outlined)
-        binding.downloadButton.setImageResource(R.drawable.ic_download_outlined)
-        binding.deleteButton.setImageResource(R.drawable.ic_delete_outlined)
-        binding.selectButton.setImageResource(R.drawable.ic_check_circle_outlined)
+            binding.detailButton.setImageResource(R.drawable.ic_ior_info_circle)
+            binding.favoriteButton.setImageResource(R.drawable.ic_ior_star)
+            binding.downloadButton.setImageResource(R.drawable.ic_ior_download)
+            binding.deleteButton.setImageResource(R.drawable.ic_ior_trash)
+            binding.selectButton.setImageResource(R.drawable.ic_ior_check_circle)
         
         // 统一设置底栏按钮颜色：深色模式强制白色，其他模式使用主题色
         val tintList = getBottomBarIconTint()
@@ -845,9 +845,9 @@ class PhotoViewActivity : AppCompatActivity() {
         val photo = photos[currentIndex]
         val settingsManager = SettingsManager(this)
         if (settingsManager.isPhotoFavorite(photo.id)) {
-            binding.favoriteButton.setImageResource(R.drawable.ic_star_filled_md3)
+            binding.favoriteButton.setImageResource(R.drawable.ic_ior_star_solid)
         } else {
-            binding.favoriteButton.setImageResource(R.drawable.ic_star_outlined)
+            binding.favoriteButton.setImageResource(R.drawable.ic_ior_star)
         }
     }
 
@@ -957,15 +957,15 @@ class PhotoViewActivity : AppCompatActivity() {
 
     private fun updateBottomBarIcons() {
         if (isCardMode) {
-            binding.modeSwitchButton.setImageResource(R.drawable.ic_webtoon_mode_outlined)
+            binding.modeSwitchButton.setImageResource(R.drawable.ic_ior_album_list)
         } else {
-            binding.modeSwitchButton.setImageResource(R.drawable.ic_card_mode_outlined)
+            binding.modeSwitchButton.setImageResource(R.drawable.ic_ior_view_grid)
         }
         
         if (isImmersiveMode) {
-            binding.immersiveButton.setImageResource(R.drawable.ic_fullscreen_exit_md3)
+            binding.immersiveButton.setImageResource(R.drawable.ic_ior_collapse)
         } else {
-            binding.immersiveButton.setImageResource(R.drawable.ic_fullscreen_md3)
+            binding.immersiveButton.setImageResource(R.drawable.ic_ior_maximize)
         }
         
         // 重新应用颜色，因为setImageResource可能会重置tint

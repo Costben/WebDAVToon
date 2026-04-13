@@ -52,7 +52,7 @@
         <ImageView
             android:layout_width="24dp"
             android:layout_height="24dp"
-            android:src="@android:drawable/ic_input_add"
+            android:src="@drawable/ic_ior_plus_circle"
             app:tint="?attr/colorOnSurfaceVariant" />
 
         <TextView
@@ -80,7 +80,7 @@
         <ImageView
             android:layout_width="24dp"
             android:layout_height="24dp"
-            android:src="@drawable/ic_star_outlined"
+            android:src="@drawable/ic_ior_star"
             app:tint="?attr/colorOnSurfaceVariant" />
 
         <TextView
@@ -108,7 +108,7 @@
         <ImageView
             android:layout_width="24dp"
             android:layout_height="24dp"
-            android:src="@drawable/ic_settings_md3"
+            android:src="@drawable/ic_ior_settings"
             app:tint="?attr/colorOnSurfaceVariant" />
 
         <TextView

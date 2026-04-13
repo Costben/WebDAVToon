@@ -34,10 +34,12 @@
 
     <style name="RoundedOverflowMenu" parent="Widget.AppCompat.PopupMenu.Overflow">
         <item name="android:popupBackground">@drawable/bg_menu_rounded</item>
+        <item name="android:popupElevation">16dp</item>
     </style>
 
     <style name="RoundedPopupMenu" parent="Widget.AppCompat.PopupMenu">
         <item name="android:popupBackground">@drawable/bg_menu_rounded</item>
+        <item name="android:popupElevation">16dp</item>
     </style>
 
     <style name="Theme.WebDAVToon" parent="Base.Theme.WebDAVToon">

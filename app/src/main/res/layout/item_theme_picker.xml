@@ -22,7 +22,7 @@
             android:layout_width="24dp"
             android:layout_height="24dp"
             android:layout_gravity="center"
-            android:src="@drawable/ic_check_circle"
+            android:src="@drawable/ic_ior_check_circle"
             android:visibility="gone"
             app:tint="?attr/colorOnSurface"
             xmlns:app="http://schemas.android.com/apk/res-auto" />

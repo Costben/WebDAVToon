@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.SystemClock
 import android.os.Bundle
+import android.content.res.Configuration
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
@@ -14,6 +15,7 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.DrawableCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -21,6 +23,8 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import erl.webdavtoon.databinding.ActivityFolderViewBinding
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -31,6 +35,8 @@ class FolderViewActivity : AppCompatActivity() {
     private lateinit var adapter: FolderAdapter
     private var currentAllFolders: List<Folder> = emptyList()
     private var currentSearchKeyword: String = ""
+    private var currentLoadUsesToolbarPill: Boolean = false
+    private var toolbarRefreshHideJob: Job? = null
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -90,11 +96,19 @@ class FolderViewActivity : AppCompatActivity() {
     private fun observeState() {
         lifecycleScope.launch {
             FolderState.state.collect { state ->
-                binding.toolbarProgressBar.visibility = if (state.isLoading) View.VISIBLE else View.GONE
+                if (state.isLoading) {
+                    return@collect
+                }
+
                 binding.progressBar.visibility = View.GONE
                 binding.swipeRefreshLayout.isRefreshing = false
                 if (state.error != null) {
+                    hideToolbarRefreshPill()
                     Toast.makeText(this@FolderViewActivity, state.error, Toast.LENGTH_SHORT).show()
+                } else if (currentLoadUsesToolbarPill) {
+                    showToolbarRefreshCompleted()
+                } else {
+                    hideToolbarRefreshPill()
                 }
                 adapter.setFolders(state.folders)
             }
@@ -233,6 +247,7 @@ class FolderViewActivity : AppCompatActivity() {
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.main_menu, menu)
+        OverflowMenuHelper.enableOptionalIcons(menu)
 
         val searchItem = menu.findItem(R.id.action_search)
         val searchView = searchItem?.actionView as? androidx.appcompat.widget.SearchView
@@ -254,24 +269,33 @@ class FolderViewActivity : AppCompatActivity() {
 
         val rotationLockItem = menu.findItem(R.id.action_rotation_lock)
         rotationLockItem?.isChecked = settingsManager.isRotationLocked()
+        tintOverflowMenuIcons(menu)
 
         return true
     }
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
+        OverflowMenuHelper.enableOptionalIcons(menu)
         val isSelectionMode = adapter.isSelectionMode
         val deleteItem = menu.findItem(R.id.action_delete)
         deleteItem?.isVisible = isSelectionMode
         if (isSelectionMode) {
             deleteItem?.icon?.let { icon ->
-                androidx.core.graphics.drawable.DrawableCompat.setTint(icon, android.graphics.Color.RED)
+                DrawableCompat.setTint(icon, android.graphics.Color.RED)
             }
         }
         menu.findItem(R.id.action_search)?.isVisible = !isSelectionMode
         menu.findItem(R.id.action_settings)?.isVisible = !isSelectionMode
         menu.findItem(R.id.action_grid_columns)?.isVisible = !isSelectionMode
         menu.findItem(R.id.action_sort_order)?.isVisible = !isSelectionMode
+        tintOverflowMenuIcons(menu)
         return super.onPrepareOptionsMenu(menu)
+    }
+
+    override fun onMenuOpened(featureId: Int, menu: Menu): Boolean {
+        OverflowMenuHelper.enableOptionalIcons(menu)
+        tintOverflowMenuIcons(menu)
+        return super.onMenuOpened(featureId, menu)
     }
 
     private fun applyFilterAndSort() {
@@ -345,7 +369,7 @@ class FolderViewActivity : AppCompatActivity() {
             .setMessage(getString(R.string.delete_folders_message, selectedFolders.size))
             .setPositiveButton(R.string.delete) { _, _ ->
                 lifecycleScope.launch {
-                    binding.toolbarProgressBar.visibility = View.VISIBLE
+                    showToolbarRefreshing()
                     var count = 0
                     selectedFolders.forEach { folder ->
                         val repository: PhotoRepository = if (!folder.isLocal) {
@@ -362,7 +386,6 @@ class FolderViewActivity : AppCompatActivity() {
                             count++
                         }
                     }
-                    binding.toolbarProgressBar.visibility = View.GONE
                     Toast.makeText(this@FolderViewActivity, getString(R.string.deleted_folders_count, count), Toast.LENGTH_SHORT).show()
                     adapter.exitSelectionMode()
                     loadFolders(forceRefresh = true)
@@ -387,6 +410,7 @@ class FolderViewActivity : AppCompatActivity() {
     }
 
     private fun loadFolders(forceRefresh: Boolean = false) {
+        beginFolderLoading(forceRefresh)
         FolderState.setLoading()
         val startedAt = SystemClock.elapsedRealtime()
 
@@ -473,5 +497,94 @@ class FolderViewActivity : AppCompatActivity() {
 
             adapter.updateFolderPreview(folder.path, updatedPreviewUris, preview.hasSubFolders)
         }
+    }
+
+    private fun beginFolderLoading(forceRefresh: Boolean) {
+        val isInitialLoad = !forceRefresh && currentAllFolders.isEmpty() && adapter.itemCount == 0
+        currentLoadUsesToolbarPill = !isInitialLoad
+        if (isInitialLoad) {
+            binding.progressBar.visibility = View.VISIBLE
+            hideToolbarRefreshPill()
+        } else {
+            binding.progressBar.visibility = View.GONE
+            showToolbarRefreshing()
+        }
+    }
+
+    private fun showToolbarRefreshing() {
+        toolbarRefreshHideJob?.cancel()
+        binding.toolbarProgressBar.root.alpha = 0f
+        binding.toolbarProgressBar.root.visibility = View.VISIBLE
+        binding.toolbarProgressBar.toolbarRefreshSpinner.visibility = View.VISIBLE
+        binding.toolbarProgressBar.toolbarRefreshDoneIcon.visibility = View.GONE
+        binding.toolbarProgressBar.toolbarRefreshText.setText(R.string.refresh_status_refreshing)
+        binding.toolbarProgressBar.root.animate().alpha(1f).setDuration(180L).start()
+    }
+
+    private fun showToolbarRefreshCompleted() {
+        toolbarRefreshHideJob?.cancel()
+        binding.toolbarProgressBar.root.visibility = View.VISIBLE
+        binding.toolbarProgressBar.root.alpha = 1f
+        binding.toolbarProgressBar.toolbarRefreshSpinner.visibility = View.GONE
+        binding.toolbarProgressBar.toolbarRefreshDoneIcon.visibility = View.VISIBLE
+        binding.toolbarProgressBar.toolbarRefreshText.setText(R.string.refresh_status_completed)
+        toolbarRefreshHideJob = lifecycleScope.launch {
+            delay(700L)
+            hideToolbarRefreshPill()
+        }
+    }
+
+    private fun hideToolbarRefreshPill() {
+        toolbarRefreshHideJob?.cancel()
+        binding.toolbarProgressBar.root.animate()
+            .alpha(0f)
+            .setDuration(160L)
+            .withEndAction {
+                binding.toolbarProgressBar.root.visibility = View.GONE
+                binding.toolbarProgressBar.root.alpha = 1f
+                binding.toolbarProgressBar.toolbarRefreshSpinner.visibility = View.VISIBLE
+                binding.toolbarProgressBar.toolbarRefreshDoneIcon.visibility = View.GONE
+            }
+            .start()
+    }
+
+    private fun tintOverflowMenuIcons(menu: Menu) {
+        val normalColor = if (isDarkModeEnabled()) {
+            android.graphics.Color.WHITE
+        } else {
+            ContextCompat.getColor(this, R.color.onSurface)
+        }
+        val deleteColor = ContextCompat.getColor(this, R.color.primary_red)
+        val submenuItems = listOf(
+            R.id.action_col_1,
+            R.id.action_col_2,
+            R.id.action_col_3,
+            R.id.action_col_4,
+            R.id.action_sort_name_asc,
+            R.id.action_sort_name_desc,
+            R.id.action_sort_date_desc,
+            R.id.action_sort_date_asc
+        )
+
+        listOf(
+            R.id.action_select,
+            R.id.action_settings,
+            R.id.action_grid_columns,
+            R.id.action_sort_order,
+            R.id.action_rotation_lock
+        ).forEach { id ->
+            menu.findItem(id)?.icon?.mutate()?.let { DrawableCompat.setTint(it, normalColor) }
+        }
+
+        submenuItems.forEach { id ->
+            menu.findItem(id)?.icon?.mutate()?.let { DrawableCompat.setTint(it, normalColor) }
+        }
+
+        menu.findItem(R.id.action_delete)?.icon?.mutate()?.let { DrawableCompat.setTint(it, deleteColor) }
+    }
+
+    private fun isDarkModeEnabled(): Boolean {
+        val nightModeFlags = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+        return nightModeFlags == Configuration.UI_MODE_NIGHT_YES
     }
 }
