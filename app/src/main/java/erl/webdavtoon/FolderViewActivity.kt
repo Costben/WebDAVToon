@@ -7,13 +7,16 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.SystemClock
 import android.os.Bundle
+import android.content.res.Configuration
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.view.menu.MenuBuilder
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.DrawableCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -233,6 +236,7 @@ class FolderViewActivity : AppCompatActivity() {
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.main_menu, menu)
+        (menu as? MenuBuilder)?.setOptionalIconsVisible(true)
 
         val searchItem = menu.findItem(R.id.action_search)
         val searchView = searchItem?.actionView as? androidx.appcompat.widget.SearchView
@@ -254,24 +258,33 @@ class FolderViewActivity : AppCompatActivity() {
 
         val rotationLockItem = menu.findItem(R.id.action_rotation_lock)
         rotationLockItem?.isChecked = settingsManager.isRotationLocked()
+        tintOverflowMenuIcons(menu)
 
         return true
     }
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
+        (menu as? MenuBuilder)?.setOptionalIconsVisible(true)
         val isSelectionMode = adapter.isSelectionMode
         val deleteItem = menu.findItem(R.id.action_delete)
         deleteItem?.isVisible = isSelectionMode
         if (isSelectionMode) {
             deleteItem?.icon?.let { icon ->
-                androidx.core.graphics.drawable.DrawableCompat.setTint(icon, android.graphics.Color.RED)
+                DrawableCompat.setTint(icon, android.graphics.Color.RED)
             }
         }
         menu.findItem(R.id.action_search)?.isVisible = !isSelectionMode
         menu.findItem(R.id.action_settings)?.isVisible = !isSelectionMode
         menu.findItem(R.id.action_grid_columns)?.isVisible = !isSelectionMode
         menu.findItem(R.id.action_sort_order)?.isVisible = !isSelectionMode
+        tintOverflowMenuIcons(menu)
         return super.onPrepareOptionsMenu(menu)
+    }
+
+    override fun onMenuOpened(featureId: Int, menu: Menu): Boolean {
+        (menu as? MenuBuilder)?.setOptionalIconsVisible(true)
+        tintOverflowMenuIcons(menu)
+        return super.onMenuOpened(featureId, menu)
     }
 
     private fun applyFilterAndSort() {
@@ -473,5 +486,45 @@ class FolderViewActivity : AppCompatActivity() {
 
             adapter.updateFolderPreview(folder.path, updatedPreviewUris, preview.hasSubFolders)
         }
+    }
+
+    private fun tintOverflowMenuIcons(menu: Menu) {
+        val normalColor = if (isDarkModeEnabled()) {
+            android.graphics.Color.WHITE
+        } else {
+            ContextCompat.getColor(this, R.color.onSurface)
+        }
+        val deleteColor = ContextCompat.getColor(this, R.color.primary_red)
+        val submenuItems = listOf(
+            R.id.action_col_1,
+            R.id.action_col_2,
+            R.id.action_col_3,
+            R.id.action_col_4,
+            R.id.action_sort_name_asc,
+            R.id.action_sort_name_desc,
+            R.id.action_sort_date_desc,
+            R.id.action_sort_date_asc
+        )
+
+        listOf(
+            R.id.action_select,
+            R.id.action_settings,
+            R.id.action_grid_columns,
+            R.id.action_sort_order,
+            R.id.action_rotation_lock
+        ).forEach { id ->
+            menu.findItem(id)?.icon?.mutate()?.let { DrawableCompat.setTint(it, normalColor) }
+        }
+
+        submenuItems.forEach { id ->
+            menu.findItem(id)?.icon?.mutate()?.let { DrawableCompat.setTint(it, normalColor) }
+        }
+
+        menu.findItem(R.id.action_delete)?.icon?.mutate()?.let { DrawableCompat.setTint(it, deleteColor) }
+    }
+
+    private fun isDarkModeEnabled(): Boolean {
+        val nightModeFlags = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+        return nightModeFlags == Configuration.UI_MODE_NIGHT_YES
     }
 }

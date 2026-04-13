@@ -18,7 +18,7 @@
         android:layout_height="24dp"
         android:layout_marginEnd="16dp"
         android:contentDescription="@null"
-        tools:src="@android:drawable/ic_menu_preferences" />
+        tools:src="@drawable/ic_ior_settings" />
 
     <LinearLayout
         android:layout_width="0dp"
@@ -62,7 +62,7 @@
             android:id="@+id/chevron"
             android:layout_width="24dp"
             android:layout_height="24dp"
-            android:src="@drawable/ic_chevron_right" 
+            android:src="@drawable/ic_ior_nav_arrow_right" 
             android:visibility="gone"
             tools:visibility="visible"/>
             

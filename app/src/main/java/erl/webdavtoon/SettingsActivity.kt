@@ -105,6 +105,7 @@ class SettingsActivity : AppCompatActivity() {
         binding.manageAccountButton.setOnClickListener { showWebDavConfigDialog() }
 
         binding.settingServerType.apply {
+            icon.setImageResource(R.drawable.ic_ior_server)
             title.text = getString(R.string.server_type)
             summary.text = "WEBDAV"
             root.setOnClickListener {
@@ -113,76 +114,90 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         binding.settingHost.apply {
+            icon.setImageResource(R.drawable.ic_ior_cloud)
             title.text = getString(R.string.host_address)
             root.setOnClickListener { showWebDavConfigDialog() }
         }
 
         binding.settingTheme.apply {
+            icon.setImageResource(R.drawable.ic_ior_palette)
             title.text = getString(R.string.theme)
             root.setOnClickListener { showThemeDialog() }
         }
 
         binding.settingLanguage.apply {
+            icon.setImageResource(R.drawable.ic_ior_translate)
             title.text = getString(R.string.language)
             root.setOnClickListener { showLanguageDialog() }
         }
 
         binding.settingGridColumns.apply {
+            icon.setImageResource(R.drawable.ic_ior_view_grid)
             title.text = getString(R.string.grid_columns)
             root.setOnClickListener { showGridColumnsDialog() }
         }
 
         binding.settingSortOrder.apply {
+            icon.setImageResource(R.drawable.ic_ior_sort)
             title.text = getString(R.string.sort_order)
             root.setOnClickListener { showSortOrderDialog() }
         }
 
         binding.settingThumbnailQuality.apply {
+            icon.setImageResource(R.drawable.ic_ior_multiple_pages)
             title.text = getString(R.string.thumbnail_quality)
             root.setOnClickListener { showThumbnailQualityDialog() }
         }
 
         binding.settingReaderMaxZoom.apply {
+            icon.setImageResource(R.drawable.ic_ior_zoom_in)
             title.text = getString(R.string.reader_max_zoom)
             root.setOnClickListener { showReaderMaxZoomDialog() }
         }
 
         binding.settingVideoAutoplay.apply {
+            icon.setImageResource(R.drawable.ic_ior_play)
             title.text = getString(R.string.video_autoplay)
             root.setOnClickListener { showVideoAutoplayDialog() }
             root.visibility = View.GONE
         }
 
         binding.settingVideoExternalMode.apply {
+            icon.setImageResource(R.drawable.ic_ior_open_in_browser)
             title.text = getString(R.string.video_external_player_mode)
             root.setOnClickListener { showVideoExternalPlayerModeDialog() }
         }
 
         binding.settingVideoDecoder.apply {
+            icon.setImageResource(R.drawable.ic_ior_developer)
             title.text = getString(R.string.video_decoder)
             root.setOnClickListener { showVideoDecoderDialog() }
             root.visibility = View.GONE
         }
 
         binding.settingVideoGestures.apply {
+            icon.setImageResource(R.drawable.ic_ior_open_select_hand_gesture)
             title.text = getString(R.string.video_gestures)
             root.setOnClickListener { showVideoGesturesDialog() }
             root.visibility = View.GONE
         }
 
         binding.settingVideoDoubleTapSeek.apply {
+            icon.setImageResource(R.drawable.ic_ior_refresh_circle)
             title.text = getString(R.string.video_double_tap_seek_interval)
             root.setOnClickListener { showVideoDoubleTapSeekDialog() }
             root.visibility = View.GONE
         }
 
         binding.settingClearCache.apply {
+            icon.setImageResource(R.drawable.ic_ior_bin)
             title.text = getString(R.string.clear_cache)
             summary.text = getString(R.string.clear_cache_summary)
             root.setOnClickListener { showClearCacheConfirmation() }
         }
 
         binding.settingAbout.apply {
+            icon.setImageResource(R.drawable.ic_ior_info_circle)
             title.text = getString(R.string.about)
             summary.text = getString(R.string.about_summary)
             root.setOnClickListener {

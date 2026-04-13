@@ -19,7 +19,7 @@
             android:layout_height="?attr/actionBarSize"
             app:title="@string/settings"
             app:titleTextColor="?android:attr/textColorPrimary"
-            app:navigationIcon="@drawable/ic_arrow_back"
+            app:navigationIcon="@drawable/ic_ior_arrow_left"
             app:navigationIconTint="?android:attr/textColorPrimary" />
 
     </com.google.android.material.appbar.AppBarLayout>
@@ -52,7 +52,7 @@
                     android:id="@+id/account_icon"
                     android:layout_width="48dp"
                     android:layout_height="48dp"
-                    android:src="@drawable/ic_launcher_foreground" 
+                    android:src="@drawable/ic_ior_server"
                     android:background="@drawable/circle_background"
                     android:padding="8dp"/>
 

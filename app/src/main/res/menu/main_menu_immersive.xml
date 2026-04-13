@@ -4,12 +4,12 @@
     <item
         android:id="@+id/action_immersive_mode"
         android:title="@string/immersive_switch"
-        android:icon="@android:drawable/ic_menu_view"
+        android:icon="@drawable/ic_ior_maximize"
         app:showAsAction="ifRoom"
         app:actionViewClass="androidx.appcompat.widget.SwitchCompat" />
     <item
         android:id="@+id/action_settings"
         android:title="@string/settings"
-        android:icon="@android:drawable/ic_menu_preferences"
+        android:icon="@drawable/ic_ior_settings"
         app:showAsAction="never" />
 </menu>

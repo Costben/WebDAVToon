@@ -31,7 +31,7 @@
         android:layout_width="32dp"
         android:layout_height="32dp"
         android:layout_margin="16dp"
-        android:src="@drawable/ic_check_circle"
+        android:src="@drawable/ic_ior_check_circle"
         android:visibility="gone"
         app:tint="?attr/colorPrimary"
         app:layout_constraintTop_toTopOf="parent"
