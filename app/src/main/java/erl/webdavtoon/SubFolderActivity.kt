@@ -22,6 +22,8 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import erl.webdavtoon.databinding.ActivityFolderViewBinding
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -34,6 +36,8 @@ class SubFolderActivity : AppCompatActivity() {
     private var isWebDav: Boolean = false
     private var currentAllFolders: List<Folder> = emptyList()
     private var currentSearchKeyword: String = ""
+    private var currentLoadUsesToolbarPill: Boolean = false
+    private var toolbarRefreshHideJob: Job? = null
 
     private val settingsLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -317,7 +321,7 @@ class SubFolderActivity : AppCompatActivity() {
             .setMessage(getString(R.string.delete_folders_message, selectedFolders.size))
             .setPositiveButton(R.string.delete) { _, _ ->
                 lifecycleScope.launch {
-                    binding.toolbarProgressBar.visibility = View.VISIBLE
+                    showToolbarRefreshing()
                     var count = 0
                     selectedFolders.forEach { folder ->
                         val repository: PhotoRepository = if (!folder.isLocal) {
@@ -334,7 +338,6 @@ class SubFolderActivity : AppCompatActivity() {
                             count++
                         }
                     }
-                    binding.toolbarProgressBar.visibility = View.GONE
                     android.widget.Toast.makeText(this@SubFolderActivity, getString(R.string.deleted_folders_count, count), android.widget.Toast.LENGTH_SHORT).show()
                     adapter.exitSelectionMode()
                     loadFolders(forceRefresh = true)
@@ -377,9 +380,7 @@ class SubFolderActivity : AppCompatActivity() {
     }
 
     private fun loadFolders(forceRefresh: Boolean = false) {
-        if (!binding.swipeRefreshLayout.isRefreshing) {
-            binding.toolbarProgressBar.visibility = View.VISIBLE
-        }
+        beginFolderLoading(forceRefresh)
         val startedAt = SystemClock.elapsedRealtime()
 
         lifecycleScope.launch {
@@ -419,12 +420,66 @@ class SubFolderActivity : AppCompatActivity() {
                 )
             } catch (e: Exception) {
                 android.util.Log.e("SubFolderActivity", "Folders load failed", e)
+                hideToolbarRefreshPill()
             }
 
-            // adapter.setFolders(allFolders) - Removed, handled by applyFilterAndSort
-            binding.toolbarProgressBar.visibility = View.GONE
+            if (currentLoadUsesToolbarPill) {
+                showToolbarRefreshCompleted()
+            } else {
+                hideToolbarRefreshPill()
+            }
             binding.swipeRefreshLayout.isRefreshing = false
+            binding.progressBar.visibility = View.GONE
         }
+    }
+
+    private fun beginFolderLoading(forceRefresh: Boolean) {
+        val isInitialLoad = !forceRefresh && currentAllFolders.isEmpty() && adapter.itemCount == 0
+        currentLoadUsesToolbarPill = !isInitialLoad
+        if (isInitialLoad) {
+            binding.progressBar.visibility = View.VISIBLE
+            hideToolbarRefreshPill()
+        } else {
+            binding.progressBar.visibility = View.GONE
+            showToolbarRefreshing()
+        }
+    }
+
+    private fun showToolbarRefreshing() {
+        toolbarRefreshHideJob?.cancel()
+        binding.toolbarProgressBar.root.alpha = 0f
+        binding.toolbarProgressBar.root.visibility = View.VISIBLE
+        binding.toolbarProgressBar.toolbarRefreshSpinner.visibility = View.VISIBLE
+        binding.toolbarProgressBar.toolbarRefreshDoneIcon.visibility = View.GONE
+        binding.toolbarProgressBar.toolbarRefreshText.setText(R.string.refresh_status_refreshing)
+        binding.toolbarProgressBar.root.animate().alpha(1f).setDuration(180L).start()
+    }
+
+    private fun showToolbarRefreshCompleted() {
+        toolbarRefreshHideJob?.cancel()
+        binding.toolbarProgressBar.root.visibility = View.VISIBLE
+        binding.toolbarProgressBar.root.alpha = 1f
+        binding.toolbarProgressBar.toolbarRefreshSpinner.visibility = View.GONE
+        binding.toolbarProgressBar.toolbarRefreshDoneIcon.visibility = View.VISIBLE
+        binding.toolbarProgressBar.toolbarRefreshText.setText(R.string.refresh_status_completed)
+        toolbarRefreshHideJob = lifecycleScope.launch {
+            delay(700L)
+            hideToolbarRefreshPill()
+        }
+    }
+
+    private fun hideToolbarRefreshPill() {
+        toolbarRefreshHideJob?.cancel()
+        binding.toolbarProgressBar.root.animate()
+            .alpha(0f)
+            .setDuration(160L)
+            .withEndAction {
+                binding.toolbarProgressBar.root.visibility = View.GONE
+                binding.toolbarProgressBar.root.alpha = 1f
+                binding.toolbarProgressBar.toolbarRefreshSpinner.visibility = View.VISIBLE
+                binding.toolbarProgressBar.toolbarRefreshDoneIcon.visibility = View.GONE
+            }
+            .start()
     }
 
     private fun resolveRemotePreview(folder: Folder) {
