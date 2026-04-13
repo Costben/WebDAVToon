@@ -10,6 +10,7 @@ import android.text.Spanned
 import android.text.style.ForegroundColorSpan
 import android.view.MotionEvent
 import android.view.View
+import android.view.Menu
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SearchView
@@ -17,6 +18,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.graphics.drawable.DrawableCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.StaggeredGridLayoutManager
@@ -290,8 +292,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    override fun onCreateOptionsMenu(menu: android.view.Menu): Boolean {
+    override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.main_menu, menu)
+        OverflowMenuHelper.enableOptionalIcons(menu)
         optionsMenu = menu
 
         infoMenuItem = menu.findItem(R.id.action_info)
@@ -300,7 +303,7 @@ class MainActivity : AppCompatActivity() {
         deleteMenuItem?.isVisible = photoAdapter.isSelectionMode()
         favoriteMenuItem = menu.findItem(R.id.action_favorite)
         favoriteMenuItem?.isVisible = photoAdapter.isSelectionMode()
-        favoriteMenuItem?.setIcon(if (isFavorites) R.drawable.ic_star_filled_md3 else R.drawable.ic_star_outlined)
+        favoriteMenuItem?.setIcon(if (isFavorites) R.drawable.ic_ior_star_solid else R.drawable.ic_ior_star)
 
         val searchItem = menu.findItem(R.id.action_search)
         val searchView = searchItem?.actionView as? SearchView
@@ -325,8 +328,21 @@ class MainActivity : AppCompatActivity() {
 
         val rotationLockItem = menu.findItem(R.id.action_rotation_lock)
         rotationLockItem?.isChecked = settingsManager.isRotationLocked()
+        tintOverflowMenuIcons(menu)
 
         return true
+    }
+
+    override fun onPrepareOptionsMenu(menu: Menu): Boolean {
+        OverflowMenuHelper.enableOptionalIcons(menu)
+        tintOverflowMenuIcons(menu)
+        return super.onPrepareOptionsMenu(menu)
+    }
+
+    override fun onMenuOpened(featureId: Int, menu: Menu): Boolean {
+        OverflowMenuHelper.enableOptionalIcons(menu)
+        tintOverflowMenuIcons(menu)
+        return super.onMenuOpened(featureId, menu)
     }
 
     override fun onOptionsItemSelected(item: android.view.MenuItem): Boolean {
@@ -410,6 +426,7 @@ class MainActivity : AppCompatActivity() {
             deleteMenuItem?.isVisible = false
             favoriteMenuItem?.isVisible = false
             deleteMenuItem?.title = getString(R.string.delete)
+            optionsMenu?.findItem(R.id.action_select)?.isVisible = true
             optionsMenu?.findItem(R.id.action_search)?.isVisible = true
             optionsMenu?.findItem(R.id.action_settings)?.isVisible = true
             optionsMenu?.findItem(R.id.action_grid_columns)?.isVisible = true
@@ -429,19 +446,21 @@ class MainActivity : AppCompatActivity() {
             deleteMenuItem?.isVisible = true
             favoriteMenuItem?.isVisible = true
             tintDeleteAction()
+            optionsMenu?.findItem(R.id.action_select)?.isVisible = false
             optionsMenu?.findItem(R.id.action_search)?.isVisible = false
             optionsMenu?.findItem(R.id.action_settings)?.isVisible = false
             optionsMenu?.findItem(R.id.action_grid_columns)?.isVisible = false
             optionsMenu?.findItem(R.id.action_sort_order)?.isVisible = false
-            favoriteMenuItem?.setIcon(if (isFavorites) R.drawable.ic_star_filled_md3 else R.drawable.ic_star_outlined)
+            favoriteMenuItem?.setIcon(if (isFavorites) R.drawable.ic_ior_star_solid else R.drawable.ic_ior_star)
             favoriteMenuItem?.icon?.let { icon ->
-                androidx.core.graphics.drawable.DrawableCompat.setTint(
+                DrawableCompat.setTint(
                     icon,
                     ContextCompat.getColor(this, R.color.primary)
                 )
             }
             supportActionBar?.title = if (count == 0) getString(R.string.select_items) else getString(R.string.selected_count, count)
         }
+        optionsMenu?.let(::tintOverflowMenuIcons)
     }
 
     private fun updateSelectedFavorites() {
@@ -496,12 +515,43 @@ class MainActivity : AppCompatActivity() {
     private fun tintDeleteAction() {
         val deleteColor = ContextCompat.getColor(this, R.color.primary_red)
         deleteMenuItem?.icon?.let { icon ->
-            androidx.core.graphics.drawable.DrawableCompat.setTint(icon, deleteColor)
+            DrawableCompat.setTint(icon, deleteColor)
         }
         val deleteTitle = SpannableString(getString(R.string.delete)).apply {
             setSpan(ForegroundColorSpan(deleteColor), 0, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
         deleteMenuItem?.title = deleteTitle
+    }
+
+    private fun tintOverflowMenuIcons(menu: Menu) {
+        val normalColor = ContextCompat.getColor(this, R.color.onSurface)
+        val deleteColor = ContextCompat.getColor(this, R.color.primary_red)
+        val submenuItems = listOf(
+            R.id.action_col_1,
+            R.id.action_col_2,
+            R.id.action_col_3,
+            R.id.action_col_4,
+            R.id.action_sort_name_asc,
+            R.id.action_sort_name_desc,
+            R.id.action_sort_date_desc,
+            R.id.action_sort_date_asc
+        )
+
+        listOf(
+            R.id.action_select,
+            R.id.action_settings,
+            R.id.action_grid_columns,
+            R.id.action_sort_order,
+            R.id.action_rotation_lock
+        ).forEach { id ->
+            menu.findItem(id)?.icon?.mutate()?.let { DrawableCompat.setTint(it, normalColor) }
+        }
+
+        submenuItems.forEach { id ->
+            menu.findItem(id)?.icon?.mutate()?.let { DrawableCompat.setTint(it, normalColor) }
+        }
+
+        menu.findItem(R.id.action_delete)?.icon?.mutate()?.let { DrawableCompat.setTint(it, deleteColor) }
     }
 
     private fun showSelectedPhotoDetails() {

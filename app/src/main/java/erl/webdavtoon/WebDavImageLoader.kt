@@ -696,8 +696,8 @@ object WebDavImageLoader {
             .diskCacheStrategy(DiskCacheStrategy.ALL)
             .skipMemoryCache(false)
             .priority(Priority.HIGH)
-            .placeholder(android.R.drawable.ic_menu_gallery)
-            .error(android.R.drawable.ic_menu_report_image)
+            .placeholder(R.drawable.ic_ior_media_image)
+            .error(R.drawable.ic_ior_warning_circle)
 
         if (isFolderPreview) {
             requestOptions = requestOptions

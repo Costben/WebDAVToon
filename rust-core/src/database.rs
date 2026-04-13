@@ -2,7 +2,7 @@ use crate::models::{Folder, MediaType, Photo, SortOrder};
 use rusqlite::{params, Connection, Result};
 use std::path::Path;
 
-const FOLDER_PREVIEW_STRATEGY_VERSION: i64 = 4;
+const FOLDER_PREVIEW_STRATEGY_VERSION: i64 = 6;
 
 pub struct Database {
     conn: Connection,

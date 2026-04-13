@@ -6,12 +6,14 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
+import android.content.res.Configuration
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.DrawableCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -19,6 +21,8 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import erl.webdavtoon.databinding.ActivityFolderViewBinding
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -31,6 +35,8 @@ class SubFolderActivity : AppCompatActivity() {
     private var isWebDav: Boolean = false
     private var currentAllFolders: List<Folder> = emptyList()
     private var currentSearchKeyword: String = ""
+    private var currentLoadUsesToolbarPill: Boolean = false
+    private var toolbarRefreshHideJob: Job? = null
 
     private val settingsLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -212,6 +218,7 @@ class SubFolderActivity : AppCompatActivity() {
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.main_menu, menu)
+        OverflowMenuHelper.enableOptionalIcons(menu)
 
         val searchItem = menu.findItem(R.id.action_search)
         val searchView = searchItem?.actionView as? androidx.appcompat.widget.SearchView
@@ -233,24 +240,33 @@ class SubFolderActivity : AppCompatActivity() {
 
         val rotationLockItem = menu.findItem(R.id.action_rotation_lock)
         rotationLockItem?.isChecked = settingsManager.isRotationLocked()
+        tintOverflowMenuIcons(menu)
 
         return true
     }
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
+        OverflowMenuHelper.enableOptionalIcons(menu)
         val isSelectionMode = adapter.isSelectionMode
         val deleteItem = menu.findItem(R.id.action_delete)
         deleteItem?.isVisible = isSelectionMode
         if (isSelectionMode) {
             deleteItem?.icon?.let { icon ->
-                androidx.core.graphics.drawable.DrawableCompat.setTint(icon, android.graphics.Color.RED)
+                DrawableCompat.setTint(icon, android.graphics.Color.RED)
             }
         }
         menu.findItem(R.id.action_search)?.isVisible = !isSelectionMode
         menu.findItem(R.id.action_settings)?.isVisible = !isSelectionMode
         menu.findItem(R.id.action_grid_columns)?.isVisible = !isSelectionMode
         menu.findItem(R.id.action_sort_order)?.isVisible = !isSelectionMode
+        tintOverflowMenuIcons(menu)
         return super.onPrepareOptionsMenu(menu)
+    }
+
+    override fun onMenuOpened(featureId: Int, menu: Menu): Boolean {
+        OverflowMenuHelper.enableOptionalIcons(menu)
+        tintOverflowMenuIcons(menu)
+        return super.onMenuOpened(featureId, menu)
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
@@ -304,7 +320,7 @@ class SubFolderActivity : AppCompatActivity() {
             .setMessage(getString(R.string.delete_folders_message, selectedFolders.size))
             .setPositiveButton(R.string.delete) { _, _ ->
                 lifecycleScope.launch {
-                    binding.toolbarProgressBar.visibility = View.VISIBLE
+                    showToolbarRefreshing()
                     var count = 0
                     selectedFolders.forEach { folder ->
                         val repository: PhotoRepository = if (!folder.isLocal) {
@@ -321,7 +337,6 @@ class SubFolderActivity : AppCompatActivity() {
                             count++
                         }
                     }
-                    binding.toolbarProgressBar.visibility = View.GONE
                     android.widget.Toast.makeText(this@SubFolderActivity, getString(R.string.deleted_folders_count, count), android.widget.Toast.LENGTH_SHORT).show()
                     adapter.exitSelectionMode()
                     loadFolders(forceRefresh = true)
@@ -364,9 +379,7 @@ class SubFolderActivity : AppCompatActivity() {
     }
 
     private fun loadFolders(forceRefresh: Boolean = false) {
-        if (!binding.swipeRefreshLayout.isRefreshing) {
-            binding.toolbarProgressBar.visibility = View.VISIBLE
-        }
+        beginFolderLoading(forceRefresh)
         val startedAt = SystemClock.elapsedRealtime()
 
         lifecycleScope.launch {
@@ -380,6 +393,50 @@ class SubFolderActivity : AppCompatActivity() {
 
                 val folders = repository.getFolders(folderPath, forceRefresh).filterNot { f ->
                     !f.isLocal && (f.name.startsWith(".") || f.path.trim('/').split('/').any { it.startsWith(".") })
+                }.toMutableList()
+
+                val directPhotos = if (isWebDav) {
+                    repository.getPhotos(
+                        folderPath = folderPath,
+                        recursive = false,
+                        forceRefresh = forceRefresh
+                    )
+                } else {
+                    emptyList()
+                }
+
+                if (isWebDav && folders.isEmpty()) {
+                    val recursivePhotos = repository.getPhotos(
+                        folderPath = folderPath,
+                        recursive = true,
+                        forceRefresh = forceRefresh
+                    )
+                    val synthesizedFolders =
+                        synthesizeRemoteFoldersFromPhotos(
+                            currentFolderPath = folderPath,
+                            photos = recursivePhotos
+                        )
+                    android.util.Log.i(
+                        "SubFolderActivity",
+                        "remoteFallback path=$folderPath directPhotos=${directPhotos.size} recursivePhotos=${recursivePhotos.size} synthesizedFolders=${synthesizedFolders.size}"
+                    )
+                    folders.addAll(synthesizedFolders)
+                }
+
+                if (isWebDav && folders.isNotEmpty()) {
+                    if (directPhotos.isNotEmpty()) {
+                        folders.add(
+                            Folder(
+                                path = "virtual://internal_photos?path=$folderPath",
+                                name = getString(R.string.internal_photos, directPhotos.size),
+                                isLocal = false,
+                                photoCount = directPhotos.size,
+                                previewUris = directPhotos.take(4).map { it.imageUri },
+                                hasSubFolders = false,
+                                dateModified = directPhotos.maxOfOrNull { it.dateModified } ?: 0L
+                            )
+                        )
+                    }
                 }
 
                 if (folders.isEmpty()) {
@@ -406,12 +463,66 @@ class SubFolderActivity : AppCompatActivity() {
                 )
             } catch (e: Exception) {
                 android.util.Log.e("SubFolderActivity", "Folders load failed", e)
+                hideToolbarRefreshPill()
             }
 
-            // adapter.setFolders(allFolders) - Removed, handled by applyFilterAndSort
-            binding.toolbarProgressBar.visibility = View.GONE
+            if (currentLoadUsesToolbarPill) {
+                showToolbarRefreshCompleted()
+            } else {
+                hideToolbarRefreshPill()
+            }
             binding.swipeRefreshLayout.isRefreshing = false
+            binding.progressBar.visibility = View.GONE
         }
+    }
+
+    private fun beginFolderLoading(forceRefresh: Boolean) {
+        val isInitialLoad = !forceRefresh && currentAllFolders.isEmpty() && adapter.itemCount == 0
+        currentLoadUsesToolbarPill = !isInitialLoad
+        if (isInitialLoad) {
+            binding.progressBar.visibility = View.VISIBLE
+            hideToolbarRefreshPill()
+        } else {
+            binding.progressBar.visibility = View.GONE
+            showToolbarRefreshing()
+        }
+    }
+
+    private fun showToolbarRefreshing() {
+        toolbarRefreshHideJob?.cancel()
+        binding.toolbarProgressBar.root.alpha = 0f
+        binding.toolbarProgressBar.root.visibility = View.VISIBLE
+        binding.toolbarProgressBar.toolbarRefreshSpinner.visibility = View.VISIBLE
+        binding.toolbarProgressBar.toolbarRefreshDoneIcon.visibility = View.GONE
+        binding.toolbarProgressBar.toolbarRefreshText.setText(R.string.refresh_status_refreshing)
+        binding.toolbarProgressBar.root.animate().alpha(1f).setDuration(180L).start()
+    }
+
+    private fun showToolbarRefreshCompleted() {
+        toolbarRefreshHideJob?.cancel()
+        binding.toolbarProgressBar.root.visibility = View.VISIBLE
+        binding.toolbarProgressBar.root.alpha = 1f
+        binding.toolbarProgressBar.toolbarRefreshSpinner.visibility = View.GONE
+        binding.toolbarProgressBar.toolbarRefreshDoneIcon.visibility = View.VISIBLE
+        binding.toolbarProgressBar.toolbarRefreshText.setText(R.string.refresh_status_completed)
+        toolbarRefreshHideJob = lifecycleScope.launch {
+            delay(700L)
+            hideToolbarRefreshPill()
+        }
+    }
+
+    private fun hideToolbarRefreshPill() {
+        toolbarRefreshHideJob?.cancel()
+        binding.toolbarProgressBar.root.animate()
+            .alpha(0f)
+            .setDuration(160L)
+            .withEndAction {
+                binding.toolbarProgressBar.root.visibility = View.GONE
+                binding.toolbarProgressBar.root.alpha = 1f
+                binding.toolbarProgressBar.toolbarRefreshSpinner.visibility = View.VISIBLE
+                binding.toolbarProgressBar.toolbarRefreshDoneIcon.visibility = View.GONE
+            }
+            .start()
     }
 
     private fun resolveRemotePreview(folder: Folder) {
@@ -433,6 +544,113 @@ class SubFolderActivity : AppCompatActivity() {
             }
 
             adapter.updateFolderPreview(folder.path, updatedPreviewUris, preview.hasSubFolders)
+        }
+    }
+
+    private fun tintOverflowMenuIcons(menu: Menu) {
+        val normalColor = if (isDarkModeEnabled()) {
+            android.graphics.Color.WHITE
+        } else {
+            ContextCompat.getColor(this, R.color.onSurface)
+        }
+        val deleteColor = ContextCompat.getColor(this, R.color.primary_red)
+        val submenuItems = listOf(
+            R.id.action_col_1,
+            R.id.action_col_2,
+            R.id.action_col_3,
+            R.id.action_col_4,
+            R.id.action_sort_name_asc,
+            R.id.action_sort_name_desc,
+            R.id.action_sort_date_desc,
+            R.id.action_sort_date_asc
+        )
+
+        listOf(
+            R.id.action_select,
+            R.id.action_settings,
+            R.id.action_grid_columns,
+            R.id.action_sort_order,
+            R.id.action_rotation_lock
+        ).forEach { id ->
+            menu.findItem(id)?.icon?.mutate()?.let { DrawableCompat.setTint(it, normalColor) }
+        }
+
+        submenuItems.forEach { id ->
+            menu.findItem(id)?.icon?.mutate()?.let { DrawableCompat.setTint(it, normalColor) }
+        }
+
+        menu.findItem(R.id.action_delete)?.icon?.mutate()?.let { DrawableCompat.setTint(it, deleteColor) }
+    }
+
+    private fun isDarkModeEnabled(): Boolean {
+        val nightModeFlags = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+        return nightModeFlags == Configuration.UI_MODE_NIGHT_YES
+    }
+
+    private fun synthesizeRemoteFoldersFromPhotos(
+        currentFolderPath: String,
+        photos: List<Photo>
+    ): List<Folder> {
+        if (photos.isEmpty()) return emptyList()
+
+        data class Aggregate(
+            val childPath: String,
+            val childName: String,
+            val previewUris: MutableList<android.net.Uri> = mutableListOf(),
+            var hasSubFolders: Boolean = false,
+            var latestModified: Long = 0L
+        )
+
+        val normalizedCurrent = currentFolderPath.trim('/').let { trimmed ->
+            if (trimmed.isEmpty()) "" else "$trimmed/"
+        }
+        val endpoint = settingsManager.getFullWebDavUrl().trimEnd('/')
+        val aggregates = linkedMapOf<String, Aggregate>()
+
+        photos.forEach { photo ->
+            val relative = photo.imageUri.toString()
+                .removePrefix(endpoint)
+                .trimStart('/')
+                .let { path ->
+                    when {
+                        normalizedCurrent.isEmpty() -> path
+                        path.startsWith(normalizedCurrent) -> path.removePrefix(normalizedCurrent)
+                        else -> return@forEach
+                    }
+                }
+
+            val segments = relative.split('/').filter { it.isNotEmpty() }
+            if (segments.size < 2) return@forEach
+
+            val childName = segments.first()
+            val childPath = if (normalizedCurrent.isEmpty()) {
+                "$childName/"
+            } else {
+                "$normalizedCurrent$childName/"
+            }
+
+            val aggregate = aggregates.getOrPut(childPath) {
+                Aggregate(
+                    childPath = childPath,
+                    childName = childName
+                )
+            }
+            if (aggregate.previewUris.size < 4) {
+                aggregate.previewUris.add(photo.imageUri)
+            }
+            aggregate.hasSubFolders = aggregate.hasSubFolders || segments.size > 2
+            aggregate.latestModified = maxOf(aggregate.latestModified, photo.dateModified)
+        }
+
+        return aggregates.values.map { aggregate ->
+            Folder(
+                path = aggregate.childPath,
+                name = aggregate.childName,
+                isLocal = false,
+                previewUris = aggregate.previewUris,
+                hasSubFolders = aggregate.hasSubFolders,
+                dateModified = aggregate.latestModified
+            )
         }
     }
 }

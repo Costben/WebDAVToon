@@ -161,8 +161,6 @@ dependencies {
 
     implementation("com.github.chrisbanes:PhotoView:2.3.0")
     implementation("com.google.code.gson:gson:2.10.1")
-    implementation("androidx.media3:media3-exoplayer:1.5.1")
-    implementation("androidx.media3:media3-ui:1.5.1")
     implementation("com.github.wseemann:FFmpegMediaMetadataRetriever-core:1.0.19")
     implementation("com.github.wseemann:FFmpegMediaMetadataRetriever-native:1.0.19")
 
