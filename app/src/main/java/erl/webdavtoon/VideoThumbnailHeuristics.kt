@@ -6,6 +6,13 @@ import kotlin.math.sqrt
 
 object VideoThumbnailHeuristics {
 
+    data class FolderPreviewCandidate<T>(
+        val value: T,
+        val mediaType: MediaType,
+        val isBlankLike: Boolean,
+        val sourceOrder: Int
+    )
+
     private const val DARK_LUMA_THRESHOLD = 24
     private const val BRIGHT_LUMA_THRESHOLD = 232
     private const val LOW_SATURATION_THRESHOLD = 0.12f
@@ -51,8 +58,15 @@ object VideoThumbnailHeuristics {
         if (shouldUseFirstFrameOnly) {
             addCandidate(0L)
         } else {
-            addCandidate(requestedTimeUs)
-            defaultFrameTimesUs.forEach(::addCandidate)
+            if (isFolderPreview) {
+                if (requestedTimeUs > 0L) {
+                    addCandidate(requestedTimeUs)
+                }
+                defaultFrameTimesUs.forEach(::addCandidate)
+            } else {
+                addCandidate(requestedTimeUs)
+                defaultFrameTimesUs.forEach(::addCandidate)
+            }
             if (durationUs != null) {
                 lateFallbackFrameTimesUs.forEach(::addCandidate)
             }
@@ -60,6 +74,24 @@ object VideoThumbnailHeuristics {
 
         addCandidate(0L)
         return candidates.toList()
+    }
+
+    fun <T> selectFolderPreviewCandidates(
+        candidates: List<FolderPreviewCandidate<T>>,
+        limit: Int = 4
+    ): List<T> {
+        if (candidates.isEmpty() || limit <= 0) return emptyList()
+
+        return candidates
+            .sortedWith(
+                compareBy<FolderPreviewCandidate<T>>(
+                    { it.isBlankLike },
+                    { it.mediaType == MediaType.VIDEO },
+                    { it.sourceOrder }
+                )
+            )
+            .take(limit)
+            .map { it.value }
     }
 
     fun shouldPreferSyncFrameSearch(
@@ -163,7 +195,7 @@ object VideoThumbnailHeuristics {
     }
 }
 
-fun Bitmap.isLikelyBlankVideoThumbnail(): Boolean {
+fun Bitmap.isLikelyBlankPreviewBitmap(): Boolean {
     if (width <= 0 || height <= 0) return true
 
     val sampleColumns = minOf(6, width)
@@ -181,3 +213,5 @@ fun Bitmap.isLikelyBlankVideoThumbnail(): Boolean {
 
     return VideoThumbnailHeuristics.isLikelyBlankFrame(samples)
 }
+
+fun Bitmap.isLikelyBlankVideoThumbnail(): Boolean = isLikelyBlankPreviewBitmap()

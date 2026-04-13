@@ -12,6 +12,14 @@ import java.io.File
 class LocalPhotoRepository(private val context: Context) : PhotoRepository {
 
     private val mediaCollection: Uri = MediaStore.Files.getContentUri("external")
+    private val maxFolderPreviewCandidates = 12
+    private val tinyPreviewImageBytes = 96L * 1024L
+
+    private data class LocalPreviewCandidate(
+        val uri: Uri,
+        val mediaType: MediaType,
+        val sizeBytes: Long
+    )
 
     private fun buildSortOrder(): String {
         return when (SettingsManager(context).getPhotoSortOrder()) {
@@ -132,6 +140,39 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
         )
     }
 
+    private fun registerPreviewCandidate(
+        candidates: MutableList<LocalPreviewCandidate>,
+        uri: Uri,
+        mediaType: MediaType,
+        sizeBytes: Long
+    ) {
+        if (candidates.size < maxFolderPreviewCandidates) {
+            candidates.add(
+                LocalPreviewCandidate(
+                    uri = uri,
+                    mediaType = mediaType,
+                    sizeBytes = sizeBytes
+                )
+            )
+        }
+    }
+
+    private fun selectPreviewUris(candidates: List<LocalPreviewCandidate>): List<Uri> {
+        return VideoThumbnailHeuristics.selectFolderPreviewCandidates(
+            candidates.mapIndexed { index, candidate ->
+                VideoThumbnailHeuristics.FolderPreviewCandidate(
+                    value = candidate.uri,
+                    mediaType = candidate.mediaType,
+                    isBlankLike = candidate.mediaType == MediaType.IMAGE && (
+                        candidate.sizeBytes in 1 until tinyPreviewImageBytes ||
+                            WebDavImageLoader.isLikelyBlankLocalImagePreview(context, candidate.uri)
+                        ),
+                    sourceOrder = index
+                )
+            }
+        )
+    }
+
     override suspend fun queryMediaPage(
         folderPath: String,
         recursive: Boolean,
@@ -216,11 +257,13 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
 
     override suspend fun getFolders(rootPath: String, forceRefresh: Boolean): List<Folder> = withContext(Dispatchers.IO) {
         val foldersMap = linkedMapOf<String, Folder>()
+        val previewCandidatesByFolder = linkedMapOf<String, MutableList<LocalPreviewCandidate>>()
         val projection = arrayOf(
             MediaStore.Files.FileColumns._ID,
             MediaStore.Files.FileColumns.DISPLAY_NAME,
             MediaStore.Files.FileColumns.DATA,
             MediaStore.Files.FileColumns.DATE_MODIFIED,
+            MediaStore.Files.FileColumns.SIZE,
             MediaStore.Files.FileColumns.MEDIA_TYPE
         )
 
@@ -249,9 +292,10 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
             val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DISPLAY_NAME)
             val dataCol = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATA)
             val dateCol = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATE_MODIFIED)
+            val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.SIZE)
             val mediaTypeCol = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.MEDIA_TYPE)
 
-            val directRootPreviewUris = mutableListOf<Uri>()
+            val directRootPreviewCandidates = mutableListOf<LocalPreviewCandidate>()
             var directRootCount = 0
             var directRootDateModified = 0L
 
@@ -267,6 +311,7 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
 
                 val id = cursor.getLong(idCol)
                 val dateModified = cursor.getLong(dateCol)
+                val sizeBytes = cursor.getLong(sizeCol)
                 val mediaType = when (cursor.getInt(mediaTypeCol)) {
                     MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO -> MediaType.VIDEO
                     else -> MediaType.IMAGE
@@ -275,7 +320,7 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
 
                 if (rootPath.isNotEmpty() && parentPath == rootPath) {
                     directRootCount++
-                    if (directRootPreviewUris.size < 4) directRootPreviewUris.add(uri)
+                    registerPreviewCandidate(directRootPreviewCandidates, uri, mediaType, sizeBytes)
                     directRootDateModified = maxOf(directRootDateModified, dateModified)
                     continue
                 }
@@ -338,21 +383,21 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
                 }
 
                 val existing = foldersMap[folderKey]
+                val previewCandidates = previewCandidatesByFolder.getOrPut(folderKey) { mutableListOf() }
+                registerPreviewCandidate(previewCandidates, uri, mediaType, sizeBytes)
                 if (existing == null) {
                     foldersMap[folderKey] = Folder(
                         path = folderKey,
                         name = folderName,
                         isLocal = true,
                         photoCount = 1,
-                        previewUris = listOf(uri),
+                        previewUris = emptyList(),
                         hasSubFolders = hasSubFolders,
                         dateModified = dateModified
                     )
                 } else {
-                    val previews = if (existing.previewUris.size < 4) existing.previewUris + uri else existing.previewUris
                     foldersMap[folderKey] = existing.copy(
                         photoCount = existing.photoCount + 1,
-                        previewUris = previews,
                         hasSubFolders = existing.hasSubFolders || hasSubFolders,
                         dateModified = maxOf(existing.dateModified, dateModified)
                     )
@@ -360,19 +405,25 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
             }
 
             if (rootPath.isNotEmpty() && directRootCount > 0 && foldersMap.isNotEmpty()) {
+                val virtualPath = "virtual://internal_photos?path=$rootPath"
+                previewCandidatesByFolder[virtualPath] = directRootPreviewCandidates
                 foldersMap["virtual://internal_photos?path=$rootPath"] = Folder(
-                    path = "virtual://internal_photos?path=$rootPath",
+                    path = virtualPath,
                     name = context.getString(R.string.internal_photos, directRootCount),
                     isLocal = true,
                     photoCount = directRootCount,
-                    previewUris = directRootPreviewUris,
+                    previewUris = emptyList(),
                     hasSubFolders = false,
                     dateModified = directRootDateModified
                 )
             }
         }
 
-        foldersMap.values.toList()
+        foldersMap.values.map { folder ->
+            folder.copy(
+                previewUris = selectPreviewUris(previewCandidatesByFolder[folder.path].orEmpty())
+            )
+        }
     }
 
     override suspend fun deletePhoto(photo: Photo): Boolean = withContext(Dispatchers.IO) {

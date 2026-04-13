@@ -68,6 +68,43 @@ class VideoThumbnailHeuristicsTest {
     }
 
     @Test
+    fun candidateFrameTimes_folderPreviewDeprioritizesFirstFrame() {
+        assertEquals(
+            listOf(1_000_000L, 3_000_000L, 5_000_000L, 8_000_000L, 12_000_000L, 0L),
+            VideoThumbnailHeuristics.candidateFrameTimesUs(
+                requestedTimeUs = 0L,
+                isFolderPreview = true
+            )
+        )
+    }
+
+    @Test
+    fun candidateFrameTimes_folderPreviewLongDurationKeepsLateFallbacksBeforeZero() {
+        assertEquals(
+            listOf(
+                1_000_000L,
+                3_000_000L,
+                5_000_000L,
+                8_000_000L,
+                12_000_000L,
+                20_000_000L,
+                30_000_000L,
+                45_000_000L,
+                60_000_000L,
+                90_000_000L,
+                120_000_000L,
+                129_999_000L,
+                0L
+            ),
+            VideoThumbnailHeuristics.candidateFrameTimesUs(
+                requestedTimeUs = 0L,
+                durationMs = 130_000L,
+                isFolderPreview = true
+            )
+        )
+    }
+
+    @Test
     fun shouldPreferSyncFrameSearch_onlyForNormalAviFrames() {
         assertTrue(
             VideoThumbnailHeuristics.shouldPreferSyncFrameSearch(
@@ -124,6 +161,19 @@ class VideoThumbnailHeuristicsTest {
     }
 
     @Test
+    fun sparseStatusBarHighlightsOnBlackSamples_areTreatedAsBlank() {
+        val screenshotLikeSamples = IntArray(36) { index ->
+            when (index) {
+                1, 4, 30 -> 0xFFF8F8F8.toInt()
+                31 -> 0xFF54B2FF.toInt()
+                else -> 0xFF020202.toInt()
+            }
+        }
+
+        assertTrue(VideoThumbnailHeuristics.isLikelyBlankFrame(screenshotLikeSamples))
+    }
+
+    @Test
     fun variedColorSamples_areNotTreatedAsBlank() {
         val colorfulSamples = intArrayOf(
             0xFF102030.toInt(), 0xFFAA3300.toInt(), 0xFF11AA55.toInt(), 0xFF2244CC.toInt(),
@@ -132,5 +182,25 @@ class VideoThumbnailHeuristicsTest {
         )
 
         assertFalse(VideoThumbnailHeuristics.isLikelyBlankFrame(colorfulSamples))
+    }
+
+    @Test
+    fun selectFolderPreviewCandidates_prefersUsableImagesBeforeVideosAndBlanks() {
+        val selected = VideoThumbnailHeuristics.selectFolderPreviewCandidates(
+            listOf(
+                VideoThumbnailHeuristics.FolderPreviewCandidate("blank-image", MediaType.IMAGE, true, 0),
+                VideoThumbnailHeuristics.FolderPreviewCandidate("video", MediaType.VIDEO, false, 1),
+                VideoThumbnailHeuristics.FolderPreviewCandidate("good-image-1", MediaType.IMAGE, false, 2),
+                VideoThumbnailHeuristics.FolderPreviewCandidate("good-image-2", MediaType.IMAGE, false, 3),
+                VideoThumbnailHeuristics.FolderPreviewCandidate("good-image-3", MediaType.IMAGE, false, 4),
+                VideoThumbnailHeuristics.FolderPreviewCandidate("blank-video", MediaType.VIDEO, true, 5),
+                VideoThumbnailHeuristics.FolderPreviewCandidate("good-image-4", MediaType.IMAGE, false, 6)
+            )
+        )
+
+        assertEquals(
+            listOf("good-image-1", "good-image-2", "good-image-3", "good-image-4"),
+            selected
+        )
     }
 }
