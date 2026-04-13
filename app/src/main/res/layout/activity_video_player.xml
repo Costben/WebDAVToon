@@ -72,7 +72,7 @@
         android:layout_marginBottom="52dp"
         android:contentDescription="@string/exo_controls_play_description"
         android:padding="16dp"
-        android:src="@drawable/ic_play_arrow"
+        android:src="@drawable/ic_ior_play"
         app:tint="@android:color/white"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -100,7 +100,7 @@
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/cancel"
             android:padding="8dp"
-            android:src="@drawable/ic_arrow_back"
+            android:src="@drawable/ic_ior_arrow_left"
             app:tint="@android:color/white" />
 
         <TextView
@@ -122,7 +122,7 @@
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/video_rotate_landscape"
             android:padding="8dp"
-            android:src="@drawable/ic_screen_rotation"
+            android:src="@drawable/ic_ior_rotate_camera_right"
             app:tint="@android:color/white" />
     </LinearLayout>
 

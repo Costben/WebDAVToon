@@ -56,7 +56,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_margin="16dp"
-            android:src="@drawable/ic_card_mode_md3"
+            android:src="@drawable/ic_ior_view_grid"
             app:shapeAppearanceOverlay="@style/ShapeAppearanceOverlay.App.Fab.Circle"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintRight_toRightOf="parent" />

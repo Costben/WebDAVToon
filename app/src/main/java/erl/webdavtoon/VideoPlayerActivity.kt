@@ -408,7 +408,7 @@ class VideoPlayerActivity : AppCompatActivity() {
 
     private fun updateCenterPlayPauseButton() {
         val isPlaying = player?.isPlaying == true
-        binding.centerPlayPauseButton.setImageResource(if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play_arrow)
+        binding.centerPlayPauseButton.setImageResource(if (isPlaying) R.drawable.ic_ior_pause_solid else R.drawable.ic_ior_play_solid)
         binding.centerPlayPauseButton.contentDescription = getString(
             if (isPlaying) Media3UiR.string.exo_controls_pause_description
             else Media3UiR.string.exo_controls_play_description

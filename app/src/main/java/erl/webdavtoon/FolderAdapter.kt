@@ -271,7 +271,7 @@ class FolderAdapter(
 
         private fun showRemoteVideoPlaceholder(imageView: ImageView) {
             imageView.scaleType = ImageView.ScaleType.CENTER
-            imageView.setImageResource(android.R.drawable.ic_media_play)
+            imageView.setImageResource(R.drawable.ic_ior_play)
         }
     }
 }

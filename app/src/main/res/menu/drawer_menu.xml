@@ -6,10 +6,10 @@
     
     <item android:id="@+id/nav_add_server"
         android:title="@string/add_webdav_server"
-        android:icon="@android:drawable/ic_input_add" />
+        android:icon="@drawable/ic_ior_plus_circle" />
 
     <item
         android:id="@+id/nav_settings"
-        android:icon="@android:drawable/ic_menu_preferences"
+        android:icon="@drawable/ic_ior_settings"
         android:title="@string/settings" />
 </menu>
