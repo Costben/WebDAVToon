@@ -11,7 +11,6 @@ import android.text.style.ForegroundColorSpan
 import android.view.MotionEvent
 import android.view.View
 import android.view.Menu
-import androidx.appcompat.view.menu.MenuBuilder
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SearchView
@@ -295,7 +294,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.main_menu, menu)
-        (menu as? MenuBuilder)?.setOptionalIconsVisible(true)
+        OverflowMenuHelper.enableOptionalIcons(menu)
         optionsMenu = menu
 
         infoMenuItem = menu.findItem(R.id.action_info)
@@ -335,13 +334,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
-        (menu as? MenuBuilder)?.setOptionalIconsVisible(true)
+        OverflowMenuHelper.enableOptionalIcons(menu)
         tintOverflowMenuIcons(menu)
         return super.onPrepareOptionsMenu(menu)
     }
 
     override fun onMenuOpened(featureId: Int, menu: Menu): Boolean {
-        (menu as? MenuBuilder)?.setOptionalIconsVisible(true)
+        OverflowMenuHelper.enableOptionalIcons(menu)
         tintOverflowMenuIcons(menu)
         return super.onMenuOpened(featureId, menu)
     }
