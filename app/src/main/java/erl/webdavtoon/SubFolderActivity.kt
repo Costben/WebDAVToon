@@ -393,6 +393,50 @@ class SubFolderActivity : AppCompatActivity() {
 
                 val folders = repository.getFolders(folderPath, forceRefresh).filterNot { f ->
                     !f.isLocal && (f.name.startsWith(".") || f.path.trim('/').split('/').any { it.startsWith(".") })
+                }.toMutableList()
+
+                val directPhotos = if (isWebDav) {
+                    repository.getPhotos(
+                        folderPath = folderPath,
+                        recursive = false,
+                        forceRefresh = forceRefresh
+                    )
+                } else {
+                    emptyList()
+                }
+
+                if (isWebDav && folders.isEmpty()) {
+                    val recursivePhotos = repository.getPhotos(
+                        folderPath = folderPath,
+                        recursive = true,
+                        forceRefresh = forceRefresh
+                    )
+                    val synthesizedFolders =
+                        synthesizeRemoteFoldersFromPhotos(
+                            currentFolderPath = folderPath,
+                            photos = recursivePhotos
+                        )
+                    android.util.Log.i(
+                        "SubFolderActivity",
+                        "remoteFallback path=$folderPath directPhotos=${directPhotos.size} recursivePhotos=${recursivePhotos.size} synthesizedFolders=${synthesizedFolders.size}"
+                    )
+                    folders.addAll(synthesizedFolders)
+                }
+
+                if (isWebDav && folders.isNotEmpty()) {
+                    if (directPhotos.isNotEmpty()) {
+                        folders.add(
+                            Folder(
+                                path = "virtual://internal_photos?path=$folderPath",
+                                name = getString(R.string.internal_photos, directPhotos.size),
+                                isLocal = false,
+                                photoCount = directPhotos.size,
+                                previewUris = directPhotos.take(4).map { it.imageUri },
+                                hasSubFolders = false,
+                                dateModified = directPhotos.maxOfOrNull { it.dateModified } ?: 0L
+                            )
+                        )
+                    }
                 }
 
                 if (folders.isEmpty()) {
@@ -541,5 +585,72 @@ class SubFolderActivity : AppCompatActivity() {
     private fun isDarkModeEnabled(): Boolean {
         val nightModeFlags = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
         return nightModeFlags == Configuration.UI_MODE_NIGHT_YES
+    }
+
+    private fun synthesizeRemoteFoldersFromPhotos(
+        currentFolderPath: String,
+        photos: List<Photo>
+    ): List<Folder> {
+        if (photos.isEmpty()) return emptyList()
+
+        data class Aggregate(
+            val childPath: String,
+            val childName: String,
+            val previewUris: MutableList<android.net.Uri> = mutableListOf(),
+            var hasSubFolders: Boolean = false,
+            var latestModified: Long = 0L
+        )
+
+        val normalizedCurrent = currentFolderPath.trim('/').let { trimmed ->
+            if (trimmed.isEmpty()) "" else "$trimmed/"
+        }
+        val endpoint = settingsManager.getFullWebDavUrl().trimEnd('/')
+        val aggregates = linkedMapOf<String, Aggregate>()
+
+        photos.forEach { photo ->
+            val relative = photo.imageUri.toString()
+                .removePrefix(endpoint)
+                .trimStart('/')
+                .let { path ->
+                    when {
+                        normalizedCurrent.isEmpty() -> path
+                        path.startsWith(normalizedCurrent) -> path.removePrefix(normalizedCurrent)
+                        else -> return@forEach
+                    }
+                }
+
+            val segments = relative.split('/').filter { it.isNotEmpty() }
+            if (segments.size < 2) return@forEach
+
+            val childName = segments.first()
+            val childPath = if (normalizedCurrent.isEmpty()) {
+                "$childName/"
+            } else {
+                "$normalizedCurrent$childName/"
+            }
+
+            val aggregate = aggregates.getOrPut(childPath) {
+                Aggregate(
+                    childPath = childPath,
+                    childName = childName
+                )
+            }
+            if (aggregate.previewUris.size < 4) {
+                aggregate.previewUris.add(photo.imageUri)
+            }
+            aggregate.hasSubFolders = aggregate.hasSubFolders || segments.size > 2
+            aggregate.latestModified = maxOf(aggregate.latestModified, photo.dateModified)
+        }
+
+        return aggregates.values.map { aggregate ->
+            Folder(
+                path = aggregate.childPath,
+                name = aggregate.childName,
+                isLocal = false,
+                previewUris = aggregate.previewUris,
+                hasSubFolders = aggregate.hasSubFolders,
+                dateModified = aggregate.latestModified
+            )
+        }
     }
 }
