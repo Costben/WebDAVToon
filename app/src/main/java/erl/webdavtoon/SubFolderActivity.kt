@@ -12,7 +12,6 @@ import android.view.MenuItem
 import android.view.View
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.view.menu.MenuBuilder
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.DrawableCompat
 import androidx.core.view.ViewCompat
@@ -219,7 +218,7 @@ class SubFolderActivity : AppCompatActivity() {
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.main_menu, menu)
-        (menu as? MenuBuilder)?.setOptionalIconsVisible(true)
+        OverflowMenuHelper.enableOptionalIcons(menu)
 
         val searchItem = menu.findItem(R.id.action_search)
         val searchView = searchItem?.actionView as? androidx.appcompat.widget.SearchView
@@ -247,7 +246,7 @@ class SubFolderActivity : AppCompatActivity() {
     }
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
-        (menu as? MenuBuilder)?.setOptionalIconsVisible(true)
+        OverflowMenuHelper.enableOptionalIcons(menu)
         val isSelectionMode = adapter.isSelectionMode
         val deleteItem = menu.findItem(R.id.action_delete)
         deleteItem?.isVisible = isSelectionMode
@@ -265,7 +264,7 @@ class SubFolderActivity : AppCompatActivity() {
     }
 
     override fun onMenuOpened(featureId: Int, menu: Menu): Boolean {
-        (menu as? MenuBuilder)?.setOptionalIconsVisible(true)
+        OverflowMenuHelper.enableOptionalIcons(menu)
         tintOverflowMenuIcons(menu)
         return super.onMenuOpened(featureId, menu)
     }

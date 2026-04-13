@@ -31,8 +31,8 @@
             android:layout_width="16dp"
             android:layout_height="16dp"
             android:src="@drawable/ic_ior_check_circle_solid"
-            android:tint="?attr/colorPrimary"
-            android:visibility="gone" />
+            android:visibility="gone"
+            app:tint="?attr/colorPrimary" />
 
         <TextView
             android:id="@+id/toolbarRefreshText"
