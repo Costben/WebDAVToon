@@ -24,6 +24,8 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import erl.webdavtoon.databinding.ActivityFolderViewBinding
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -34,6 +36,8 @@ class FolderViewActivity : AppCompatActivity() {
     private lateinit var adapter: FolderAdapter
     private var currentAllFolders: List<Folder> = emptyList()
     private var currentSearchKeyword: String = ""
+    private var currentLoadUsesToolbarPill: Boolean = false
+    private var toolbarRefreshHideJob: Job? = null
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -93,11 +97,19 @@ class FolderViewActivity : AppCompatActivity() {
     private fun observeState() {
         lifecycleScope.launch {
             FolderState.state.collect { state ->
-                binding.toolbarProgressBar.visibility = if (state.isLoading) View.VISIBLE else View.GONE
+                if (state.isLoading) {
+                    return@collect
+                }
+
                 binding.progressBar.visibility = View.GONE
                 binding.swipeRefreshLayout.isRefreshing = false
                 if (state.error != null) {
+                    hideToolbarRefreshPill()
                     Toast.makeText(this@FolderViewActivity, state.error, Toast.LENGTH_SHORT).show()
+                } else if (currentLoadUsesToolbarPill) {
+                    showToolbarRefreshCompleted()
+                } else {
+                    hideToolbarRefreshPill()
                 }
                 adapter.setFolders(state.folders)
             }
@@ -358,7 +370,7 @@ class FolderViewActivity : AppCompatActivity() {
             .setMessage(getString(R.string.delete_folders_message, selectedFolders.size))
             .setPositiveButton(R.string.delete) { _, _ ->
                 lifecycleScope.launch {
-                    binding.toolbarProgressBar.visibility = View.VISIBLE
+                    showToolbarRefreshing()
                     var count = 0
                     selectedFolders.forEach { folder ->
                         val repository: PhotoRepository = if (!folder.isLocal) {
@@ -375,7 +387,6 @@ class FolderViewActivity : AppCompatActivity() {
                             count++
                         }
                     }
-                    binding.toolbarProgressBar.visibility = View.GONE
                     Toast.makeText(this@FolderViewActivity, getString(R.string.deleted_folders_count, count), Toast.LENGTH_SHORT).show()
                     adapter.exitSelectionMode()
                     loadFolders(forceRefresh = true)
@@ -400,6 +411,7 @@ class FolderViewActivity : AppCompatActivity() {
     }
 
     private fun loadFolders(forceRefresh: Boolean = false) {
+        beginFolderLoading(forceRefresh)
         FolderState.setLoading()
         val startedAt = SystemClock.elapsedRealtime()
 
@@ -486,6 +498,55 @@ class FolderViewActivity : AppCompatActivity() {
 
             adapter.updateFolderPreview(folder.path, updatedPreviewUris, preview.hasSubFolders)
         }
+    }
+
+    private fun beginFolderLoading(forceRefresh: Boolean) {
+        val isInitialLoad = !forceRefresh && currentAllFolders.isEmpty() && adapter.itemCount == 0
+        currentLoadUsesToolbarPill = !isInitialLoad
+        if (isInitialLoad) {
+            binding.progressBar.visibility = View.VISIBLE
+            hideToolbarRefreshPill()
+        } else {
+            binding.progressBar.visibility = View.GONE
+            showToolbarRefreshing()
+        }
+    }
+
+    private fun showToolbarRefreshing() {
+        toolbarRefreshHideJob?.cancel()
+        binding.toolbarProgressBar.root.alpha = 0f
+        binding.toolbarProgressBar.root.visibility = View.VISIBLE
+        binding.toolbarProgressBar.toolbarRefreshSpinner.visibility = View.VISIBLE
+        binding.toolbarProgressBar.toolbarRefreshDoneIcon.visibility = View.GONE
+        binding.toolbarProgressBar.toolbarRefreshText.setText(R.string.refresh_status_refreshing)
+        binding.toolbarProgressBar.root.animate().alpha(1f).setDuration(180L).start()
+    }
+
+    private fun showToolbarRefreshCompleted() {
+        toolbarRefreshHideJob?.cancel()
+        binding.toolbarProgressBar.root.visibility = View.VISIBLE
+        binding.toolbarProgressBar.root.alpha = 1f
+        binding.toolbarProgressBar.toolbarRefreshSpinner.visibility = View.GONE
+        binding.toolbarProgressBar.toolbarRefreshDoneIcon.visibility = View.VISIBLE
+        binding.toolbarProgressBar.toolbarRefreshText.setText(R.string.refresh_status_completed)
+        toolbarRefreshHideJob = lifecycleScope.launch {
+            delay(700L)
+            hideToolbarRefreshPill()
+        }
+    }
+
+    private fun hideToolbarRefreshPill() {
+        toolbarRefreshHideJob?.cancel()
+        binding.toolbarProgressBar.root.animate()
+            .alpha(0f)
+            .setDuration(160L)
+            .withEndAction {
+                binding.toolbarProgressBar.root.visibility = View.GONE
+                binding.toolbarProgressBar.root.alpha = 1f
+                binding.toolbarProgressBar.toolbarRefreshSpinner.visibility = View.VISIBLE
+                binding.toolbarProgressBar.toolbarRefreshDoneIcon.visibility = View.GONE
+            }
+            .start()
     }
 
     private fun tintOverflowMenuIcons(menu: Menu) {
