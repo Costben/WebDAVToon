@@ -108,11 +108,11 @@ class AndroidKeystoreWebDavPasswordStore(context: Context) : WebDavSecretStore {
 
         preferences.edit()
             .putString(preferenceKey(slot), encrypt(password))
-            .apply()
+            .commit()
     }
 
     override fun remove(slot: Int) {
-        preferences.edit().remove(preferenceKey(slot)).apply()
+        preferences.edit().remove(preferenceKey(slot)).commit()
     }
 
     private fun preferenceKey(slot: Int): String = "webdav_password_slot_$slot"
