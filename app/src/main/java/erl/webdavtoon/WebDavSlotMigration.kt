@@ -1,7 +1,7 @@
 package erl.webdavtoon
 
 import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
+import com.google.gson.JsonParser
 
 object WebDavSlotMigration {
     private val gson = Gson()
@@ -9,17 +9,21 @@ object WebDavSlotMigration {
     fun migrateLegacySlotsJson(json: String, persistentStore: WebDavSecretStore): String {
         if (json.isBlank()) return json
 
-        val type = object : TypeToken<Map<String, LegacyWebDavSlotConfig>>() {}.type
-        val legacySlots = runCatching {
-            gson.fromJson<Map<String, LegacyWebDavSlotConfig>>(json, type)
+        val root = runCatching {
+            val parsed = JsonParser.parseString(json)
+            check(parsed.isJsonObject) { "Legacy WebDAV slots JSON must be an object" }
+            parsed.asJsonObject
         }.getOrNull() ?: return json
 
-        val migratedSlots = legacySlots.mapValues { (slotKey, legacy) ->
-            if (legacy.rememberPassword && legacy.password.isNotBlank()) {
-                slotKey.toIntOrNull()?.let { persistentStore.put(it, legacy.password) }
+        val migratedSlots = runCatching {
+            root.entrySet().associate { (slotKey, value) ->
+                val legacy = gson.fromJson(value, LegacyWebDavSlotConfig::class.java)
+                if (legacy.rememberPassword && legacy.password.isNotBlank()) {
+                    slotKey.toIntOrNull()?.let { persistentStore.put(it, legacy.password) }
+                }
+                slotKey to legacy.toSlotConfig()
             }
-            legacy.toSlotConfig()
-        }
+        }.getOrNull() ?: return json
 
         return gson.toJson(migratedSlots)
     }

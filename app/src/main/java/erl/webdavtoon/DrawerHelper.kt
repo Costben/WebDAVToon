@@ -114,6 +114,7 @@ object DrawerHelper {
         onSaved: () -> Unit
     ) {
         val dialogBinding = DialogServerConfigWebdavBinding.inflate(activity.layoutInflater)
+        val slotExisted = settingsManager.getAllSlots().contains(slot)
 
         val protocols = arrayOf("http", "https")
         val adapter = ArrayAdapter(activity, android.R.layout.simple_dropdown_item_1line, protocols)
@@ -132,15 +133,19 @@ object DrawerHelper {
             .setTitle(activity.getString(R.string.webdav_config, slot))
             .setView(dialogBinding.root)
             .setPositiveButton(R.string.save) { _, _ ->
-                settingsManager.setWebDavAlias(dialogBinding.aliasEdit.text.toString(), slot)
-                settingsManager.setWebDavProtocol(dialogBinding.protocolEdit.text.toString(), slot)
-                settingsManager.setWebDavUrl(dialogBinding.hostEdit.text.toString(), slot)
-                settingsManager.setWebDavPort(dialogBinding.portEdit.text.toString().toIntOrNull() ?: 443, slot)
-                settingsManager.setWebDavUsername(dialogBinding.usernameEdit.text.toString(), slot)
-                settingsManager.setWebDavRememberPassword(dialogBinding.rememberPasswordCheck.isChecked, slot)
-                settingsManager.setWebDavPassword(dialogBinding.passwordEdit.text.toString(), slot)
-                settingsManager.setWebDavEnabled(true, slot)
-                
+                settingsManager.saveWebDavConfiguration(
+                    slot = slot,
+                    alias = dialogBinding.aliasEdit.text.toString(),
+                    protocol = dialogBinding.protocolEdit.text.toString(),
+                    url = dialogBinding.hostEdit.text.toString(),
+                    port = dialogBinding.portEdit.text.toString().toIntOrNull() ?: 443,
+                    username = dialogBinding.usernameEdit.text.toString(),
+                    password = dialogBinding.passwordEdit.text.toString(),
+                    rememberPassword = dialogBinding.rememberPasswordCheck.isChecked,
+                    enabled = true,
+                    switchToSlotOnSave = !slotExisted
+                )
+
                 onSaved()
                 Toast.makeText(activity, activity.getString(R.string.server_saved), Toast.LENGTH_SHORT).show()
             }

@@ -253,8 +253,8 @@ class FolderAdapter(
                 )
 
                 if (mediaType == MediaType.VIDEO) {
+                    showVideoPlaceholder(imageView)
                     if (isRemote) {
-                        showRemoteVideoPlaceholder(imageView)
                         WebDavImageLoader.loadWebDavVideoThumbnail(
                             imageView.context,
                             uri,
@@ -297,7 +297,7 @@ class FolderAdapter(
             }
         }
 
-        private fun showRemoteVideoPlaceholder(imageView: ImageView) {
+        private fun showVideoPlaceholder(imageView: ImageView) {
             imageView.scaleType = ImageView.ScaleType.CENTER
             imageView.setImageResource(R.drawable.ic_ior_play)
         }

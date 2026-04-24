@@ -68,6 +68,7 @@ reference/
 
 # Root-level exported APK copy
 /webdavtoon-debug.apk
+/webdavtoon-release.apk
 
 # Local-only agent / HOTL docs
 /hotl-workflow-*.md

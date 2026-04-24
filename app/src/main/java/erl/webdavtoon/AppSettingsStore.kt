@@ -2,6 +2,7 @@ package erl.webdavtoon
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -146,6 +147,13 @@ class AppSettingsStore(context: Context) {
     suspend fun putBooleanSync(key: Preferences.Key<Boolean>, value: Boolean) {
         writeCached(key, value)
         appContext.dataStore.edit { it[key] = value }
+    }
+
+    suspend fun editSync(transform: MutablePreferences.() -> Unit) {
+        appContext.dataStore.edit { preferences ->
+            preferences.transform()
+            updateCache(preferences)
+        }
     }
 
     fun <T> remove(key: Preferences.Key<T>) {

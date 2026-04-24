@@ -1,7 +1,7 @@
 package erl.webdavtoon
 
 import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
+import com.google.gson.JsonParser
 
 object MigrationJson {
     private val gson = Gson()
@@ -10,11 +10,16 @@ object MigrationJson {
 
     fun decodeFavoritePhotos(json: String): Map<String, FavoritePhotoEntity> {
         return try {
-            val type = object : TypeToken<Map<String, String>>() {}.type
-            val legacy: Map<String, String> = gson.fromJson(json, type)
-            legacy.mapNotNull { (id, value) ->
+            val root = JsonParser.parseString(json)
+            check(root.isJsonObject) { "Favorite photos JSON must be an object" }
+            root.asJsonObject.entrySet().mapNotNull { (id, value) ->
                 try {
-                    val photo = gson.fromJson(value, Photo::class.java)
+                    val photo = when {
+                        value.isJsonNull -> null
+                        value.isJsonPrimitive && value.asJsonPrimitive.isString ->
+                            gson.fromJson(value.asString, Photo::class.java)
+                        else -> gson.fromJson(value, Photo::class.java)
+                    }
                     if (photo != null) {
                         id to FavoritePhotoEntity(
                             id = photo.id,
