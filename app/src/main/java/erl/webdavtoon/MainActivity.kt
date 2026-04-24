@@ -15,7 +15,6 @@ import android.view.View
 import android.view.Menu
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.SearchView
 import androidx.core.content.FileProvider
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
@@ -313,26 +312,16 @@ class MainActivity : AppCompatActivity() {
         favoriteMenuItem?.isVisible = photoAdapter.isSelectionMode()
         favoriteMenuItem?.setIcon(if (isFavorites) R.drawable.ic_ior_star_solid else R.drawable.ic_ior_star)
 
-        val searchItem = menu.findItem(R.id.action_search)
-        val searchView = searchItem?.actionView as? SearchView
-        searchView?.queryHint = getString(R.string.search_photos)
-        searchView?.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
-            override fun onQueryTextSubmit(query: String?): Boolean {
-                currentQuery = currentQuery.copy(keyword = query.orEmpty().trim())
+        SearchMenuHelper.configureLiveSearch(
+            context = this,
+            searchItem = menu.findItem(R.id.action_search),
+            hint = getString(R.string.search_photos),
+            currentKeyword = { currentQuery.keyword },
+            onKeywordChanged = { keyword ->
+                currentQuery = currentQuery.copy(keyword = keyword)
                 refreshMedia()
-                searchView.clearFocus()
-                return true
             }
-
-            override fun onQueryTextChange(newText: String?): Boolean {
-                val keyword = newText.orEmpty().trim()
-                if (keyword.isEmpty() && currentQuery.keyword.isNotEmpty()) {
-                    currentQuery = currentQuery.copy(keyword = "")
-                    refreshMedia()
-                }
-                return true
-            }
-        })
+        )
 
         val rotationLockItem = menu.findItem(R.id.action_rotation_lock)
         rotationLockItem?.isChecked = settingsManager.isRotationLocked()
