@@ -83,6 +83,7 @@
     <string name="file_dimension_prefix">尺寸: %1$dx%2$d</string>
     <string name="local_prefix">本地: %1$b</string>
     <string name="photo_details_more_ellipsis">……</string>
+    <string name="share">分享</string>
     <string name="favorite_added">已收藏</string>
     <string name="favorite_removed">已取消收藏</string>
     <string name="favorite_requires_selection">请先选择图片，再进行收藏</string>

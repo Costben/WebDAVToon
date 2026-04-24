@@ -22,9 +22,10 @@ object FavoriteSelectionPlanner {
                 toRemove = selectedItems
             )
         } else {
+            val allSelectedAreFavorites = selectedItems.all { idSelector(it) in favoriteIds }
             FavoriteSelectionPlan(
-                toAdd = selectedItems.filterNot { idSelector(it) in favoriteIds },
-                toRemove = emptyList()
+                toAdd = if (allSelectedAreFavorites) emptyList() else selectedItems.filterNot { idSelector(it) in favoriteIds },
+                toRemove = if (allSelectedAreFavorites) selectedItems else emptyList()
             )
         }
     }
