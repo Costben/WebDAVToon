@@ -39,6 +39,22 @@ class FavoriteSelectionPlannerTest {
     }
 
     @Test
+    fun `buildPlan removes selected photos in normal view when all are already favorited`() {
+        val photo1 = "1"
+        val photo2 = "2"
+
+        val plan = FavoriteSelectionPlanner.buildPlan(
+            selectedItems = listOf(photo1, photo2),
+            favoriteIds = setOf("1", "2"),
+            isFavoritesView = false,
+            idSelector = { it }
+        )
+
+        assertEquals(emptyList<String>(), plan.toAdd)
+        assertEquals(listOf(photo1, photo2), plan.toRemove)
+    }
+
+    @Test
     fun `buildPlan returns empty when nothing selected`() {
         val plan = FavoriteSelectionPlanner.buildPlan(
             selectedItems = emptyList<String>(),
