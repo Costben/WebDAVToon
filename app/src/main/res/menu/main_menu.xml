@@ -2,9 +2,9 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <item
-        android:id="@+id/action_info"
-        android:title="@string/photo_details"
-        android:icon="@drawable/ic_ior_info_circle"
+        android:id="@+id/action_share"
+        android:title="@string/share"
+        android:icon="@drawable/ic_ior_share_android"
         android:orderInCategory="1"
         app:showAsAction="always"
         android:visible="false" />
@@ -14,6 +14,13 @@
         android:icon="@drawable/ic_ior_star"
         android:orderInCategory="2"
         app:showAsAction="always"
+        android:visible="false" />
+    <item
+        android:id="@+id/action_info"
+        android:title="@string/photo_details"
+        android:icon="@drawable/ic_ior_info_circle"
+        android:orderInCategory="90"
+        app:showAsAction="never"
         android:visible="false" />
     <item
         android:id="@+id/action_delete"
