@@ -220,23 +220,16 @@ class SubFolderActivity : AppCompatActivity() {
         menuInflater.inflate(R.menu.main_menu, menu)
         OverflowMenuHelper.enableOptionalIcons(menu)
 
-        val searchItem = menu.findItem(R.id.action_search)
-        val searchView = searchItem?.actionView as? androidx.appcompat.widget.SearchView
-        searchView?.queryHint = getString(R.string.search_folders)
-        searchView?.setOnQueryTextListener(object : androidx.appcompat.widget.SearchView.OnQueryTextListener {
-            override fun onQueryTextSubmit(query: String?): Boolean {
-                currentSearchKeyword = query.orEmpty().trim()
+        SearchMenuHelper.configureLiveSearch(
+            context = this,
+            searchItem = menu.findItem(R.id.action_search),
+            hint = getString(R.string.search_folders),
+            currentKeyword = { currentSearchKeyword },
+            onKeywordChanged = { keyword ->
+                currentSearchKeyword = keyword
                 applyFilterAndSort()
-                searchView.clearFocus()
-                return true
             }
-
-            override fun onQueryTextChange(newText: String?): Boolean {
-                currentSearchKeyword = newText.orEmpty().trim()
-                applyFilterAndSort()
-                return true
-            }
-        })
+        )
 
         val rotationLockItem = menu.findItem(R.id.action_rotation_lock)
         rotationLockItem?.isChecked = settingsManager.isRotationLocked()
