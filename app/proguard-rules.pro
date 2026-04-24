@@ -28,6 +28,9 @@
 -keep class erl.webdavtoon.GlideRequest { *; }
 -keep class erl.webdavtoon.GlideRequests { *; }
 
+# FFmpegMediaMetadataRetriever relies on JNI field/method names that R8 must not strip or rename.
+-keep class wseemann.media.** { *; }
+
 # Gson-backed persisted models must retain stable field names.
 -keep class erl.webdavtoon.Photo { *; }
 -keep class erl.webdavtoon.WebDavSlotConfig { *; }
