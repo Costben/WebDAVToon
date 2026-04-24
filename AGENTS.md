@@ -47,6 +47,7 @@ Last updated: 2026-04-10
 
 ## APK export rule
 - After producing a new debug APK for verification or delivery, also place a copy in the project root as `webdavtoon-debug.apk` so it is easy for the user to download directly.
+- After producing a new release APK for verification or delivery, also place a copy in the project root as `webdavtoon-release.apk` so it is easy for the user to download directly.
 - Keep generated root-level APK exports ignored by git.
 
 ## HOTL workflow rule for incoming requests

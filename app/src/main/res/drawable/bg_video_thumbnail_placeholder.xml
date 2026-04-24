@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <size
+                android:width="320dp"
+                android:height="180dp" />
+            <corners android:radius="8dp" />
+            <solid android:color="#12000000" />
+        </shape>
+    </item>
+
+    <item
+        android:width="48dp"
+        android:height="48dp"
+        android:drawable="@drawable/ic_ior_play_solid"
+        android:gravity="center" />
+</layer-list>

@@ -86,6 +86,7 @@ object WebDavImageLoader {
         val cacheKey = buildVideoBitmapCacheKey(encodedUrl, isFolderPreview)
         imageView.tag = cacheKey
         progressBar?.visibility = View.VISIBLE
+        showVideoPlaceholder(imageView, isFolderPreview)
 
         remoteVideoThumbCache.get(cacheKey)?.let { cached ->
             if (cached.isLikelyBlankVideoThumbnail()) {
@@ -134,6 +135,7 @@ object WebDavImageLoader {
                     imageView.setImageBitmap(bitmap)
                     android.util.Log.i("WebDavImageLoader", "WebDAV-Video thumbnail success: $encodedUrl")
                 } else {
+                    showVideoPlaceholder(imageView, isFolderPreview)
                     android.util.Log.w("WebDavImageLoader", "WebDAV-Video thumbnail fallback placeholder: $encodedUrl")
                 }
                 progressBar?.visibility = View.GONE
@@ -169,6 +171,7 @@ object WebDavImageLoader {
         val cacheKey = buildVideoBitmapCacheKey(videoUri.toString(), isFolderPreview)
         imageView.tag = cacheKey
         progressBar?.visibility = View.VISIBLE
+        showVideoPlaceholder(imageView, isFolderPreview)
 
         localVideoThumbCache.get(cacheKey)?.let { cached ->
             if (cached.isLikelyBlankVideoThumbnail()) {
@@ -200,6 +203,7 @@ object WebDavImageLoader {
                     applyVideoThumbnailDisplayMode(imageView, isFolderPreview)
                     imageView.setImageBitmap(bitmap)
                 } else {
+                    showVideoPlaceholder(imageView, isFolderPreview)
                     android.util.Log.w("WebDavImageLoader", "Local-Video thumbnail fallback placeholder: $videoUri")
                 }
                 progressBar?.visibility = View.GONE
@@ -934,6 +938,16 @@ object WebDavImageLoader {
                 progressBar?.visibility = View.GONE
                 return false
             }
+        }
+    }
+
+    private fun showVideoPlaceholder(imageView: ImageView, isFolderPreview: Boolean) {
+        if (isFolderPreview) {
+            imageView.scaleType = ImageView.ScaleType.CENTER
+            imageView.setImageResource(R.drawable.ic_ior_play)
+        } else {
+            imageView.scaleType = ImageView.ScaleType.FIT_CENTER
+            imageView.setImageResource(R.drawable.bg_video_thumbnail_placeholder)
         }
     }
 
