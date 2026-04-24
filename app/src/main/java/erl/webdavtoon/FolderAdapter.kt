@@ -41,6 +41,8 @@ class FolderAdapter(
             .filter { !it.isLocal && it.previewUris.isEmpty() }
             .map { it.path }
             .toSet()
+        val previousSelectionCount = selectedFolderPaths.size
+        val previousSelectionMode = isSelectionMode
 
         if (folders == mergedFolders) {
             folders = mergedFolders
@@ -50,7 +52,7 @@ class FolderAdapter(
             if (folders.isNotEmpty()) {
                 notifyItemRangeChanged(0, folders.size)
             }
-            onSelectionChanged(selectedFolderPaths.size)
+            notifySelectionChangedIfNeeded(previousSelectionCount, previousSelectionMode)
             return
         }
 
@@ -76,7 +78,13 @@ class FolderAdapter(
             isSelectionMode = false
         }
         diffResult.dispatchUpdatesTo(this)
-        onSelectionChanged(selectedFolderPaths.size)
+        notifySelectionChangedIfNeeded(previousSelectionCount, previousSelectionMode)
+    }
+
+    private fun notifySelectionChangedIfNeeded(previousCount: Int, previousMode: Boolean) {
+        if (previousCount != selectedFolderPaths.size || previousMode != isSelectionMode) {
+            onSelectionChanged(selectedFolderPaths.size)
+        }
     }
 
     fun enterSelectionMode(folder: Folder) {

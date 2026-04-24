@@ -1,8 +1,11 @@
 package erl.webdavtoon
 
+import android.content.ClipData
 import android.content.Context
 import android.content.DialogInterface
+import android.content.Intent
 import android.content.res.Configuration
+import android.net.Uri
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
@@ -10,6 +13,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.coordinatorlayout.widget.CoordinatorLayout
+import androidx.core.content.FileProvider
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -21,7 +25,11 @@ import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import erl.webdavtoon.databinding.ActivityPhotoViewBinding
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
 import kotlin.math.roundToInt
 
 /**
@@ -46,6 +54,7 @@ class PhotoViewActivity : AppCompatActivity() {
     private var isSelectionMode = false
     private var isFavorites = false
     private var deleteMenuItem: android.view.MenuItem? = null
+    private var shareMenuItem: android.view.MenuItem? = null
     private var isDraggingFastScroll = false
     private var isInitialLoad = true
 
@@ -363,26 +372,28 @@ class PhotoViewActivity : AppCompatActivity() {
         val count = if (isCardMode) adapter.getSelectedCount() else webtoonAdapter?.getSelectedCount() ?: 0
         val defaultTint = getBottomBarIconTint()
         val primaryTint = android.content.res.ColorStateList.valueOf(ContextCompat.getColor(this, R.color.primary))
-        val redTint = android.content.res.ColorStateList.valueOf(android.graphics.Color.RED)
 
 
         if (isSelectionMode) {
             binding.toolbar.title = getString(R.string.selected_count, count)
+            shareMenuItem?.isVisible = true
             deleteMenuItem?.isVisible = true
-            // 确保 Toolbar 删除图标为红色
             deleteMenuItem?.icon?.let { icon ->
                 androidx.core.graphics.drawable.DrawableCompat.setTint(icon, android.graphics.Color.RED)
             }
             // 确保底栏删除图标为红色
-            binding.deleteButton.imageTintList = redTint
+            binding.deleteButton.visibility = View.GONE
             // 更新多选按钮图标颜色为主题色
             binding.selectButton.imageTintList = primaryTint
             binding.favoriteButton.imageTintList = primaryTint
+            invalidateOptionsMenu()
         } else {
             deleteMenuItem?.isVisible = false
+            shareMenuItem?.isVisible = false
             // 恢复底栏按钮颜色
             binding.deleteButton.imageTintList = defaultTint
             binding.selectButton.imageTintList = defaultTint
+            shareMenuItem?.isVisible = false
             updateFavoriteButtonState()
             updateCurrentPosition()
         }
@@ -390,13 +401,17 @@ class PhotoViewActivity : AppCompatActivity() {
 
     override fun onCreateOptionsMenu(menu: android.view.Menu): Boolean {
         menuInflater.inflate(R.menu.main_menu, menu)
+        OverflowMenuHelper.enableOptionalIcons(menu)
         // 隐藏不需要的菜单项
         menu.findItem(R.id.action_search)?.isVisible = false
         menu.findItem(R.id.action_select)?.isVisible = false
         menu.findItem(R.id.action_settings)?.isVisible = false
         menu.findItem(R.id.action_sort_order)?.isVisible = false
         menu.findItem(R.id.action_grid_columns)?.isVisible = false
-        
+        shareMenuItem = menu.findItem(R.id.action_share)
+        shareMenuItem?.isVisible = isSelectionMode
+        shareMenuItem?.setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_NEVER)
+
         deleteMenuItem = menu.findItem(R.id.action_delete)
         deleteMenuItem?.isVisible = isSelectionMode
         if (isSelectionMode) {
@@ -409,11 +424,49 @@ class PhotoViewActivity : AppCompatActivity() {
         val rotationLockItem = menu.findItem(R.id.action_rotation_lock)
         rotationLockItem?.isChecked = settingsManager.isRotationLocked()
 
+        tintOverflowMenuIcons(menu)
+
         return true
+    }
+
+    override fun onPrepareOptionsMenu(menu: android.view.Menu): Boolean {
+        OverflowMenuHelper.enableOptionalIcons(menu)
+        shareMenuItem?.isVisible = isSelectionMode
+        menu.findItem(R.id.action_share)?.isVisible = isSelectionMode
+        tintOverflowMenuIcons(menu)
+        return super.onPrepareOptionsMenu(menu)
+    }
+
+    override fun onMenuOpened(featureId: Int, menu: android.view.Menu): Boolean {
+        OverflowMenuHelper.enableOptionalIcons(menu)
+        tintOverflowMenuIcons(menu)
+        return super.onMenuOpened(featureId, menu)
+    }
+
+    private fun tintOverflowMenuIcons(menu: android.view.Menu) {
+        val normalColor = ContextCompat.getColor(this, R.color.onSurface)
+        val deleteColor = ContextCompat.getColor(this, R.color.primary_red)
+        menu.findItem(R.id.action_share)?.icon?.mutate()?.let { icon ->
+            androidx.core.graphics.drawable.DrawableCompat.setTint(icon, normalColor)
+        }
+        menu.findItem(R.id.action_rotation_lock)?.icon?.mutate()?.let { icon ->
+            androidx.core.graphics.drawable.DrawableCompat.setTint(icon, normalColor)
+        }
+        menu.findItem(R.id.action_delete)?.icon?.mutate()?.let { icon ->
+            androidx.core.graphics.drawable.DrawableCompat.setTint(icon, deleteColor)
+        }
+        val deleteTitle = android.text.SpannableString(getString(R.string.delete)).apply {
+            setSpan(android.text.style.ForegroundColorSpan(deleteColor), 0, length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+        menu.findItem(R.id.action_delete)?.title = deleteTitle
     }
 
     override fun onOptionsItemSelected(item: android.view.MenuItem): Boolean {
         return when (item.itemId) {
+            R.id.action_share -> {
+                shareSelectedPhotos()
+                true
+            }
             R.id.action_delete -> {
                 deleteSelectedPhotos()
                 true
@@ -426,6 +479,77 @@ class PhotoViewActivity : AppCompatActivity() {
                 true
             }
             else -> super.onOptionsItemSelected(item)
+        }
+    }
+
+    private fun shareSelectedPhotos() {
+        val selectedPhotos = if (isCardMode) adapter.getSelectedPhotos() else webtoonAdapter?.getSelectedPhotos() ?: emptyList()
+        if (selectedPhotos.isEmpty()) return
+
+        lifecycleScope.launch {
+            runCatching {
+                val shareFiles = withContext(Dispatchers.IO) {
+                    selectedPhotos.map { photo ->
+                        if (photo.isLocal) photo.imageUri else downloadRemotePhotoForShare(photo)
+                    }
+                }
+                val shareIntent = buildFileShareIntent(selectedPhotos, shareFiles)
+                startActivity(Intent.createChooser(shareIntent, getString(R.string.share)))
+            }.onFailure { error ->
+                android.util.Log.e("PhotoViewActivity", "Share failed", error)
+                Toast.makeText(this@PhotoViewActivity, getString(R.string.download_failed), Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun buildFileShareIntent(selectedPhotos: List<Photo>, uris: List<Uri>): Intent {
+        return if (uris.size == 1) {
+            Intent(Intent.ACTION_SEND).apply {
+                type = shareMimeType(selectedPhotos.first())
+                putExtra(Intent.EXTRA_STREAM, uris.first())
+                clipData = ClipData.newUri(contentResolver, selectedPhotos.first().title, uris.first())
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        } else {
+            val shareUris = ArrayList(uris)
+            Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                type = if (selectedPhotos.all { it.mediaType == MediaType.IMAGE }) "image/*" else "*/*"
+                putParcelableArrayListExtra(Intent.EXTRA_STREAM, shareUris)
+                clipData = ClipData.newUri(contentResolver, selectedPhotos.first().title, shareUris.first()).apply {
+                    shareUris.drop(1).forEach { addItem(ClipData.Item(it)) }
+                }
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        }
+    }
+
+    private fun downloadRemotePhotoForShare(photo: Photo): Uri {
+        val shareDir = File(cacheDir, "shared_media").apply { mkdirs() }
+        val safeName = photo.title.replace(Regex("[\\\\/:*?\"<>|]"), "_").ifBlank { "shared_media" }
+        val targetFile = File(shareDir, safeName)
+        val credentials = okhttp3.Credentials.basic(settingsManager.getWebDavUsername(), settingsManager.getWebDavPassword())
+        val request = okhttp3.Request.Builder()
+            .url(FileUtils.encodeWebDavUrl(photo.imageUri.toString()))
+            .addHeader("Authorization", credentials)
+            .build()
+        okhttp3.OkHttpClient().newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw java.io.IOException("HTTP ${response.code}: ${response.message}")
+            }
+            val body = response.body ?: throw java.io.IOException("Empty response body")
+            FileOutputStream(targetFile).use { output ->
+                body.byteStream().use { input -> input.copyTo(output) }
+            }
+        }
+        return FileProvider.getUriForFile(this, "${BuildConfig.APPLICATION_ID}.fileprovider", targetFile)
+    }
+
+    private fun shareMimeType(photo: Photo): String {
+        return when (photo.mediaType) {
+            MediaType.IMAGE -> "image/*"
+            MediaType.VIDEO -> detectVideoMimeType(photo.title)
+                ?: detectVideoMimeType(photo.imageUri.toString())
+                ?: "video/*"
         }
     }
 

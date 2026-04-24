@@ -1,8 +1,10 @@
 package erl.webdavtoon
 
 import android.Manifest
+import android.content.ClipData
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.text.SpannableString
@@ -13,7 +15,7 @@ import android.view.View
 import android.view.Menu
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.SearchView
+import androidx.core.content.FileProvider
 import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -26,6 +28,8 @@ import erl.webdavtoon.databinding.ActivityMainBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
 
 class MainActivity : AppCompatActivity() {
 
@@ -47,6 +51,7 @@ class MainActivity : AppCompatActivity() {
     private var currentQuery = MediaQuery()
     private var optionsMenu: android.view.Menu? = null
     private var infoMenuItem: android.view.MenuItem? = null
+    private var shareMenuItem: android.view.MenuItem? = null
     private var deleteMenuItem: android.view.MenuItem? = null
     private var favoriteMenuItem: android.view.MenuItem? = null
 
@@ -299,32 +304,24 @@ class MainActivity : AppCompatActivity() {
 
         infoMenuItem = menu.findItem(R.id.action_info)
         infoMenuItem?.isVisible = photoAdapter.isSelectionMode()
+        shareMenuItem = menu.findItem(R.id.action_share)
+        shareMenuItem?.isVisible = photoAdapter.isSelectionMode()
         deleteMenuItem = menu.findItem(R.id.action_delete)
         deleteMenuItem?.isVisible = photoAdapter.isSelectionMode()
         favoriteMenuItem = menu.findItem(R.id.action_favorite)
         favoriteMenuItem?.isVisible = photoAdapter.isSelectionMode()
         favoriteMenuItem?.setIcon(if (isFavorites) R.drawable.ic_ior_star_solid else R.drawable.ic_ior_star)
 
-        val searchItem = menu.findItem(R.id.action_search)
-        val searchView = searchItem?.actionView as? SearchView
-        searchView?.queryHint = getString(R.string.search_photos)
-        searchView?.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
-            override fun onQueryTextSubmit(query: String?): Boolean {
-                currentQuery = currentQuery.copy(keyword = query.orEmpty().trim())
+        SearchMenuHelper.configureLiveSearch(
+            context = this,
+            searchItem = menu.findItem(R.id.action_search),
+            hint = getString(R.string.search_photos),
+            currentKeyword = { currentQuery.keyword },
+            onKeywordChanged = { keyword ->
+                currentQuery = currentQuery.copy(keyword = keyword)
                 refreshMedia()
-                searchView.clearFocus()
-                return true
             }
-
-            override fun onQueryTextChange(newText: String?): Boolean {
-                val keyword = newText.orEmpty().trim()
-                if (keyword.isEmpty() && currentQuery.keyword.isNotEmpty()) {
-                    currentQuery = currentQuery.copy(keyword = "")
-                    refreshMedia()
-                }
-                return true
-            }
-        })
+        )
 
         val rotationLockItem = menu.findItem(R.id.action_rotation_lock)
         rotationLockItem?.isChecked = settingsManager.isRotationLocked()
@@ -372,6 +369,10 @@ class MainActivity : AppCompatActivity() {
             }
             R.id.action_info -> {
                 showSelectedPhotoDetails()
+                true
+            }
+            R.id.action_share -> {
+                shareSelectedPhotos()
                 true
             }
             R.id.action_favorite -> {
@@ -423,6 +424,7 @@ class MainActivity : AppCompatActivity() {
     private fun updateSelectionTitle(count: Int) {
         if (count < 0) {
             infoMenuItem?.isVisible = false
+            shareMenuItem?.isVisible = false
             deleteMenuItem?.isVisible = false
             favoriteMenuItem?.isVisible = false
             deleteMenuItem?.title = getString(R.string.delete)
@@ -443,6 +445,7 @@ class MainActivity : AppCompatActivity() {
             supportActionBar?.title = if (isRecursive && !isFavorites) "$displayTitle ${getString(R.string.all_suffix)}" else displayTitle
         } else {
             infoMenuItem?.isVisible = true
+            shareMenuItem?.isVisible = true
             deleteMenuItem?.isVisible = true
             favoriteMenuItem?.isVisible = true
             tintDeleteAction()
@@ -538,6 +541,9 @@ class MainActivity : AppCompatActivity() {
         )
 
         listOf(
+            R.id.action_share,
+            R.id.action_favorite,
+            R.id.action_info,
             R.id.action_select,
             R.id.action_settings,
             R.id.action_grid_columns,
@@ -552,6 +558,85 @@ class MainActivity : AppCompatActivity() {
         }
 
         menu.findItem(R.id.action_delete)?.icon?.mutate()?.let { DrawableCompat.setTint(it, deleteColor) }
+    }
+
+    private fun shareSelectedPhotos() {
+        val selectedPhotos = photoAdapter.getSelectedPhotos()
+        if (selectedPhotos.isEmpty()) return
+
+        lifecycleScope.launch {
+            runCatching {
+                val shareIntent = if (selectedPhotos.all { it.isLocal }) {
+                    buildLocalShareIntent(selectedPhotos)
+                } else {
+                    val shareFiles = withContext(Dispatchers.IO) {
+                        selectedPhotos.map { photo ->
+                            if (photo.isLocal) photo.imageUri else downloadRemotePhotoForShare(photo)
+                        }
+                    }
+                    buildFileShareIntent(selectedPhotos, shareFiles)
+                }
+                startActivity(Intent.createChooser(shareIntent, getString(R.string.share)))
+            }.onFailure { error ->
+                android.util.Log.e("MainActivity", "Share failed", error)
+                android.widget.Toast.makeText(this@MainActivity, getString(R.string.download_failed), android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun buildLocalShareIntent(selectedPhotos: List<Photo>): Intent {
+        return buildFileShareIntent(selectedPhotos, selectedPhotos.map { it.imageUri })
+    }
+
+    private fun buildFileShareIntent(selectedPhotos: List<Photo>, uris: List<Uri>): Intent {
+        return if (uris.size == 1) {
+            Intent(Intent.ACTION_SEND).apply {
+                type = shareMimeType(selectedPhotos.first())
+                putExtra(Intent.EXTRA_STREAM, uris.first())
+                clipData = ClipData.newUri(contentResolver, selectedPhotos.first().title, uris.first())
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        } else {
+            val shareUris = ArrayList(uris)
+            Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                type = if (selectedPhotos.all { it.mediaType == MediaType.IMAGE }) "image/*" else "*/*"
+                putParcelableArrayListExtra(Intent.EXTRA_STREAM, shareUris)
+                clipData = ClipData.newUri(contentResolver, selectedPhotos.first().title, shareUris.first()).apply {
+                    shareUris.drop(1).forEach { addItem(ClipData.Item(it)) }
+                }
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        }
+    }
+
+    private fun downloadRemotePhotoForShare(photo: Photo): Uri {
+        val shareDir = File(cacheDir, "shared_media").apply { mkdirs() }
+        val safeName = photo.title.replace(Regex("[\\\\/:*?\"<>|]"), "_").ifBlank { "shared_media" }
+        val targetFile = File(shareDir, safeName)
+        val credentials = okhttp3.Credentials.basic(settingsManager.getWebDavUsername(), settingsManager.getWebDavPassword())
+        val request = okhttp3.Request.Builder()
+            .url(FileUtils.encodeWebDavUrl(photo.imageUri.toString()))
+            .addHeader("Authorization", credentials)
+            .build()
+        okhttp3.OkHttpClient().newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw java.io.IOException("HTTP ${response.code}: ${response.message}")
+            }
+            val body = response.body ?: throw java.io.IOException("Empty response body")
+            FileOutputStream(targetFile).use { output ->
+                body.byteStream().use { input -> input.copyTo(output) }
+            }
+        }
+        return FileProvider.getUriForFile(this, "${BuildConfig.APPLICATION_ID}.fileprovider", targetFile)
+    }
+
+    private fun shareMimeType(photo: Photo): String {
+        return when (photo.mediaType) {
+            MediaType.IMAGE -> "image/*"
+            MediaType.VIDEO -> detectVideoMimeType(photo.title)
+                ?: detectVideoMimeType(photo.imageUri.toString())
+                ?: "video/*"
+        }
     }
 
     private fun showSelectedPhotoDetails() {

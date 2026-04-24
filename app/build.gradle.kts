@@ -15,7 +15,20 @@ extensions.configure<CargoExtension> {
     libname = "rust_core"
     targets = listOf("arm64")
     profile = "release"
-    pythonCommand = "python3"
+    val cargoHome = System.getenv("CARGO_HOME")
+        ?.let(::file)
+        ?: file("${System.getProperty("user.home")}/.cargo")
+    val cargoBin = cargoHome.resolve("bin")
+    if (org.gradle.internal.os.OperatingSystem.current().isWindows) {
+        cargoCommand = cargoBin.resolve("cargo.exe").absolutePath
+        rustcCommand = cargoBin.resolve("rustc.exe").absolutePath
+    }
+    val pythonExecutable = if (org.gradle.internal.os.OperatingSystem.current().isWindows) {
+        System.getenv("PYTHON") ?: file("${System.getProperty("user.home")}/AppData/Local/Microsoft/WindowsApps/python.exe").absolutePath
+    } else {
+        System.getenv("PYTHON") ?: "python3"
+    }
+    pythonCommand = pythonExecutable
     apiLevel = 24
 }
 
@@ -95,6 +108,12 @@ android {
         viewBinding = true
         buildConfig = true
     }
+
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
 }
 
 val rustJniLibDir = layout.buildDirectory.dir("rustJniLibs/android")
@@ -164,7 +183,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
 
-    implementation("androidx.datastore:datastore-preferences:1.1.1")
+    implementation("androidx.datastore:datastore-preferences:1.1.3")
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
     kapt("androidx.room:room-compiler:2.6.1")
@@ -180,11 +199,13 @@ dependencies {
 
     implementation("com.github.chrisbanes:PhotoView:2.3.0")
     implementation("com.google.code.gson:gson:2.10.1")
-    implementation("com.github.wseemann:FFmpegMediaMetadataRetriever-core:1.0.19")
-    implementation("com.github.wseemann:FFmpegMediaMetadataRetriever-native:1.0.19")
+
+    implementation("com.github.wseemann:FFmpegMediaMetadataRetriever-core:1.0.21")
+    implementation("com.github.wseemann:FFmpegMediaMetadataRetriever-native:1.0.21")
 
     implementation("net.java.dev.jna:jna:5.14.0@aar")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+    implementation("com.belerweb:pinyin4j:2.5.1")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
