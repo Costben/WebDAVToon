@@ -363,18 +363,16 @@ class PhotoViewActivity : AppCompatActivity() {
         val count = if (isCardMode) adapter.getSelectedCount() else webtoonAdapter?.getSelectedCount() ?: 0
         val defaultTint = getBottomBarIconTint()
         val primaryTint = android.content.res.ColorStateList.valueOf(ContextCompat.getColor(this, R.color.primary))
-        val redTint = android.content.res.ColorStateList.valueOf(android.graphics.Color.RED)
 
 
         if (isSelectionMode) {
             binding.toolbar.title = getString(R.string.selected_count, count)
             deleteMenuItem?.isVisible = true
-            // 确保 Toolbar 删除图标为红色
             deleteMenuItem?.icon?.let { icon ->
                 androidx.core.graphics.drawable.DrawableCompat.setTint(icon, android.graphics.Color.RED)
             }
             // 确保底栏删除图标为红色
-            binding.deleteButton.imageTintList = redTint
+            binding.deleteButton.visibility = View.GONE
             // 更新多选按钮图标颜色为主题色
             binding.selectButton.imageTintList = primaryTint
             binding.favoriteButton.imageTintList = primaryTint
@@ -390,6 +388,7 @@ class PhotoViewActivity : AppCompatActivity() {
 
     override fun onCreateOptionsMenu(menu: android.view.Menu): Boolean {
         menuInflater.inflate(R.menu.main_menu, menu)
+        OverflowMenuHelper.enableOptionalIcons(menu)
         // 隐藏不需要的菜单项
         menu.findItem(R.id.action_search)?.isVisible = false
         menu.findItem(R.id.action_select)?.isVisible = false
@@ -409,7 +408,36 @@ class PhotoViewActivity : AppCompatActivity() {
         val rotationLockItem = menu.findItem(R.id.action_rotation_lock)
         rotationLockItem?.isChecked = settingsManager.isRotationLocked()
 
+        tintOverflowMenuIcons(menu)
+
         return true
+    }
+
+    override fun onPrepareOptionsMenu(menu: android.view.Menu): Boolean {
+        OverflowMenuHelper.enableOptionalIcons(menu)
+        tintOverflowMenuIcons(menu)
+        return super.onPrepareOptionsMenu(menu)
+    }
+
+    override fun onMenuOpened(featureId: Int, menu: android.view.Menu): Boolean {
+        OverflowMenuHelper.enableOptionalIcons(menu)
+        tintOverflowMenuIcons(menu)
+        return super.onMenuOpened(featureId, menu)
+    }
+
+    private fun tintOverflowMenuIcons(menu: android.view.Menu) {
+        val normalColor = ContextCompat.getColor(this, R.color.onSurface)
+        val deleteColor = ContextCompat.getColor(this, R.color.primary_red)
+        menu.findItem(R.id.action_rotation_lock)?.icon?.mutate()?.let { icon ->
+            androidx.core.graphics.drawable.DrawableCompat.setTint(icon, normalColor)
+        }
+        menu.findItem(R.id.action_delete)?.icon?.mutate()?.let { icon ->
+            androidx.core.graphics.drawable.DrawableCompat.setTint(icon, deleteColor)
+        }
+        val deleteTitle = android.text.SpannableString(getString(R.string.delete)).apply {
+            setSpan(android.text.style.ForegroundColorSpan(deleteColor), 0, length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+        }
+        menu.findItem(R.id.action_delete)?.title = deleteTitle
     }
 
     override fun onOptionsItemSelected(item: android.view.MenuItem): Boolean {
