@@ -356,7 +356,7 @@ class SubFolderActivity : AppCompatActivity() {
             currentAllFolders
         } else {
             currentAllFolders.filter {
-                it.name.contains(currentSearchKeyword, ignoreCase = true)
+                FolderSearchMatcher.matches(it.name, currentSearchKeyword)
             }
         }
 
