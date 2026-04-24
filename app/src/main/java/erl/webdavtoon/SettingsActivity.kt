@@ -257,15 +257,17 @@ class SettingsActivity : AppCompatActivity() {
             .setTitle(getString(R.string.webdav_config, settingsManager.getCurrentSlot()))
             .setView(dialogBinding.root)
             .setPositiveButton(R.string.save) { _, _ ->
-                settingsManager.setWebDavAlias(dialogBinding.aliasEdit.text.toString())
-                settingsManager.setWebDavProtocol(dialogBinding.protocolEdit.text.toString())
-                settingsManager.setWebDavUrl(dialogBinding.hostEdit.text.toString())
-                settingsManager.setWebDavPort(dialogBinding.portEdit.text.toString().toIntOrNull() ?: 443)
-                settingsManager.setWebDavUsername(dialogBinding.usernameEdit.text.toString())
-                settingsManager.setWebDavRememberPassword(dialogBinding.rememberPasswordCheck.isChecked)
-                settingsManager.setWebDavPassword(dialogBinding.passwordEdit.text.toString())
-                settingsManager.setWebDavEnabled(true)
-                
+                settingsManager.saveWebDavConfiguration(
+                    alias = dialogBinding.aliasEdit.text.toString(),
+                    protocol = dialogBinding.protocolEdit.text.toString(),
+                    url = dialogBinding.hostEdit.text.toString(),
+                    port = dialogBinding.portEdit.text.toString().toIntOrNull() ?: 443,
+                    username = dialogBinding.usernameEdit.text.toString(),
+                    password = dialogBinding.passwordEdit.text.toString(),
+                    rememberPassword = dialogBinding.rememberPasswordCheck.isChecked,
+                    enabled = true
+                )
+
                 refreshUi()
                 setResult(RESULT_OK)
             }

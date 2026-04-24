@@ -3,7 +3,8 @@ package erl.webdavtoon
 import android.content.Context
 import android.util.Log
 import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
+import com.google.gson.JsonParser
+import kotlinx.coroutines.runBlocking
 
 class SettingsManager(context: Context) {
     private val appContext = context.applicationContext
@@ -130,7 +131,9 @@ class SettingsManager(context: Context) {
         appSettings.putBoolean(AppSettingsStore.ROTATION_LOCKED, locked)
 
     fun getCurrentSlot(): Int = appSettings.getOrDefaultInt(AppSettingsStore.CURRENT_SLOT, 0)
-    fun setCurrentSlot(slot: Int) = appSettings.putInt(AppSettingsStore.CURRENT_SLOT, slot)
+    fun setCurrentSlot(slot: Int) = runBlocking {
+        appSettings.putIntSync(AppSettingsStore.CURRENT_SLOT, slot)
+    }
 
     // Deprecated legacy switch: app runs in webdav-only mode.
     fun getServerType(): String = "webdav"
@@ -138,15 +141,17 @@ class SettingsManager(context: Context) {
 
     fun deleteSlot(slot: Int) {
         val slots = getWebDavSlots()
-        if (slots.remove(slot) != null) {
-            saveWebDavSlots(slots)
-            credentialPolicy.deletePassword(slot)
+        if (slots.remove(slot) == null) {
+            return
         }
 
-        if (getCurrentSlot() == slot) {
-            val next = slots.keys.firstOrNull() ?: 0
-            setCurrentSlot(next)
+        credentialPolicy.deletePassword(slot)
+        val next = if (getCurrentSlot() == slot) {
+            slots.keys.firstOrNull() ?: 0
+        } else {
+            null
         }
+        saveWebDavSlots(slots, next)
     }
 
     fun getAllSlots(): List<Int> {
@@ -195,6 +200,33 @@ class SettingsManager(context: Context) {
     fun setWebDavEnabled(enabled: Boolean, slot: Int = getCurrentSlot()) =
         upsertWebDavSlot(slot) { copy(enabled = enabled) }
 
+    fun saveWebDavConfiguration(
+        slot: Int = getCurrentSlot(),
+        alias: String,
+        protocol: String,
+        url: String,
+        port: Int,
+        username: String,
+        password: String,
+        rememberPassword: Boolean,
+        enabled: Boolean = true,
+        switchToSlotOnSave: Boolean = false
+    ) {
+        val slots = getWebDavSlots()
+        val current = slots[slot] ?: WebDavSlotConfig()
+        slots[slot] = current.copy(
+            alias = alias,
+            protocol = protocol,
+            url = url,
+            port = port,
+            username = username,
+            rememberPassword = rememberPassword,
+            enabled = enabled
+        )
+        saveWebDavSlots(slots, if (switchToSlotOnSave) slot else null)
+        credentialPolicy.savePassword(slot, rememberPassword, password)
+    }
+
     fun getFullWebDavUrl(slot: Int = getCurrentSlot()): String {
         val fullUrl = WebDavEndpointNormalizer.normalize(
             protocol = getWebDavProtocol(slot),
@@ -237,11 +269,15 @@ class SettingsManager(context: Context) {
             }
 
             return try {
-                val type = object : TypeToken<Map<String, WebDavSlotConfig>>() {}.type
-                val result = gson.fromJson<Map<String, WebDavSlotConfig>>(json, type).orEmpty()
-                val parsed = result.mapNotNull { (key, value) ->
-                    key.toIntOrNull()?.let { it to value }
-                }.toMap().toMutableMap()
+                val root = JsonParser.parseString(json)
+                check(root.isJsonObject) { "WebDAV slots JSON must be an object" }
+                val parsed = mutableMapOf<Int, WebDavSlotConfig>()
+                root.asJsonObject.entrySet().forEach { (key, value) ->
+                    val slot = key.toIntOrNull() ?: return@forEach
+                    runCatching {
+                        gson.fromJson(value, WebDavSlotConfig::class.java)
+                    }.getOrNull()?.let { parsed[slot] = it }
+                }
 
                 cachedSlotsJson = json
                 cachedSlotsMap = parsed
@@ -255,14 +291,23 @@ class SettingsManager(context: Context) {
         }
     }
 
-    private fun saveWebDavSlots(slots: Map<Int, WebDavSlotConfig>) {
+    private fun saveWebDavSlots(slots: Map<Int, WebDavSlotConfig>, currentSlotOverride: Int? = null) {
         val asStringMap = slots.mapKeys { it.key.toString() }
         val json = gson.toJson(asStringMap)
         synchronized(slotCacheLock) {
             cachedSlotsJson = json
             cachedSlotsMap = slots.toMutableMap()
         }
-        appSettings.putString(AppSettingsStore.WEBDAV_SLOTS_JSON, json)
+        runBlocking {
+            if (currentSlotOverride == null) {
+                appSettings.putStringSync(AppSettingsStore.WEBDAV_SLOTS_JSON, json)
+            } else {
+                appSettings.editSync {
+                    this[AppSettingsStore.WEBDAV_SLOTS_JSON] = json
+                    this[AppSettingsStore.CURRENT_SLOT] = currentSlotOverride
+                }
+            }
+        }
     }
 
     private fun getWebDavSlot(slot: Int): WebDavSlotConfig? {

@@ -68,7 +68,8 @@ android {
         getByName("debug")
 
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // Safely assign signing config
             if (signingConfigs.findByName("release") != null) {
@@ -112,25 +113,44 @@ tasks.matching { task ->
     outputs.upToDateWhen { false }
 }
 
-val exportedDebugApk = rootProject.layout.projectDirectory.file("webdavtoon-debug.apk")
-
-val exportDebugApkToRoot = tasks.register("exportDebugApkToRoot") {
-    val sourceApk = layout.buildDirectory.file("outputs/apk/debug/app-debug.apk")
+fun registerRootApkExportTask(
+    taskName: String,
+    sourceRelativePath: String,
+    exportedFileName: String
+) = tasks.register(taskName) {
+    val sourceApk = layout.buildDirectory.file(sourceRelativePath)
+    val exportedApk = rootProject.layout.projectDirectory.file(exportedFileName)
     inputs.file(sourceApk)
-    outputs.file(exportedDebugApk)
-    doNotTrackState("Copies the built debug APK into the project root for user download.")
+    outputs.file(exportedApk)
+    doNotTrackState("Copies the built APK into the project root for user download.")
 
     doLast {
         copy {
             from(sourceApk)
             into(rootProject.layout.projectDirectory)
-            rename { "webdavtoon-debug.apk" }
+            rename { exportedFileName }
         }
     }
 }
 
+val exportDebugApkToRoot = registerRootApkExportTask(
+    taskName = "exportDebugApkToRoot",
+    sourceRelativePath = "outputs/apk/debug/app-debug.apk",
+    exportedFileName = "webdavtoon-debug.apk"
+)
+
+val exportReleaseApkToRoot = registerRootApkExportTask(
+    taskName = "exportReleaseApkToRoot",
+    sourceRelativePath = "outputs/apk/release/app-release.apk",
+    exportedFileName = "webdavtoon-release.apk"
+)
+
 tasks.matching { it.name == "assembleDebug" }.configureEach {
     finalizedBy(exportDebugApkToRoot)
+}
+
+tasks.matching { it.name == "assembleRelease" }.configureEach {
+    finalizedBy(exportReleaseApkToRoot)
 }
 
 dependencies {
@@ -143,7 +163,6 @@ dependencies {
 
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
 
     implementation("androidx.datastore:datastore-preferences:1.1.1")
     implementation("androidx.room:room-runtime:2.6.1")

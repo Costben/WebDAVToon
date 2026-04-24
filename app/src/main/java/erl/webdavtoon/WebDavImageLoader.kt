@@ -7,6 +7,7 @@ import android.util.LruCache
 import android.graphics.drawable.Drawable
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.os.Build
 import android.view.View
 import android.widget.ImageView
 import android.widget.ProgressBar
@@ -32,15 +33,19 @@ import java.io.FileOutputStream
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 object WebDavImageLoader {
 
     private const val FOLDER_PREVIEW_SIZE_PX = 160
+    private const val FOLDER_PREVIEW_DECODE_MAX_PX = 240
     private const val NORMAL_VIDEO_PREVIEW_SIZE_PX = 320
     private const val DEFAULT_REMOTE_VIDEO_SOURCE_CACHE_BYTES = 64L * 1024L * 1024L
     private const val AVI_REMOTE_VIDEO_SOURCE_CACHE_BYTES = 8L * 1024L * 1024L
-    private const val VIDEO_BITMAP_CACHE_VERSION = 5
+    private const val LOCAL_IMAGE_PREVIEW_SAMPLE_MAX_PX = 96
+    private const val VIDEO_BITMAP_CACHE_VERSION = 6
     private val remoteVideoThumbCache = object : LruCache<String, Bitmap>(24) {}
     private val localVideoThumbCache = object : LruCache<String, Bitmap>(24) {}
+    private val blankLocalImagePreviewCache = object : LruCache<String, Boolean>(96) {}
 
     @Volatile
     private var cachedAuthKey: String? = null
@@ -49,6 +54,7 @@ object WebDavImageLoader {
     private var cachedAuthHeader: String? = null
 
     private val settingsManagers = ConcurrentHashMap<String, SettingsManager>()
+    private val videoThumbnailDispatcher = Dispatchers.IO.limitedParallelism(2)
 
     fun loadWebDavImage(
         context: Context,
@@ -80,6 +86,7 @@ object WebDavImageLoader {
         val cacheKey = buildVideoBitmapCacheKey(encodedUrl, isFolderPreview)
         imageView.tag = cacheKey
         progressBar?.visibility = View.VISIBLE
+        showVideoPlaceholder(imageView, isFolderPreview)
 
         remoteVideoThumbCache.get(cacheKey)?.let { cached ->
             if (cached.isLikelyBlankVideoThumbnail()) {
@@ -108,7 +115,7 @@ object WebDavImageLoader {
         )
 
         @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
-        GlobalScope.launch(Dispatchers.IO) {
+        GlobalScope.launch(videoThumbnailDispatcher) {
             val diskCached = loadCachedVideoBitmap(context, cacheKey)
             val bitmap = diskCached ?: extractRemoteVideoThumbnail(context, encodedUrl, headers, isFolderPreview)
 
@@ -128,6 +135,7 @@ object WebDavImageLoader {
                     imageView.setImageBitmap(bitmap)
                     android.util.Log.i("WebDavImageLoader", "WebDAV-Video thumbnail success: $encodedUrl")
                 } else {
+                    showVideoPlaceholder(imageView, isFolderPreview)
                     android.util.Log.w("WebDavImageLoader", "WebDAV-Video thumbnail fallback placeholder: $encodedUrl")
                 }
                 progressBar?.visibility = View.GONE
@@ -163,6 +171,7 @@ object WebDavImageLoader {
         val cacheKey = buildVideoBitmapCacheKey(videoUri.toString(), isFolderPreview)
         imageView.tag = cacheKey
         progressBar?.visibility = View.VISIBLE
+        showVideoPlaceholder(imageView, isFolderPreview)
 
         localVideoThumbCache.get(cacheKey)?.let { cached ->
             if (cached.isLikelyBlankVideoThumbnail()) {
@@ -177,7 +186,7 @@ object WebDavImageLoader {
         }
 
         @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
-        GlobalScope.launch(Dispatchers.IO) {
+        GlobalScope.launch(videoThumbnailDispatcher) {
             val diskCached = loadCachedVideoBitmap(context, cacheKey)
             val bitmap = diskCached ?: extractLocalVideoThumbnail(context, videoUri, isFolderPreview)
             withContext(Dispatchers.Main) {
@@ -194,11 +203,33 @@ object WebDavImageLoader {
                     applyVideoThumbnailDisplayMode(imageView, isFolderPreview)
                     imageView.setImageBitmap(bitmap)
                 } else {
+                    showVideoPlaceholder(imageView, isFolderPreview)
                     android.util.Log.w("WebDavImageLoader", "Local-Video thumbnail fallback placeholder: $videoUri")
                 }
                 progressBar?.visibility = View.GONE
             }
         }
+    }
+
+    fun isLikelyBlankLocalImagePreview(context: Context, imageUri: Uri): Boolean {
+        val cacheKey = imageUri.toString()
+        blankLocalImagePreviewCache.get(cacheKey)?.let { return it }
+
+        val result = runCatching {
+            decodeLocalPreviewSample(context, imageUri)?.let { bitmap ->
+                try {
+                    bitmap.isLikelyBlankPreviewBitmap()
+                } finally {
+                    runCatching { bitmap.recycle() }
+                }
+            } ?: false
+        }.getOrElse { t ->
+            android.util.Log.w("WebDavImageLoader", "Failed to inspect local image preview: $imageUri", t)
+            false
+        }
+
+        blankLocalImagePreviewCache.put(cacheKey, result)
+        return result
     }
 
     private fun extractRemoteVideoThumbnail(
@@ -559,6 +590,7 @@ object WebDavImageLoader {
             try {
                 configure(retriever)
                 val durationMs = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
+                val scaledFrameSize = resolvePlatformScaledFrameSize(retriever, isFolderPreview)
                 val candidateTimes = VideoThumbnailHeuristics.candidateFrameTimesUs(
                     requestedTimeUs = frameTimeUs,
                     durationMs = durationMs,
@@ -571,14 +603,22 @@ object WebDavImageLoader {
                 )
 
                 for (candidateTimeUs in candidateTimes) {
-                    retriever.getFrameAtTime(candidateTimeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                    retriever.extractFrameAtTime(
+                        timeUs = candidateTimeUs,
+                        option = MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+                        scaledFrameSize = scaledFrameSize
+                    )
                         ?.takeIfUsableVideoFrame(dataSourceLabel, candidateTimeUs, sourceExtension, isFolderPreview, "platform-sync")
                         ?.let { return it }
                 }
 
                 if (!preferSyncOnly) {
                     for (candidateTimeUs in candidateTimes) {
-                        retriever.getFrameAtTime(candidateTimeUs, MediaMetadataRetriever.OPTION_CLOSEST)
+                        retriever.extractFrameAtTime(
+                            timeUs = candidateTimeUs,
+                            option = MediaMetadataRetriever.OPTION_CLOSEST,
+                            scaledFrameSize = scaledFrameSize
+                        )
                             ?.takeIfUsableVideoFrame(dataSourceLabel, candidateTimeUs, sourceExtension, isFolderPreview, "platform-closest")
                             ?.let { return it }
                     }
@@ -591,6 +631,43 @@ object WebDavImageLoader {
             android.util.Log.w("WebDavImageLoader", "Platform retriever failed: $dataSourceLabel", t)
             null
         }
+    }
+
+    private fun resolvePlatformScaledFrameSize(
+        retriever: MediaMetadataRetriever,
+        isFolderPreview: Boolean
+    ): Pair<Int, Int>? {
+        if (!isFolderPreview || Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1) {
+            return null
+        }
+
+        val width = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull()
+        val height = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull()
+        if (width == null || height == null || width <= 0 || height <= 0) {
+            return null
+        }
+
+        val longestEdge = maxOf(width, height)
+        if (longestEdge <= FOLDER_PREVIEW_DECODE_MAX_PX) {
+            return width to height
+        }
+
+        val scale = FOLDER_PREVIEW_DECODE_MAX_PX.toFloat() / longestEdge.toFloat()
+        return maxOf(1, (width * scale).toInt()) to maxOf(1, (height * scale).toInt())
+    }
+
+    private fun MediaMetadataRetriever.extractFrameAtTime(
+        timeUs: Long,
+        option: Int,
+        scaledFrameSize: Pair<Int, Int>?
+    ): Bitmap? {
+        if (scaledFrameSize != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            runCatching {
+                return getScaledFrameAtTime(timeUs, option, scaledFrameSize.first, scaledFrameSize.second)
+            }
+        }
+
+        return getFrameAtTime(timeUs, option)
     }
 
     private inline fun tryExtractWithFfmpegRetriever(
@@ -864,6 +941,56 @@ object WebDavImageLoader {
         }
     }
 
+    private fun showVideoPlaceholder(imageView: ImageView, isFolderPreview: Boolean) {
+        if (isFolderPreview) {
+            imageView.scaleType = ImageView.ScaleType.CENTER
+            imageView.setImageResource(R.drawable.ic_ior_play)
+        } else {
+            imageView.scaleType = ImageView.ScaleType.FIT_CENTER
+            imageView.setImageResource(R.drawable.bg_video_thumbnail_placeholder)
+        }
+    }
+
+    private fun decodeLocalPreviewSample(context: Context, imageUri: Uri): Bitmap? {
+        val bounds = BitmapFactory.Options().apply {
+            inJustDecodeBounds = true
+        }
+        context.contentResolver.openInputStream(imageUri)?.use { input ->
+            BitmapFactory.decodeStream(input, null, bounds)
+        } ?: return null
+
+        val decodeOptions = BitmapFactory.Options().apply {
+            inSampleSize = calculateInSampleSize(
+                srcWidth = bounds.outWidth,
+                srcHeight = bounds.outHeight,
+                targetMaxDimension = LOCAL_IMAGE_PREVIEW_SAMPLE_MAX_PX
+            )
+            inPreferredConfig = Bitmap.Config.ARGB_8888
+        }
+
+        return context.contentResolver.openInputStream(imageUri)?.use { input ->
+            BitmapFactory.decodeStream(input, null, decodeOptions)
+        }
+    }
+
+    private fun calculateInSampleSize(
+        srcWidth: Int,
+        srcHeight: Int,
+        targetMaxDimension: Int
+    ): Int {
+        if (srcWidth <= 0 || srcHeight <= 0 || targetMaxDimension <= 0) return 1
+
+        var sampleSize = 1
+        var currentWidth = srcWidth
+        var currentHeight = srcHeight
+        while (maxOf(currentWidth, currentHeight) > targetMaxDimension) {
+            sampleSize *= 2
+            currentWidth = srcWidth / sampleSize
+            currentHeight = srcHeight / sampleSize
+        }
+        return sampleSize.coerceAtLeast(1)
+    }
+
     /**
      * 清除图片的 Glide 缓存
      */
@@ -873,6 +1000,7 @@ object WebDavImageLoader {
             Glide.get(context).clearMemory()
             remoteVideoThumbCache.evictAll()
             localVideoThumbCache.evictAll()
+            blankLocalImagePreviewCache.evictAll()
             withContext(Dispatchers.IO) {
                 Glide.get(context).clearDiskCache()
                 runCatching {

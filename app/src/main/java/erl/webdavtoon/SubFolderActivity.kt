@@ -381,6 +381,7 @@ class SubFolderActivity : AppCompatActivity() {
     private fun loadFolders(forceRefresh: Boolean = false) {
         beginFolderLoading(forceRefresh)
         val startedAt = SystemClock.elapsedRealtime()
+        val shouldAutoOpenPhotoList = !forceRefresh && currentAllFolders.isEmpty() && adapter.itemCount == 0
 
         lifecycleScope.launch {
             val allFolders = mutableListOf<Folder>()
@@ -442,25 +443,31 @@ class SubFolderActivity : AppCompatActivity() {
                 if (folders.isEmpty()) {
                     android.util.Log.i(
                         "SubFolderActivity",
-                        "loadFolders path=$folderPath forceRefresh=$forceRefresh empty=true elapsedMs=${SystemClock.elapsedRealtime() - startedAt}"
+                        "loadFolders path=$folderPath forceRefresh=$forceRefresh empty=true autoOpen=$shouldAutoOpenPhotoList elapsedMs=${SystemClock.elapsedRealtime() - startedAt}"
                     )
-                    val intent = Intent(this@SubFolderActivity, MainActivity::class.java).apply {
-                        putExtra("EXTRA_FOLDER_PATH", folderPath)
-                        putExtra("EXTRA_IS_WEBDAV", isWebDav)
-                        putExtra("EXTRA_RECURSIVE", false)
+                    if (shouldAutoOpenPhotoList) {
+                        val intent = Intent(this@SubFolderActivity, MainActivity::class.java).apply {
+                            putExtra("EXTRA_FOLDER_PATH", folderPath)
+                            putExtra("EXTRA_IS_WEBDAV", isWebDav)
+                            putExtra("EXTRA_RECURSIVE", false)
+                        }
+                        startActivity(intent)
+                        finish()
+                        return@launch
                     }
-                    startActivity(intent)
-                    finish()
-                    return@launch
+                    android.util.Log.w(
+                        "SubFolderActivity",
+                        "Keeping current folder page after refresh/non-initial empty result path=$folderPath"
+                    )
+                } else {
+                    allFolders.addAll(folders)
+                    currentAllFolders = allFolders.toList()
+                    applyFilterAndSort()
+                    android.util.Log.i(
+                        "SubFolderActivity",
+                        "loadFolders path=$folderPath forceRefresh=$forceRefresh count=${allFolders.size} elapsedMs=${SystemClock.elapsedRealtime() - startedAt}"
+                    )
                 }
-
-                allFolders.addAll(folders)
-                currentAllFolders = allFolders.toList()
-                applyFilterAndSort()
-                android.util.Log.i(
-                    "SubFolderActivity",
-                    "loadFolders path=$folderPath forceRefresh=$forceRefresh count=${allFolders.size} elapsedMs=${SystemClock.elapsedRealtime() - startedAt}"
-                )
             } catch (e: Exception) {
                 android.util.Log.e("SubFolderActivity", "Folders load failed", e)
                 hideToolbarRefreshPill()
