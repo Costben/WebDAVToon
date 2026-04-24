@@ -28,8 +28,8 @@ android {
         applicationId = "erl.webdavtoon"
         minSdk = 24
         targetSdk = 36
-        versionCode = 14
-        versionName = "1.1.6"
+        versionCode = 15
+        versionName = "1.1.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
