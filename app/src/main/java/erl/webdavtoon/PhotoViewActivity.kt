@@ -54,6 +54,7 @@ class PhotoViewActivity : AppCompatActivity() {
     private var isSelectionMode = false
     private var isFavorites = false
     private var deleteMenuItem: android.view.MenuItem? = null
+    private var shareMenuItem: android.view.MenuItem? = null
     private var isDraggingFastScroll = false
     private var isInitialLoad = true
 
@@ -375,6 +376,7 @@ class PhotoViewActivity : AppCompatActivity() {
 
         if (isSelectionMode) {
             binding.toolbar.title = getString(R.string.selected_count, count)
+            shareMenuItem?.isVisible = true
             deleteMenuItem?.isVisible = true
             deleteMenuItem?.icon?.let { icon ->
                 androidx.core.graphics.drawable.DrawableCompat.setTint(icon, android.graphics.Color.RED)
@@ -384,11 +386,14 @@ class PhotoViewActivity : AppCompatActivity() {
             // 更新多选按钮图标颜色为主题色
             binding.selectButton.imageTintList = primaryTint
             binding.favoriteButton.imageTintList = primaryTint
+            invalidateOptionsMenu()
         } else {
             deleteMenuItem?.isVisible = false
+            shareMenuItem?.isVisible = false
             // 恢复底栏按钮颜色
             binding.deleteButton.imageTintList = defaultTint
             binding.selectButton.imageTintList = defaultTint
+            shareMenuItem?.isVisible = false
             updateFavoriteButtonState()
             updateCurrentPosition()
         }
@@ -403,7 +408,9 @@ class PhotoViewActivity : AppCompatActivity() {
         menu.findItem(R.id.action_settings)?.isVisible = false
         menu.findItem(R.id.action_sort_order)?.isVisible = false
         menu.findItem(R.id.action_grid_columns)?.isVisible = false
-        menu.findItem(R.id.action_share)?.isVisible = isSelectionMode
+        shareMenuItem = menu.findItem(R.id.action_share)
+        shareMenuItem?.isVisible = isSelectionMode
+        shareMenuItem?.setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_NEVER)
 
         deleteMenuItem = menu.findItem(R.id.action_delete)
         deleteMenuItem?.isVisible = isSelectionMode
@@ -424,6 +431,8 @@ class PhotoViewActivity : AppCompatActivity() {
 
     override fun onPrepareOptionsMenu(menu: android.view.Menu): Boolean {
         OverflowMenuHelper.enableOptionalIcons(menu)
+        shareMenuItem?.isVisible = isSelectionMode
+        menu.findItem(R.id.action_share)?.isVisible = isSelectionMode
         tintOverflowMenuIcons(menu)
         return super.onPrepareOptionsMenu(menu)
     }
