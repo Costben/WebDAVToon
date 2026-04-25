@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="default_reader_mode">Default Reader Mode</string>
+    <string name="default_reader_mode_webtoon">Comic mode</string>
+    <string name="default_reader_mode_card">Normal mode</string>
+</resources>

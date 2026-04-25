@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="slideshow">Slideshow</string>
+    <string name="slideshow_interval_title">Slideshow Interval (ms)</string>
+    <string name="slideshow_interval_error">Enter at least %1$d ms</string>
+</resources>
