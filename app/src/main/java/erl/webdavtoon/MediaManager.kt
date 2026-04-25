@@ -5,10 +5,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Locale
 import kotlin.random.Random
 
 /**
- * 集中管理媒体库的分页加载逻辑，供 MainActivity 和 PhotoViewActivity 共享
+ * 集中管理媒体库的分页加载逻辑，供 MainActivity �?PhotoViewActivity 共享
  */
 object MediaManager {
     private const val PAGE_SIZE = 120
@@ -22,21 +23,20 @@ object MediaManager {
         randomizePhotos: Boolean = false,
         photoShuffleSeed: Long = 0L
     ): List<Photo> {
-        if (photos.isEmpty()) return photos
+        val baseSorted = sortMediaItems(photos, sortOrder)
+        if (baseSorted.isEmpty()) return baseSorted
 
-        // 非递归模式的数据已经由 Repository 排好序，直接返回，避免重复排序
         if (!isRecursive) {
-            return if (randomizePhotos) photos.shuffled(Random(photoShuffleSeed)) else photos
+            return if (randomizePhotos) baseSorted.shuffled(Random(photoShuffleSeed)) else baseSorted
         }
 
         val grouped = LinkedHashMap<String, List<Photo>>()
-        for (photo in photos) {
+        for (photo in baseSorted) {
             grouped[photo.folderPath] = (grouped[photo.folderPath] ?: emptyList()) + photo
         }
 
-        // 只有一个文件夹时无需重排文件夹，但仍可随机当前文件夹内图片
         if (grouped.size <= 1) {
-            return if (randomizePhotos) photos.shuffled(Random(photoShuffleSeed)) else photos
+            return if (randomizePhotos) baseSorted.shuffled(Random(photoShuffleSeed)) else baseSorted
         }
 
         val sortedFolderPaths = sortFolderPaths(
@@ -47,9 +47,19 @@ object MediaManager {
             oldestDate = { folderPhotos -> folderPhotos.minOfOrNull { it.dateModified } ?: 0L }
         )
 
-        val result = ArrayList<Photo>(photos.size)
+        val result = ArrayList<Photo>(baseSorted.size)
         result.addAll(flattenFolderGroups(grouped, sortedFolderPaths, randomizePhotos, photoShuffleSeed))
         return result
+    }
+    private fun sortMediaItems(photos: List<Photo>, sortOrder: Int): List<Photo> {
+        return when (sortOrder) {
+            SettingsManager.SORT_NAME_ASC -> photos.sortedBy { it.title.lowercase(Locale.ROOT) }
+            SettingsManager.SORT_NAME_DESC -> photos.sortedByDescending { it.title.lowercase(Locale.ROOT) }
+            SettingsManager.SORT_DATE_ASC -> photos.sortedBy { it.dateModified }
+            SettingsManager.SORT_DATE_DESC,
+            SettingsManager.SORT_RANDOM_FOLDERS -> photos.sortedByDescending { it.dateModified }
+            else -> photos.sortedByDescending { it.dateModified }
+        }
     }
 
     internal fun <T> sortFolderPaths(
@@ -144,58 +154,68 @@ object MediaManager {
         scope.launch {
             try {
                 val settingsManager = SettingsManager(context)
+                val sortOrder = settingsManager.getPhotoSortOrder()
                 val page = withContext(Dispatchers.IO) {
-                    if (state.isFavorites) {
-                        val allFavorites = settingsManager.getFavoritePhotos()
-                        val keyword = state.currentQuery.keyword.trim()
-                        val filtered = if (keyword.isNotEmpty()) {
-                            allFavorites.filter { it.title.contains(keyword, ignoreCase = true) }
-                        } else {
-                            allFavorites
-                        }
-
-                        val safeOffset = if (append) state.currentOffset.coerceAtLeast(0) else 0
-                        val items = filtered.drop(safeOffset).take(PAGE_SIZE)
-                        val next = safeOffset + items.size
-                        MediaPageResult(items = items, hasMore = next < filtered.size, nextOffset = next)
+                    val allMedia = if (state.isFavorites) {
+                        settingsManager.getFavoritePhotos()
                     } else if (state.isRemote) {
                         RustWebDavPhotoRepository(settingsManager)
-                            .queryMediaPage(
+                            .getPhotos(
                                 state.folderPath,
                                 state.isRecursive,
-                                state.currentQuery,
-                                if (append) state.currentOffset else 0,
-                                PAGE_SIZE,
                                 forceRefresh
                             )
                     } else {
                         LocalPhotoRepository(context)
-                            .queryMediaPage(
+                            .getPhotos(
                                 state.folderPath,
                                 state.isRecursive,
-                                state.currentQuery,
-                                if (append) state.currentOffset else 0,
-                                PAGE_SIZE,
                                 forceRefresh
                             )
                     }
+
+                    val ordered = sortPhotos(
+                        photos = allMedia.filter { matchesMediaQuery(it, state.currentQuery) },
+                        sortOrder = sortOrder,
+                        isRecursive = state.isRecursive,
+                        clusterShuffleSeed = state.clusterShuffleSeed,
+                        randomizePhotos = state.currentQuery.randomizePhotos,
+                        photoShuffleSeed = state.photoShuffleSeed
+                    )
+
+                    val safeOffset = if (append) state.currentOffset.coerceAtLeast(0) else 0
+                    val items = ordered.drop(safeOffset).take(PAGE_SIZE)
+                    val next = safeOffset + items.size
+                    MediaPageResult(items = items, hasMore = next < ordered.size, nextOffset = next)
                 }
 
-                mediaViewModel?.setPage(page.items, page.hasMore, page.nextOffset, append)
-
-                // 同时更新 PhotoCache，确保 PhotoViewActivity 也能拿到最新的全量列表
-                if (append) {
-                    val currentPhotos = PhotoCache.getPhotos().toMutableList()
-                    currentPhotos.addAll(page.items)
-                    PhotoCache.setPhotos(currentPhotos)
-                } else {
-                    PhotoCache.setPhotos(page.items)
-                }
+                val viewModel = mediaViewModel ?: return@launch
+                viewModel.setPage(page.items, page.hasMore, page.nextOffset, append)
+                val updatedState = viewModel.state.value
+                MediaStateCache.setState(updatedState)
+                PhotoCache.setPhotos(updatedState.photos)
 
             } catch (e: Exception) {
                 android.util.Log.e("MediaManager", "Load failed: ${e.message}", e)
                 mediaViewModel?.setError(e.message ?: e.toString())
             }
         }
+    }
+
+    private fun matchesMediaQuery(photo: Photo, query: MediaQuery): Boolean {
+        val keyword = query.keyword.trim()
+        if (keyword.isNotEmpty() && !photo.title.contains(keyword, ignoreCase = true)) return false
+        if (query.minSizeBytes != null && photo.size < query.minSizeBytes) return false
+        if (query.maxSizeBytes != null && photo.size > query.maxSizeBytes) return false
+
+        if (query.extensions.isNotEmpty()) {
+            val uri = photo.imageUri.toString().lowercase(Locale.ROOT)
+            val matched = query.extensions.any { ext ->
+                val clean = ext.trim().trimStart('.').lowercase(Locale.ROOT)
+                uri.endsWith(".$clean")
+            }
+            if (!matched) return false
+        }
+        return true
     }
 }

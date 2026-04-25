@@ -37,6 +37,10 @@ object ConfigMigration {
                 .let { appSettings.putIntSync(AppSettingsStore.WATERFALL_MAX_WIDTH, it) }
             legacy.getInt(SettingsManager.KEY_READER_MAX_ZOOM_PERCENT, 300)
                 .let { appSettings.putIntSync(AppSettingsStore.READER_MAX_ZOOM_PERCENT, it) }
+            legacy.getString(
+                SettingsManager.KEY_DEFAULT_READER_MODE,
+                SettingsManager.DEFAULT_READER_MODE_WEBTOON
+            )?.let { appSettings.putStringSync(AppSettingsStore.DEFAULT_READER_MODE, it) }
             legacy.getBoolean(SettingsManager.KEY_ROTATION_LOCKED, false)
                 .let { appSettings.putBooleanSync(AppSettingsStore.ROTATION_LOCKED, it) }
             legacy.getInt(SettingsManager.KEY_CURRENT_SLOT, 0)
