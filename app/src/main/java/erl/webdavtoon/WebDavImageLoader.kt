@@ -23,7 +23,9 @@ import com.bumptech.glide.load.model.LazyHeaders
 import com.bumptech.glide.load.resource.bitmap.DownsampleStrategy
 import com.bumptech.glide.request.RequestListener
 import com.bumptech.glide.request.RequestOptions
+import com.bumptech.glide.request.target.CustomTarget
 import com.bumptech.glide.request.target.Target
+import com.bumptech.glide.request.transition.Transition
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -206,6 +208,48 @@ object WebDavImageLoader {
             android.util.Log.d("WebDavImageLoader", "Local image preload start: $imageUri size=original")
             request.preload()
         }
+    }
+
+    fun loadImageDrawable(
+        context: Context,
+        imageUri: Uri,
+        isLocal: Boolean,
+        limitSize: Boolean = false,
+        isWaterfall: Boolean = false,
+        isFolderPreview: Boolean = false,
+        width: Int? = null,
+        height: Int? = null,
+        onReady: (Drawable) -> Unit,
+        onFailed: () -> Unit
+    ): Target<Drawable> {
+        val requestOptions = buildRequestOptions(context, limitSize, isWaterfall, isFolderPreview)
+        val model: Any = if (isLocal) imageUri else buildWebDavModel(context, imageUri)
+        val targetWidth = width?.takeIf { it > 0 } ?: Target.SIZE_ORIGINAL
+        val targetHeight = height?.takeIf { it > 0 } ?: Target.SIZE_ORIGINAL
+        val logTag = if (isLocal) "Local slideshow" else "WebDAV slideshow"
+        val target = object : CustomTarget<Drawable>(targetWidth, targetHeight) {
+            override fun onResourceReady(resource: Drawable, transition: Transition<in Drawable>?) {
+                onReady(resource)
+            }
+
+            override fun onLoadCleared(placeholder: Drawable?) = Unit
+
+            override fun onLoadFailed(errorDrawable: Drawable?) {
+                onFailed()
+            }
+        }
+
+        Glide.with(context)
+            .load(model)
+            .apply(requestOptions)
+            .listener(defaultDrawableListener(logTag, null))
+            .into(target)
+
+        return target
+    }
+
+    fun clearDrawableTarget(context: Context, target: Target<Drawable>) {
+        Glide.with(context).clear(target)
     }
 
     fun loadLocalVideoThumbnail(

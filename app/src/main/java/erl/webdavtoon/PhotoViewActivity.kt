@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.DialogInterface
 import android.content.Intent
 import android.content.res.Configuration
+import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -67,15 +68,14 @@ class PhotoViewActivity : AppCompatActivity() {
     private var isSlideshowPlaying = false
     private var slideshowIntervalMs = DEFAULT_SLIDESHOW_INTERVAL_MS
     private var lastPreloadedCardIndex = RecyclerView.NO_POSITION
+    private var isSlideshowAdvancePending = false
+    private var slideshowSessionId = 0
+    private var slideshowDrawableTarget: com.bumptech.glide.request.target.Target<Drawable>? = null
     private val slideshowHandler = Handler(Looper.getMainLooper())
     private val slideshowRunnable = object : Runnable {
         override fun run() {
-            if (!isSlideshowPlaying) return
-            if (!advanceSlideshowPage()) {
-                stopSlideshow()
-                return
-            }
-            slideshowHandler.postDelayed(this, slideshowIntervalMs)
+            if (!isSlideshowPlaying || isSlideshowAdvancePending) return
+            advanceSlideshowPage()
         }
     }
 
@@ -897,6 +897,8 @@ class PhotoViewActivity : AppCompatActivity() {
 
     private fun startSlideshow() {
         if (!isCardMode || photos.size <= 1 || currentIndex >= photos.lastIndex) return
+        slideshowSessionId += 1
+        isSlideshowAdvancePending = false
         preloadUpcomingCardImages(currentIndex)
         isSlideshowPlaying = true
         updateBottomBarIcons()
@@ -905,35 +907,132 @@ class PhotoViewActivity : AppCompatActivity() {
     }
 
     private fun stopSlideshow() {
-        if (!isSlideshowPlaying) {
-            slideshowHandler.removeCallbacks(slideshowRunnable)
-            return
-        }
+        slideshowSessionId += 1
         isSlideshowPlaying = false
+        isSlideshowAdvancePending = false
         slideshowHandler.removeCallbacks(slideshowRunnable)
+        clearSlideshowDrawableTarget()
+        hideSlideshowOverlay()
         if (::binding.isInitialized) {
             updateBottomBarIcons()
         }
     }
 
-    private fun advanceSlideshowPage(): Boolean {
-        if (!isCardMode || photos.isEmpty() || currentIndex >= photos.lastIndex) return false
-        preloadCardImage(currentIndex + 1)
-        currentIndex += 1
+    private fun advanceSlideshowPage() {
+        if (!isCardMode || photos.isEmpty() || currentIndex >= photos.lastIndex) {
+            stopSlideshow()
+            return
+        }
+
+        val targetIndex = currentIndex + 1
+        val photo = photos[targetIndex]
+        val session = slideshowSessionId
+        val (width, height) = getCardImageLoadSize()
+        isSlideshowAdvancePending = true
+        clearSlideshowDrawableTarget()
+
+        android.util.Log.d(
+            "PhotoViewActivity",
+            "slideshow prepare index=$targetIndex size=${width}x${height} uri=${photo.imageUri}"
+        )
+
+        slideshowDrawableTarget = WebDavImageLoader.loadImageDrawable(
+            context = this,
+            imageUri = photo.imageUri,
+            isLocal = photo.isLocal,
+            limitSize = false,
+            width = width,
+            height = height,
+            onReady = { drawable ->
+                if (!isSlideshowPlaying || session != slideshowSessionId || targetIndex !in photos.indices) {
+                    return@loadImageDrawable
+                }
+
+                android.util.Log.d("PhotoViewActivity", "slideshow ready index=$targetIndex")
+                performSlideshowCut(targetIndex, drawable)
+                isSlideshowAdvancePending = false
+
+                if (currentIndex >= photos.lastIndex) {
+                    isSlideshowPlaying = false
+                    slideshowHandler.removeCallbacks(slideshowRunnable)
+                    updateBottomBarIcons()
+                    binding.recyclerView.postDelayed({
+                        if (!isSlideshowPlaying) hideSlideshowOverlay()
+                    }, 250L)
+                } else {
+                    slideshowHandler.removeCallbacks(slideshowRunnable)
+                    slideshowHandler.postDelayed(slideshowRunnable, slideshowIntervalMs)
+                }
+            },
+            onFailed = {
+                if (session != slideshowSessionId) return@loadImageDrawable
+                android.util.Log.w("PhotoViewActivity", "slideshow image load failed index=$targetIndex uri=${photo.imageUri}")
+                isSlideshowAdvancePending = false
+                stopSlideshow()
+            }
+        )
+    }
+
+    private fun performSlideshowCut(targetIndex: Int, drawable: Drawable) {
+        binding.slideshowTransitionImageView.setImageDrawable(drawable.newDrawableForDisplay())
+        binding.slideshowTransitionImageView.visibility = View.VISIBLE
+
+        currentIndex = targetIndex
         val layoutManager = binding.recyclerView.layoutManager as? LinearLayoutManager
         if (layoutManager != null) {
             layoutManager.scrollToPositionWithOffset(currentIndex, 0)
         } else {
             binding.recyclerView.scrollToPosition(currentIndex)
         }
+
+        syncCurrentSlideshowHolder(targetIndex, drawable)
+
         if (!isSelectionMode && currentIndex in photos.indices) {
             binding.toolbar.title = photos[currentIndex].title
             updateFavoriteButtonState()
         }
         preloadUpcomingCardImages(currentIndex)
-        return currentIndex < photos.lastIndex
+        android.util.Log.d("PhotoViewActivity", "slideshow cut index=$currentIndex")
     }
 
+    private fun syncCurrentSlideshowHolder(index: Int, drawable: Drawable) {
+        binding.recyclerView.post {
+            val holder = binding.recyclerView.findViewHolderForAdapterPosition(index) as? PhotoDetailAdapter.PhotoDetailViewHolder
+            if (holder != null) {
+                holder.showPreparedDrawable(drawable.newDrawableForDisplay(), maxReaderZoomScale)
+                android.util.Log.d("PhotoViewActivity", "slideshow holder synced index=$index")
+            } else {
+                android.util.Log.d("PhotoViewActivity", "slideshow holder sync skipped index=$index")
+            }
+        }
+    }
+
+    private fun getCardImageLoadSize(): Pair<Int, Int> {
+        val visibleImage = binding.recyclerView.findViewById<android.widget.ImageView>(R.id.imageView)
+        val width = visibleImage?.width?.takeIf { it > 0 }
+            ?: binding.recyclerView.width.takeIf { it > 0 }
+            ?: resources.displayMetrics.widthPixels
+        val height = visibleImage?.height?.takeIf { it > 0 }
+            ?: (binding.recyclerView.height - binding.recyclerView.paddingTop - binding.recyclerView.paddingBottom).takeIf { it > 0 }
+            ?: binding.recyclerView.height.takeIf { it > 0 }
+            ?: resources.displayMetrics.heightPixels
+        return width to height
+    }
+
+    private fun clearSlideshowDrawableTarget() {
+        slideshowDrawableTarget?.let { WebDavImageLoader.clearDrawableTarget(this, it) }
+        slideshowDrawableTarget = null
+    }
+
+    private fun hideSlideshowOverlay() {
+        if (!::binding.isInitialized) return
+        binding.slideshowTransitionImageView.visibility = View.GONE
+        binding.slideshowTransitionImageView.setImageDrawable(null)
+    }
+
+    private fun Drawable.newDrawableForDisplay(): Drawable {
+        return constantState?.newDrawable(resources)?.mutate() ?: mutate()
+    }
     private fun preloadUpcomingCardImages(anchorIndex: Int) {
         if (!isCardMode || photos.isEmpty() || anchorIndex !in photos.indices) return
         if (anchorIndex == lastPreloadedCardIndex) return

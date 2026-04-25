@@ -1,5 +1,6 @@
 package erl.webdavtoon
 
+import android.graphics.drawable.Drawable
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.ViewGroup
@@ -163,6 +164,14 @@ class PhotoDetailAdapter(
                 binding.selectionOverlay.visibility = android.view.View.GONE
                 binding.checkIcon.visibility = android.view.View.GONE
             }
+        }
+
+        fun showPreparedDrawable(drawable: Drawable, maxZoomScale: Float) {
+            binding.imageView.minimumScale = 1.0f
+            binding.imageView.mediumScale = ((1.0f + maxZoomScale) / 2f).coerceAtLeast(1.5f)
+            binding.imageView.maximumScale = maxZoomScale
+            binding.imageView.setScale(1.0f, false)
+            binding.imageView.setImageDrawable(drawable)
         }
     }
 }
