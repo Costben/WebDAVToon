@@ -49,6 +49,8 @@
     <string name="sort_name_desc">名称 (Z-A)</string>
     <string name="sort_date_desc">日期 (最新在前)</string>
     <string name="sort_date_asc">日期 (最早在前)</string>
+    <string name="sort_random_folders">文件夹随机</string>
+    <string name="randomize_photos">图片随机排列</string>
     <string name="webdav_config">WebDAV 配置 (插槽 %1$d)</string>
     <string name="save">保存</string>
     <string name="test_connection">测试连接</string>

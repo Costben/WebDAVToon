@@ -74,7 +74,8 @@ class SettingsActivity : AppCompatActivity() {
         menu.findItem(R.id.action_settings)?.isVisible = false
         menu.findItem(R.id.action_grid_columns)?.isVisible = false
         menu.findItem(R.id.action_sort_order)?.isVisible = false
-        
+        menu.findItem(R.id.action_randomize_photos)?.isVisible = false
+
         val rotationLockItem = menu.findItem(R.id.action_rotation_lock)
         rotationLockItem?.isChecked = settingsManager.isRotationLocked()
         

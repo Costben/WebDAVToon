@@ -52,6 +52,7 @@ class SettingsManager(context: Context) {
         const val SORT_NAME_DESC = 1
         const val SORT_DATE_DESC = 2
         const val SORT_DATE_ASC = 3
+        const val SORT_RANDOM_FOLDERS = 4
 
         private val gson = Gson()
         private val slotCacheLock = Any()
