@@ -27,6 +27,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.random.Random
 
 class FolderViewActivity : AppCompatActivity() {
 
@@ -35,6 +36,7 @@ class FolderViewActivity : AppCompatActivity() {
     private lateinit var adapter: FolderAdapter
     private var currentAllFolders: List<Folder> = emptyList()
     private var currentSearchKeyword: String = ""
+    private var folderShuffleSeed: Long = Random.nextLong()
     private var currentLoadUsesToolbarPill: Boolean = false
     private var toolbarRefreshHideJob: Job? = null
 
@@ -215,6 +217,7 @@ class FolderViewActivity : AppCompatActivity() {
         binding.recyclerView.adapter = adapter
 
         binding.swipeRefreshLayout.setOnRefreshListener {
+            resetFolderShuffleIfRandomSort()
             loadFolders(forceRefresh = true)
         }
 
@@ -263,6 +266,7 @@ class FolderViewActivity : AppCompatActivity() {
 
         val rotationLockItem = menu.findItem(R.id.action_rotation_lock)
         rotationLockItem?.isChecked = settingsManager.isRotationLocked()
+        menu.findItem(R.id.action_randomize_photos)?.isVisible = false
         tintOverflowMenuIcons(menu)
 
         return true
@@ -282,6 +286,7 @@ class FolderViewActivity : AppCompatActivity() {
         menu.findItem(R.id.action_settings)?.isVisible = !isSelectionMode
         menu.findItem(R.id.action_grid_columns)?.isVisible = !isSelectionMode
         menu.findItem(R.id.action_sort_order)?.isVisible = !isSelectionMode
+        menu.findItem(R.id.action_randomize_photos)?.isVisible = false
         tintOverflowMenuIcons(menu)
         return super.onPrepareOptionsMenu(menu)
     }
@@ -306,6 +311,7 @@ class FolderViewActivity : AppCompatActivity() {
             SettingsManager.SORT_NAME_DESC -> filtered.sortedByDescending { it.name }
             SettingsManager.SORT_DATE_DESC -> filtered.sortedByDescending { it.dateModified }
             SettingsManager.SORT_DATE_ASC -> filtered.sortedBy { it.dateModified }
+            SettingsManager.SORT_RANDOM_FOLDERS -> filtered.shuffled(Random(folderShuffleSeed))
             else -> filtered
         }
 
@@ -337,6 +343,7 @@ class FolderViewActivity : AppCompatActivity() {
             R.id.action_sort_name_desc -> updateSortOrder(SettingsManager.SORT_NAME_DESC)
             R.id.action_sort_date_desc -> updateSortOrder(SettingsManager.SORT_DATE_DESC)
             R.id.action_sort_date_asc -> updateSortOrder(SettingsManager.SORT_DATE_ASC)
+            R.id.action_sort_random_folders -> updateSortOrder(SettingsManager.SORT_RANDOM_FOLDERS)
             else -> super.onOptionsItemSelected(item)
         }
     }
@@ -397,8 +404,17 @@ class FolderViewActivity : AppCompatActivity() {
         return true
     }
 
+    private fun resetFolderShuffleIfRandomSort() {
+        if (settingsManager.getSortOrder() == SettingsManager.SORT_RANDOM_FOLDERS) {
+            folderShuffleSeed = Random.nextLong()
+        }
+    }
+
     private fun updateSortOrder(order: Int): Boolean {
         settingsManager.setSortOrder(order)
+        if (order == SettingsManager.SORT_RANDOM_FOLDERS) {
+            folderShuffleSeed = Random.nextLong()
+        }
         applyFilterAndSort()
         return true
     }
@@ -556,7 +572,8 @@ class FolderViewActivity : AppCompatActivity() {
             R.id.action_sort_name_asc,
             R.id.action_sort_name_desc,
             R.id.action_sort_date_desc,
-            R.id.action_sort_date_asc
+            R.id.action_sort_date_asc,
+            R.id.action_sort_random_folders
         )
 
         listOf(

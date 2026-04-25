@@ -4,7 +4,8 @@ data class MediaQuery(
     val keyword: String = "",
     val extensions: Set<String> = emptySet(),
     val minSizeBytes: Long? = null,
-    val maxSizeBytes: Long? = null
+    val maxSizeBytes: Long? = null,
+    val randomizePhotos: Boolean = false
 )
 
 data class MediaPageResult(
