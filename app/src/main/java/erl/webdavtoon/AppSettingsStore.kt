@@ -40,6 +40,7 @@ class AppSettingsStore(context: Context) {
         val WATERFALL_PERCENT = intPreferencesKey("waterfall_percent")
         val WATERFALL_MAX_WIDTH = intPreferencesKey("waterfall_max_width")
         val READER_MAX_ZOOM_PERCENT = intPreferencesKey("reader_max_zoom_percent")
+        val DEFAULT_READER_MODE = stringPreferencesKey("default_reader_mode")
         val VIDEO_EXTERNAL_PLAYER_MODE = stringPreferencesKey("video_external_player_mode")
         val ROTATION_LOCKED = booleanPreferencesKey("rotation_locked")
         val MIGRATED_TO_DATASTORE = booleanPreferencesKey("migrated_to_datastore")

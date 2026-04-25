@@ -75,6 +75,30 @@ object WebDavImageLoader {
             .into(imageView)
     }
 
+    fun preloadWebDavImage(
+        context: Context,
+        imageUri: Uri,
+        limitSize: Boolean = true,
+        isWaterfall: Boolean = false,
+        isFolderPreview: Boolean = false,
+        width: Int? = null,
+        height: Int? = null
+    ) {
+        val requestOptions = buildRequestOptions(context, limitSize, isWaterfall, isFolderPreview)
+        val model = buildWebDavModel(context, imageUri)
+
+        val request = Glide.with(context)
+            .load(model)
+            .apply(requestOptions)
+        if (width != null && height != null && width > 0 && height > 0) {
+            android.util.Log.d("WebDavImageLoader", "WebDAV image preload start: $imageUri size=${width}x${height}")
+            request.preload(width, height)
+        } else {
+            android.util.Log.d("WebDavImageLoader", "WebDAV image preload start: $imageUri size=original")
+            request.preload()
+        }
+    }
+
     fun loadWebDavVideoThumbnail(
         context: Context,
         videoUri: Uri,
@@ -159,6 +183,29 @@ object WebDavImageLoader {
             .apply(requestOptions)
             .listener(defaultDrawableListener("Local", progressBar))
             .into(imageView)
+    }
+
+    fun preloadLocalImage(
+        context: Context,
+        imageUri: Uri,
+        limitSize: Boolean = true,
+        isWaterfall: Boolean = false,
+        isFolderPreview: Boolean = false,
+        width: Int? = null,
+        height: Int? = null
+    ) {
+        val requestOptions = buildRequestOptions(context, limitSize, isWaterfall, isFolderPreview)
+
+        val request = Glide.with(context)
+            .load(imageUri)
+            .apply(requestOptions)
+        if (width != null && height != null && width > 0 && height > 0) {
+            android.util.Log.d("WebDavImageLoader", "Local image preload start: $imageUri size=${width}x${height}")
+            request.preload(width, height)
+        } else {
+            android.util.Log.d("WebDavImageLoader", "Local image preload start: $imageUri size=original")
+            request.preload()
+        }
     }
 
     fun loadLocalVideoThumbnail(
@@ -773,17 +820,18 @@ object WebDavImageLoader {
             .diskCacheStrategy(DiskCacheStrategy.ALL)
             .skipMemoryCache(false)
             .priority(Priority.HIGH)
-            .placeholder(R.drawable.ic_ior_media_image)
             .error(R.drawable.ic_ior_warning_circle)
 
         if (isFolderPreview) {
             requestOptions = requestOptions
+                .placeholder(R.drawable.ic_ior_media_image)
                 .override(FOLDER_PREVIEW_SIZE_PX, FOLDER_PREVIEW_SIZE_PX)
                 .downsample(DownsampleStrategy.AT_MOST)
                 .format(DecodeFormat.PREFER_RGB_565)
                 .priority(Priority.HIGH)
                 .dontAnimate()
         } else if (isWaterfall) {
+            requestOptions = requestOptions.placeholder(R.drawable.ic_ior_media_image)
             val settings = SettingsManager(context)
             requestOptions = when (settings.getWaterfallQualityMode()) {
                 SettingsManager.WATERFALL_MODE_MAX_WIDTH -> {
@@ -803,10 +851,13 @@ object WebDavImageLoader {
             }
         } else if (limitSize) {
             requestOptions = requestOptions
+                .placeholder(R.drawable.ic_ior_media_image)
                 .override(320, 320)
                 .downsample(DownsampleStrategy.AT_MOST)
         } else {
-            requestOptions = requestOptions.downsample(DownsampleStrategy.AT_MOST)
+            requestOptions = requestOptions
+                .downsample(DownsampleStrategy.AT_MOST)
+                .dontAnimate()
         }
 
         return requestOptions
@@ -908,6 +959,10 @@ object WebDavImageLoader {
                 dataSource: DataSource,
                 isFirstResource: Boolean
             ): Boolean {
+                android.util.Log.d(
+                    "WebDavImageLoader",
+                    "$tag image ready source=$dataSource first=$isFirstResource model=$model"
+                )
                 progressBar?.visibility = View.GONE
                 return false
             }

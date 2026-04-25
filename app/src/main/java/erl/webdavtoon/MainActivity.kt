@@ -124,6 +124,11 @@ class MainActivity : AppCompatActivity() {
         checkPermissionsAndLoad()
     }
 
+    override fun onResume() {
+        super.onResume()
+        MediaManager.mediaViewModel = androidx.lifecycle.ViewModelProvider(this)[MediaViewModel::class.java]
+    }
+
     private fun setupUi() {
         setSupportActionBar(binding.toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(folderPath.isNotEmpty())
@@ -240,16 +245,10 @@ class MainActivity : AppCompatActivity() {
                 } else if (state.photos.isEmpty()) {
                     binding.emptyView.text = getString(R.string.no_photos_found)
                 }
-                val sortedPhotos = MediaManager.sortPhotos(
-                    photos = state.photos,
-                    sortOrder = settingsManager.getPhotoSortOrder(),
-                    isRecursive = isRecursive,
-                    clusterShuffleSeed = state.clusterShuffleSeed,
-                    randomizePhotos = state.currentQuery.randomizePhotos,
-                    photoShuffleSeed = state.photoShuffleSeed
-                )
+                val displayedPhotos = state.photos
                 binding.swipeRefreshLayout.isRefreshing = state.isLoading && state.photos.isNotEmpty()
-                photoAdapter.setPhotos(sortedPhotos)
+                photoAdapter.setPhotos(displayedPhotos)
+                MediaStateCache.setState(state.copy(photos = displayedPhotos))
             }
         }
     }
@@ -771,4 +770,19 @@ object PhotoCache {
         photos.clear()
     }
 }
+object MediaStateCache {
+    private val lock = Any()
+    private var state: MediaUiState? = null
 
+    fun setState(value: MediaUiState) {
+        synchronized(lock) {
+            state = value.copy(isLoading = false, error = null)
+        }
+    }
+
+    fun getState(): MediaUiState? = synchronized(lock) { state }
+
+    fun clear() {
+        synchronized(lock) { state = null }
+    }
+}

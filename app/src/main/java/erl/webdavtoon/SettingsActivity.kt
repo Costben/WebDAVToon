@@ -156,6 +156,12 @@ class SettingsActivity : AppCompatActivity() {
             root.setOnClickListener { showReaderMaxZoomDialog() }
         }
 
+        binding.settingDefaultReaderMode.apply {
+            icon.setImageResource(R.drawable.ic_ior_multiple_pages)
+            title.text = getString(R.string.default_reader_mode)
+            root.setOnClickListener { showDefaultReaderModeDialog() }
+        }
+
         binding.settingVideoExternalMode.apply {
             icon.setImageResource(R.drawable.ic_ior_open_in_browser)
             title.text = getString(R.string.video_external_player_mode)
@@ -226,6 +232,9 @@ class SettingsActivity : AppCompatActivity() {
             R.string.reader_max_zoom_summary,
             settingsManager.getReaderMaxZoomPercent().coerceIn(100, 500)
         )
+
+        binding.settingDefaultReaderMode.title.text = getString(R.string.default_reader_mode)
+        binding.settingDefaultReaderMode.summary.text = defaultReaderModeLabel(settingsManager.getDefaultReaderMode())
 
         binding.settingVideoExternalMode.title.text = getString(R.string.video_external_player_mode)
         binding.settingVideoExternalMode.summary.text = when (settingsManager.getVideoExternalPlayerMode()) {
@@ -541,6 +550,35 @@ class SettingsActivity : AppCompatActivity() {
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
+    }
+
+    private fun showDefaultReaderModeDialog() {
+        val modes = arrayOf(
+            SettingsManager.DEFAULT_READER_MODE_WEBTOON,
+            SettingsManager.DEFAULT_READER_MODE_CARD
+        )
+        val labels = arrayOf(
+            getString(R.string.default_reader_mode_webtoon),
+            getString(R.string.default_reader_mode_card)
+        )
+        val current = modes.indexOf(settingsManager.getDefaultReaderMode()).coerceAtLeast(0)
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.default_reader_mode)
+            .setSingleChoiceItems(labels, current) { dialog, which ->
+                settingsManager.setDefaultReaderMode(modes[which])
+                refreshUi()
+                dialog.dismiss()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun defaultReaderModeLabel(mode: String): String {
+        return when (mode) {
+            SettingsManager.DEFAULT_READER_MODE_CARD -> getString(R.string.default_reader_mode_card)
+            else -> getString(R.string.default_reader_mode_webtoon)
+        }
     }
 
     private fun showVideoExternalPlayerModeDialog() {

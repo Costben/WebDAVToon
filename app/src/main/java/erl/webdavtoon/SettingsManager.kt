@@ -40,11 +40,14 @@ class SettingsManager(context: Context) {
         const val KEY_WATERFALL_PERCENT = "waterfall_percent"
         const val KEY_WATERFALL_MAX_WIDTH = "waterfall_max_width"
         const val KEY_READER_MAX_ZOOM_PERCENT = "reader_max_zoom_percent"
+        const val KEY_DEFAULT_READER_MODE = "default_reader_mode"
         const val KEY_VIDEO_EXTERNAL_PLAYER_MODE = "video_external_player_mode"
         const val KEY_ROTATION_LOCKED = "rotation_locked"
 
         const val WATERFALL_MODE_PERCENT = "percent"
         const val WATERFALL_MODE_MAX_WIDTH = "max_width"
+        const val DEFAULT_READER_MODE_WEBTOON = "webtoon"
+        const val DEFAULT_READER_MODE_CARD = "card"
         const val VIDEO_EXTERNAL_PLAYER_MODE_SYSTEM_DEFAULT = "system_default"
         const val VIDEO_EXTERNAL_PLAYER_MODE_CHOOSER = "chooser"
 
@@ -102,6 +105,28 @@ class SettingsManager(context: Context) {
 
     fun setReaderMaxZoomPercent(percent: Int) =
         appSettings.putInt(AppSettingsStore.READER_MAX_ZOOM_PERCENT, percent)
+
+    fun getDefaultReaderMode(): String =
+        appSettings.getOrDefaultString(
+            AppSettingsStore.DEFAULT_READER_MODE,
+            DEFAULT_READER_MODE_WEBTOON
+        ).let { mode ->
+            when (mode) {
+                DEFAULT_READER_MODE_WEBTOON,
+                DEFAULT_READER_MODE_CARD -> mode
+                else -> DEFAULT_READER_MODE_WEBTOON
+            }
+        }
+
+    fun setDefaultReaderMode(mode: String) =
+        appSettings.putString(
+            AppSettingsStore.DEFAULT_READER_MODE,
+            when (mode) {
+                DEFAULT_READER_MODE_WEBTOON,
+                DEFAULT_READER_MODE_CARD -> mode
+                else -> DEFAULT_READER_MODE_WEBTOON
+            }
+        )
 
     fun getVideoExternalPlayerMode(): String =
         appSettings.getOrDefaultString(

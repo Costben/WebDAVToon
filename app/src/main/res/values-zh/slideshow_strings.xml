@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="slideshow">幻灯片播放</string>
+    <string name="slideshow_interval_title">幻灯片间隔（毫秒）</string>
+    <string name="slideshow_interval_error">请输入至少 %1$d 毫秒</string>
+</resources>
