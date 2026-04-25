@@ -408,6 +408,7 @@ class PhotoViewActivity : AppCompatActivity() {
         menu.findItem(R.id.action_settings)?.isVisible = false
         menu.findItem(R.id.action_sort_order)?.isVisible = false
         menu.findItem(R.id.action_grid_columns)?.isVisible = false
+        menu.findItem(R.id.action_randomize_photos)?.isVisible = false
         shareMenuItem = menu.findItem(R.id.action_share)
         shareMenuItem?.isVisible = isSelectionMode
         shareMenuItem?.setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_NEVER)
@@ -433,6 +434,7 @@ class PhotoViewActivity : AppCompatActivity() {
         OverflowMenuHelper.enableOptionalIcons(menu)
         shareMenuItem?.isVisible = isSelectionMode
         menu.findItem(R.id.action_share)?.isVisible = isSelectionMode
+        menu.findItem(R.id.action_randomize_photos)?.isVisible = false
         tintOverflowMenuIcons(menu)
         return super.onPrepareOptionsMenu(menu)
     }
@@ -859,7 +861,14 @@ class PhotoViewActivity : AppCompatActivity() {
                 // 仅当会话匹配且图片列表确实发生变化时才更新
                 if (state.sessionKey.isNotEmpty()) {
                     val currentSortOrder = settingsManager.getPhotoSortOrder()
-                    val sortedStatePhotos = MediaManager.sortPhotos(state.photos, currentSortOrder, state.isRecursive)
+                    val sortedStatePhotos = MediaManager.sortPhotos(
+                        photos = state.photos,
+                        sortOrder = currentSortOrder,
+                        isRecursive = state.isRecursive,
+                        clusterShuffleSeed = state.clusterShuffleSeed,
+                        randomizePhotos = state.currentQuery.randomizePhotos,
+                        photoShuffleSeed = state.photoShuffleSeed
+                    )
                     
                     if (sortedStatePhotos != photos) {
                         photos = sortedStatePhotos

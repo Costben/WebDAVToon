@@ -17,7 +17,9 @@ data class MediaUiState(
     val isRecursive: Boolean = false,
     val isFavorites: Boolean = false,
     val currentQuery: MediaQuery = MediaQuery(),
-    val currentOffset: Int = 0
+    val currentOffset: Int = 0,
+    val clusterShuffleSeed: Long = 0L,
+    val photoShuffleSeed: Long = 0L
 )
 
 class MediaViewModel(
@@ -35,7 +37,9 @@ class MediaViewModel(
         isRemote: Boolean,
         isRecursive: Boolean,
         isFavorites: Boolean,
-        query: MediaQuery
+        query: MediaQuery,
+        clusterShuffleSeed: Long,
+        photoShuffleSeed: Long
     ) {
         savedStateHandle[sessionKeyKey] = sessionKey
         _state.value = MediaUiState(
@@ -46,7 +50,9 @@ class MediaViewModel(
             isRecursive = isRecursive,
             isFavorites = isFavorites,
             currentQuery = query,
-            currentOffset = 0
+            currentOffset = 0,
+            clusterShuffleSeed = clusterShuffleSeed,
+            photoShuffleSeed = photoShuffleSeed
         )
     }
 

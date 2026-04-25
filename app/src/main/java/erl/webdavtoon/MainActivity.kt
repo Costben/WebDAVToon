@@ -203,6 +203,9 @@ class MainActivity : AppCompatActivity() {
             }
         )
         binding.recyclerView.adapter = photoAdapter
+        binding.swipeRefreshLayout.setOnRefreshListener {
+            refreshMedia(reshuffleClusters = true)
+        }
 
         binding.recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
@@ -237,7 +240,15 @@ class MainActivity : AppCompatActivity() {
                 } else if (state.photos.isEmpty()) {
                     binding.emptyView.text = getString(R.string.no_photos_found)
                 }
-                val sortedPhotos = MediaManager.sortPhotos(state.photos, settingsManager.getPhotoSortOrder(), isRecursive)
+                val sortedPhotos = MediaManager.sortPhotos(
+                    photos = state.photos,
+                    sortOrder = settingsManager.getPhotoSortOrder(),
+                    isRecursive = isRecursive,
+                    clusterShuffleSeed = state.clusterShuffleSeed,
+                    randomizePhotos = state.currentQuery.randomizePhotos,
+                    photoShuffleSeed = state.photoShuffleSeed
+                )
+                binding.swipeRefreshLayout.isRefreshing = state.isLoading && state.photos.isNotEmpty()
                 photoAdapter.setPhotos(sortedPhotos)
             }
         }
@@ -251,10 +262,11 @@ class MainActivity : AppCompatActivity() {
         return super.dispatchTouchEvent(ev)
     }
 
-    private fun refreshMedia() {
+    private fun refreshMedia(reshuffleClusters: Boolean = false) {
         MediaManager.refresh(
             this, lifecycleScope, buildSessionKey(),
-            folderPath, isRemote, isRecursive, isFavorites, currentQuery
+            folderPath, isRemote, isRecursive, isFavorites, currentQuery,
+            reshuffleClusters = reshuffleClusters
         )
     }
 
@@ -323,6 +335,9 @@ class MainActivity : AppCompatActivity() {
             }
         )
 
+        val randomizePhotosItem = menu.findItem(R.id.action_randomize_photos)
+        randomizePhotosItem?.isVisible = true
+        randomizePhotosItem?.isChecked = currentQuery.randomizePhotos
         val rotationLockItem = menu.findItem(R.id.action_rotation_lock)
         rotationLockItem?.isChecked = settingsManager.isRotationLocked()
         tintOverflowMenuIcons(menu)
@@ -379,6 +394,7 @@ class MainActivity : AppCompatActivity() {
                 updateSelectedFavorites()
                 true
             }
+            R.id.action_randomize_photos -> toggleRandomizePhotos(item)
             R.id.action_settings -> {
                 settingsLauncher.launch(Intent(this, SettingsActivity::class.java))
                 true
@@ -391,6 +407,7 @@ class MainActivity : AppCompatActivity() {
             R.id.action_sort_name_desc -> updateSortOrder(SettingsManager.SORT_NAME_DESC)
             R.id.action_sort_date_desc -> updateSortOrder(SettingsManager.SORT_DATE_DESC)
             R.id.action_sort_date_asc -> updateSortOrder(SettingsManager.SORT_DATE_ASC)
+            R.id.action_sort_random_folders -> updateSortOrder(SettingsManager.SORT_RANDOM_FOLDERS)
             else -> super.onOptionsItemSelected(item)
         }
     }
@@ -417,7 +434,15 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateSortOrder(order: Int): Boolean {
         settingsManager.setPhotoSortOrder(order)
-        refreshMedia()
+        refreshMedia(reshuffleClusters = order == SettingsManager.SORT_RANDOM_FOLDERS)
+        return true
+    }
+
+    private fun toggleRandomizePhotos(item: android.view.MenuItem): Boolean {
+        val enabled = !item.isChecked
+        item.isChecked = enabled
+        currentQuery = currentQuery.copy(randomizePhotos = enabled)
+        refreshMedia(reshuffleClusters = true)
         return true
     }
 
@@ -432,7 +457,10 @@ class MainActivity : AppCompatActivity() {
             optionsMenu?.findItem(R.id.action_search)?.isVisible = true
             optionsMenu?.findItem(R.id.action_settings)?.isVisible = true
             optionsMenu?.findItem(R.id.action_grid_columns)?.isVisible = true
+            optionsMenu?.findItem(R.id.action_randomize_photos)?.isVisible = true
+            optionsMenu?.findItem(R.id.action_randomize_photos)?.isChecked = currentQuery.randomizePhotos
             optionsMenu?.findItem(R.id.action_sort_order)?.isVisible = true
+            optionsMenu?.findItem(R.id.action_rotation_lock)?.isVisible = true
             val displayTitle = when {
                 isFavorites -> getString(R.string.favorites)
                 folderPath.isEmpty() && !isRemote -> getString(R.string.local_photos)
@@ -454,6 +482,7 @@ class MainActivity : AppCompatActivity() {
             optionsMenu?.findItem(R.id.action_settings)?.isVisible = false
             optionsMenu?.findItem(R.id.action_grid_columns)?.isVisible = false
             optionsMenu?.findItem(R.id.action_sort_order)?.isVisible = false
+            optionsMenu?.findItem(R.id.action_randomize_photos)?.isVisible = false
             favoriteMenuItem?.setIcon(if (isFavorites) R.drawable.ic_ior_star_solid else R.drawable.ic_ior_star)
             favoriteMenuItem?.icon?.let { icon ->
                 DrawableCompat.setTint(
@@ -537,7 +566,8 @@ class MainActivity : AppCompatActivity() {
             R.id.action_sort_name_asc,
             R.id.action_sort_name_desc,
             R.id.action_sort_date_desc,
-            R.id.action_sort_date_asc
+            R.id.action_sort_date_asc,
+            R.id.action_sort_random_folders
         )
 
         listOf(
@@ -548,6 +578,7 @@ class MainActivity : AppCompatActivity() {
             R.id.action_settings,
             R.id.action_grid_columns,
             R.id.action_sort_order,
+            R.id.action_randomize_photos,
             R.id.action_rotation_lock
         ).forEach { id ->
             menu.findItem(id)?.icon?.mutate()?.let { DrawableCompat.setTint(it, normalColor) }
