@@ -60,6 +60,11 @@ class MediaViewModel(
         _state.value = _state.value.copy(isLoading = true, error = null)
     }
 
+    fun restore(state: MediaUiState) {
+        savedStateHandle[sessionKeyKey] = state.sessionKey
+        _state.value = state.copy(isLoading = false, error = null)
+    }
+
     fun setPage(photos: List<Photo>, hasMore: Boolean, nextOffset: Int, append: Boolean) {
         val merged = if (append) _state.value.photos + photos else photos
         _state.value = _state.value.copy(
