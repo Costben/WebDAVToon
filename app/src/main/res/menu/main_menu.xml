@@ -84,4 +84,10 @@
         android:icon="@drawable/ic_ior_rotate_camera_right"
         android:checkable="true"
         app:showAsAction="never" />
+    <item
+        android:id="@+id/action_gesture_control"
+        android:title="@string/gesture_control"
+        android:icon="@drawable/ic_ior_open_select_hand_gesture"
+        app:showAsAction="never"
+        android:visible="false" />
 </menu>

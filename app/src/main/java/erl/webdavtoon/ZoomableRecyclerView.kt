@@ -52,7 +52,7 @@ class ZoomableRecyclerView @JvmOverloads constructor(
         }
 
     interface OnTapListener {
-        fun onSingleTap()
+        fun onSingleTap(xFraction: Float, yFraction: Float): Boolean
         fun onLongPress()
     }
 
@@ -359,8 +359,10 @@ class ZoomableRecyclerView @JvmOverloads constructor(
 
     private inner class GestureListener : GestureDetector.SimpleOnGestureListener() {
         override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
-            onTapListener?.onSingleTap()
-            return true
+            return onTapListener?.onSingleTap(
+                (e.x / width.toFloat()).coerceIn(0f, 0.9999f),
+                (e.y / height.toFloat()).coerceIn(0f, 0.9999f)
+            ) ?: false
         }
 
         override fun onLongPress(e: MotionEvent) {

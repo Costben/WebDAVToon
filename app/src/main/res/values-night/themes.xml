@@ -1,7 +1,7 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Base application theme. -->
     <style name="Base.Theme.WebDAVToon" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your dark theme here. -->
-        <!-- <item name="colorPrimary">@color/my_dark_primary</item> -->
+        <item name="actionOverflowMenuStyle">@style/RoundedOverflowMenu</item>
+        <item name="popupMenuStyle">@style/RoundedPopupMenu</item>
     </style>
 </resources>
