@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="gesture_control">手势控制</string>
+    <string name="gesture_control_title">手势控制</string>
+    <string name="gesture_control_summary">为每个区域配置单击、双击和长按操作。</string>
+    <string name="gesture_control_enabled">启用手势控制</string>
+    <string name="gesture_control_disabled_action">未设置</string>
+    <string name="gesture_control_choose_action">选择操作</string>
+    <string name="gesture_control_single_tap">单击</string>
+    <string name="gesture_control_double_tap">双击</string>
+    <string name="gesture_control_long_press">长按</string>
+    <string name="gesture_control_grid_single_tap">单击</string>
+    <string name="gesture_control_grid_double_tap">双击</string>
+    <string name="gesture_control_grid_long_press">长按</string>
+    <string name="gesture_control_zone_top_left">左上</string>
+    <string name="gesture_control_zone_top_center">上中</string>
+    <string name="gesture_control_zone_top_right">右上</string>
+    <string name="gesture_control_zone_center_left">左中</string>
+    <string name="gesture_control_zone_center">中间</string>
+    <string name="gesture_control_zone_center_right">右中</string>
+    <string name="gesture_control_zone_bottom_left">左下</string>
+    <string name="gesture_control_zone_bottom_center">下中</string>
+    <string name="gesture_control_zone_bottom_right">右下</string>
+    <string name="gesture_control_action_none">未设置</string>
+    <string name="gesture_control_action_photo_info">图片详情</string>
+    <string name="gesture_control_action_start_slideshow">切换幻灯片</string>
+    <string name="gesture_control_action_previous_page">上一张</string>
+    <string name="gesture_control_action_next_page">下一张</string>
+    <string name="gesture_control_grid_action_none">关闭</string>
+    <string name="gesture_control_grid_action_photo_info">详情</string>
+    <string name="gesture_control_grid_action_start_slideshow">幻灯片</string>
+    <string name="gesture_control_grid_action_previous_page">上一张</string>
+    <string name="gesture_control_grid_action_next_page">下一张</string>
+</resources>

@@ -42,6 +42,7 @@ class SettingsManager(context: Context) {
         const val KEY_READER_MAX_ZOOM_PERCENT = "reader_max_zoom_percent"
         const val KEY_DEFAULT_READER_MODE = "default_reader_mode"
         const val KEY_VIDEO_EXTERNAL_PLAYER_MODE = "video_external_player_mode"
+        const val KEY_READER_GESTURE_CONTROL_JSON = "reader_gesture_control_json"
         const val KEY_ROTATION_LOCKED = "rotation_locked"
 
         const val WATERFALL_MODE_PERCENT = "percent"
@@ -155,6 +156,49 @@ class SettingsManager(context: Context) {
 
     fun setRotationLocked(locked: Boolean) =
         appSettings.putBoolean(AppSettingsStore.ROTATION_LOCKED, locked)
+
+    fun getReaderGestureControlConfig(): ReaderGestureControlConfig {
+        val json = appSettings.getOrDefaultString(AppSettingsStore.READER_GESTURE_CONTROL_JSON, "")
+        if (json.isBlank()) {
+            return ReaderGestureControlConfig.defaultConfig()
+        }
+
+        return runCatching {
+            gson.fromJson(json, ReaderGestureControlConfig::class.java)
+        }.getOrNull()?.normalize() ?: ReaderGestureControlConfig.defaultConfig()
+    }
+
+    fun setReaderGestureControlConfig(config: ReaderGestureControlConfig) {
+        appSettings.putString(
+            AppSettingsStore.READER_GESTURE_CONTROL_JSON,
+            gson.toJson(config.normalize())
+        )
+    }
+
+    fun updateReaderGestureAction(
+        zone: GestureZone,
+        gestureType: GestureType,
+        action: GestureAction
+    ) {
+        val current = getReaderGestureControlConfig().normalize()
+        val updatedZones = current.zones.map { zoneConfig ->
+            if (zoneConfig.zone != zone.code) {
+                zoneConfig
+            } else {
+                when (gestureType) {
+                    GestureType.SINGLE_TAP -> zoneConfig.copy(singleTapAction = action.code)
+                    GestureType.DOUBLE_TAP -> zoneConfig.copy(doubleTapAction = action.code)
+                    GestureType.LONG_PRESS -> zoneConfig.copy(longPressAction = action.code)
+                }
+            }
+        }
+        setReaderGestureControlConfig(current.copy(zones = updatedZones))
+    }
+
+    fun setReaderGestureControlEnabled(enabled: Boolean) {
+        val current = getReaderGestureControlConfig().normalize()
+        setReaderGestureControlConfig(current.copy(enabled = enabled))
+    }
 
     fun getCurrentSlot(): Int = appSettings.getOrDefaultInt(AppSettingsStore.CURRENT_SLOT, 0)
     fun setCurrentSlot(slot: Int) = runBlocking {

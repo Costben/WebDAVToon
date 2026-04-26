@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="gesture_control_zone_card_height">112dp</dimen>
+    <dimen name="gesture_control_zone_card_margin">1dp</dimen>
+    <dimen name="gesture_control_action_row_min_height">48dp</dimen>
+</resources>
