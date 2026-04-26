@@ -12,7 +12,8 @@ import erl.webdavtoon.databinding.ItemPhotoDetailBinding
  */
 class PhotoDetailAdapter(
     private val onLongPress: (Int) -> Unit,
-    private val onClick: (Int) -> Unit
+    private val onClick: (Int) -> Unit,
+    private val onGesture: (GestureType, Int, Float, Float) -> Boolean = { _, _, _, _ -> false }
 ) : RecyclerView.Adapter<PhotoDetailAdapter.PhotoDetailViewHolder>() {
 
     private var photos: List<Photo> = emptyList()
@@ -63,7 +64,7 @@ class PhotoDetailAdapter(
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PhotoDetailViewHolder {
         val binding = ItemPhotoDetailBinding.inflate(LayoutInflater.from(parent.context), parent, false)
-        return PhotoDetailViewHolder(binding, onLongPress, onClick)
+        return PhotoDetailViewHolder(binding, onLongPress, onClick, onGesture)
     }
 
     override fun onBindViewHolder(holder: PhotoDetailViewHolder, position: Int) {
@@ -76,32 +77,40 @@ class PhotoDetailAdapter(
     class PhotoDetailViewHolder(
         private val binding: ItemPhotoDetailBinding,
         private val onLongPress: (Int) -> Unit,
-        private val onClick: (Int) -> Unit
+        private val onClick: (Int) -> Unit,
+        private val onGesture: (GestureType, Int, Float, Float) -> Boolean
     ) : RecyclerView.ViewHolder(binding.root) {
-        
+
+        private var lastTouchX = 0.5f
+        private var lastTouchY = 0.5f
+
         init {
-            // 配置 PhotoView
             binding.imageView.apply {
-                // 设置最大缩放倍数
                 maximumScale = 10f
                 mediumScale = 3f
-                
-                // 1. 优化双击缩放逻辑：双击 1x -> 3x, 再次双击 -> 1x
-                // 我们通过设置 OnDoubleTapListener 来拦截默认行为
+
                 setOnDoubleTapListener(object : android.view.GestureDetector.OnDoubleTapListener {
                     override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
-                        // 单击仍然交给外部处理
-                        onClick(bindingAdapterPosition)
+                        val position = bindingAdapterPosition
+                        if (position == RecyclerView.NO_POSITION) return false
+                        val consumed = onGesture(GestureType.SINGLE_TAP, position, normalizedX(e), normalizedY(e))
+                        if (!consumed) {
+                            onClick(position)
+                        }
                         return true
                     }
 
                     override fun onDoubleTap(e: MotionEvent): Boolean {
+                        val position = bindingAdapterPosition
+                        if (position == RecyclerView.NO_POSITION) return false
+                        val consumed = onGesture(GestureType.DOUBLE_TAP, position, normalizedX(e), normalizedY(e))
+                        if (consumed) {
+                            return true
+                        }
                         val currentScale = scale
                         if (currentScale > 1.0f) {
-                            // 如果当前已经放大，双击还原到 1x
                             setScale(1.0f, e.x, e.y, true)
                         } else {
-                            // 如果是 1x，双击放大到 3x (mediumScale)
                             setScale(mediumScale, e.x, e.y, true)
                         }
                         return true
@@ -110,9 +119,6 @@ class PhotoDetailAdapter(
                     override fun onDoubleTapEvent(e: MotionEvent): Boolean = false
                 })
 
-                // 2. 提高缩放优先级，防止双指操作触发 ViewPager2/RecyclerView 翻页
-                // PhotoView 内部在检测到多指时会自动调用 requestDisallowInterceptTouchEvent(true)
-                // 但为了更保险，我们可以在缩放开始时显式调用
                 setOnScaleChangeListener { _, _, _ ->
                     if (scale > 1.0f) {
                         parent.requestDisallowInterceptTouchEvent(true)
@@ -120,17 +126,33 @@ class PhotoDetailAdapter(
                 }
 
                 setOnTouchListener { v, event ->
+                    if (event.actionMasked == MotionEvent.ACTION_DOWN || event.actionMasked == MotionEvent.ACTION_MOVE) {
+                        lastTouchX = normalizedX(event)
+                        lastTouchY = normalizedY(event)
+                    }
                     val disallowParent = event.pointerCount > 1 || scale > 1.0f
                     v.parent?.requestDisallowInterceptTouchEvent(disallowParent)
                     false
                 }
-                
-                // 设置长按监听
+
                 setOnLongClickListener {
-                    onLongPress(bindingAdapterPosition)
+                    val position = bindingAdapterPosition
+                    if (position == RecyclerView.NO_POSITION) return@setOnLongClickListener false
+                    val consumed = onGesture(GestureType.LONG_PRESS, position, lastTouchX, lastTouchY)
+                    if (!consumed) {
+                        onLongPress(position)
+                    }
                     true
                 }
             }
+        }
+
+        private fun normalizedX(event: MotionEvent): Float {
+            return (event.x / binding.imageView.width.toFloat()).coerceIn(0f, 0.9999f)
+        }
+
+        private fun normalizedY(event: MotionEvent): Float {
+            return (event.y / binding.imageView.height.toFloat()).coerceIn(0f, 0.9999f)
         }
 
         fun bind(photo: Photo, isSelectionMode: Boolean, isSelected: Boolean, maxZoomScale: Float) {
@@ -139,13 +161,13 @@ class PhotoDetailAdapter(
             binding.imageView.maximumScale = maxZoomScale
             binding.imageView.setScale(1.0f, false)
 
-            
+
             if (photo.isLocal) {
                 WebDavImageLoader.loadLocalImage(
                     binding.imageView.context,
                     photo.imageUri,
                     binding.imageView,
-                    limitSize = false // 详情模式下加载原图
+                    limitSize = false
                 )
             } else {
                 WebDavImageLoader.loadWebDavImage(
@@ -156,7 +178,6 @@ class PhotoDetailAdapter(
                 )
             }
 
-            // 更新多选 UI
             if (isSelectionMode) {
                 binding.selectionOverlay.visibility = if (isSelected) android.view.View.VISIBLE else android.view.View.GONE
                 binding.checkIcon.visibility = if (isSelected) android.view.View.VISIBLE else android.view.View.GONE

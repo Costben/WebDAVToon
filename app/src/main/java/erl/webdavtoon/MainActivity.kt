@@ -3,6 +3,7 @@ package erl.webdavtoon
 import android.Manifest
 import android.content.ClipData
 import android.content.Intent
+import android.content.res.Configuration
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -555,7 +556,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun tintOverflowMenuIcons(menu: Menu) {
-        val normalColor = ContextCompat.getColor(this, R.color.onSurface)
+        val normalColor = if (isDarkModeEnabled()) {
+            android.graphics.Color.WHITE
+        } else {
+            ContextCompat.getColor(this, R.color.onSurface)
+        }
         val deleteColor = ContextCompat.getColor(this, R.color.primary_red)
         val submenuItems = listOf(
             R.id.action_col_1,
@@ -588,6 +593,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         menu.findItem(R.id.action_delete)?.icon?.mutate()?.let { DrawableCompat.setTint(it, deleteColor) }
+    }
+
+    private fun isDarkModeEnabled(): Boolean {
+        val nightModeFlags = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+        return nightModeFlags == Configuration.UI_MODE_NIGHT_YES
     }
 
     private fun shareSelectedPhotos() {

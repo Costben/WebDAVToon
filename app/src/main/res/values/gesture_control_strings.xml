@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="gesture_control">Gesture Control</string>
+    <string name="gesture_control_title">Gesture Control</string>
+    <string name="gesture_control_summary">Configure single tap, double tap, and long press for each zone.</string>
+    <string name="gesture_control_enabled">Enable gesture control</string>
+    <string name="gesture_control_disabled_action">Not set</string>
+    <string name="gesture_control_choose_action">Choose action</string>
+    <string name="gesture_control_single_tap">Single tap</string>
+    <string name="gesture_control_double_tap">Double tap</string>
+    <string name="gesture_control_long_press">Long press</string>
+    <string name="gesture_control_grid_single_tap">Tap</string>
+    <string name="gesture_control_grid_double_tap">2x</string>
+    <string name="gesture_control_grid_long_press">Hold</string>
+    <string name="gesture_control_zone_top_left">Top left</string>
+    <string name="gesture_control_zone_top_center">Top center</string>
+    <string name="gesture_control_zone_top_right">Top right</string>
+    <string name="gesture_control_zone_center_left">Center left</string>
+    <string name="gesture_control_zone_center">Center</string>
+    <string name="gesture_control_zone_center_right">Center right</string>
+    <string name="gesture_control_zone_bottom_left">Bottom left</string>
+    <string name="gesture_control_zone_bottom_center">Bottom center</string>
+    <string name="gesture_control_zone_bottom_right">Bottom right</string>
+    <string name="gesture_control_action_none">Not set</string>
+    <string name="gesture_control_action_photo_info">Photo info</string>
+    <string name="gesture_control_action_start_slideshow">Toggle slideshow</string>
+    <string name="gesture_control_action_previous_page">Previous image</string>
+    <string name="gesture_control_action_next_page">Next image</string>
+    <string name="gesture_control_grid_action_none">Off</string>
+    <string name="gesture_control_grid_action_photo_info">Info</string>
+    <string name="gesture_control_grid_action_start_slideshow">Slideshow</string>
+    <string name="gesture_control_grid_action_previous_page">Prev image</string>
+    <string name="gesture_control_grid_action_next_page">Next image</string>
+</resources>

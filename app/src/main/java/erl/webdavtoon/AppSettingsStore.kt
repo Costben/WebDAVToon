@@ -42,6 +42,7 @@ class AppSettingsStore(context: Context) {
         val READER_MAX_ZOOM_PERCENT = intPreferencesKey("reader_max_zoom_percent")
         val DEFAULT_READER_MODE = stringPreferencesKey("default_reader_mode")
         val VIDEO_EXTERNAL_PLAYER_MODE = stringPreferencesKey("video_external_player_mode")
+        val READER_GESTURE_CONTROL_JSON = stringPreferencesKey("reader_gesture_control_json")
         val ROTATION_LOCKED = booleanPreferencesKey("rotation_locked")
         val MIGRATED_TO_DATASTORE = booleanPreferencesKey("migrated_to_datastore")
         val WEBDAV_SECRET_MIGRATED = booleanPreferencesKey("webdav_secret_migrated")

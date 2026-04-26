@@ -26,6 +26,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import erl.webdavtoon.databinding.ActivityPhotoViewBinding
@@ -56,8 +57,8 @@ class PhotoViewActivity : AppCompatActivity() {
     private var currentIndex = 0
     private var isWebtoonFolder = false
     private var isCardMode = false // true: 卡片模式, false: webtoon模式
-    private var isImmersiveMode = false // 沉浸模式状�?
-    private var pagerSnapHelper: androidx.recyclerview.widget.PagerSnapHelper? = null // 用于卡片模式的吸附效�?
+    private var isImmersiveMode = false // 沉浸模式状�?
+    private var pagerSnapHelper: androidx.recyclerview.widget.PagerSnapHelper? = null // 用于卡片模式的吸附效�?
 
     private var isSelectionMode = false
     private var isFavorites = false
@@ -71,6 +72,18 @@ class PhotoViewActivity : AppCompatActivity() {
     private var isSlideshowAdvancePending = false
     private var slideshowSessionId = 0
     private var slideshowDrawableTarget: com.bumptech.glide.request.target.Target<Drawable>? = null
+    private var gestureControlConfig = ReaderGestureControlConfig.defaultConfig()
+    private var selectedGestureZone = GestureZone.CENTER
+    private var gestureControlMenuItem: android.view.MenuItem? = null
+    private lateinit var gestureControlOverlay: View
+    private lateinit var gestureControlCard: View
+    private lateinit var gestureControlGrid: android.widget.GridLayout
+    private lateinit var gestureControlEnabledSwitch: com.google.android.material.materialswitch.MaterialSwitch
+    private lateinit var gestureControlSelectedZoneLabel: android.widget.TextView
+    private lateinit var gestureControlSingleTapRow: View
+    private lateinit var gestureControlDoubleTapRow: View
+    private lateinit var gestureControlLongPressRow: View
+    private val gestureZoneViews = linkedMapOf<GestureZone, View>()
     private val slideshowHandler = Handler(Looper.getMainLooper())
     private val slideshowRunnable = object : Runnable {
         override fun run() {
@@ -97,10 +110,10 @@ class PhotoViewActivity : AppCompatActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         // 设置导航栏背景透明
         window.navigationBarColor = android.graphics.Color.TRANSPARENT
-        // 设置导航栏内容浅�?深色模式
+        // 设置导航栏内容浅�?深色模式
         WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightNavigationBars = true
         
-        // 允许内容延伸到刘海区�?(Short Edges)
+        // 允许内容延伸到刘海区�?(Short Edges)
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
             val params = window.attributes
             params.layoutInDisplayCutoutMode = android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
@@ -115,16 +128,19 @@ class PhotoViewActivity : AppCompatActivity() {
 
         loadReaderZoomSettings()
         initScaleGestureDetector()
+        gestureControlConfig = settingsManager.getReaderGestureControlConfig().normalize()
 
         setupUI()
 
         setupBottomBar()
         loadData(savedInstanceState)
         
-        // 处理系统返回�?
+        // 处理系统返回�?
         onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (isSelectionMode) {
+                if (gestureControlOverlay.visibility == View.VISIBLE) {
+                    hideGestureControlOverlay()
+                } else if (isSelectionMode) {
                     exitSelectionMode()
                 } else {
                     isEnabled = false
@@ -146,14 +162,17 @@ class PhotoViewActivity : AppCompatActivity() {
         }
 
         adapter = PhotoDetailAdapter(
-            onLongPress = { position -> 
+            onLongPress = { position ->
                 if (isImmersiveMode) {
                     toggleImmersiveMode(false)
                 } else {
                     enterSelectionMode(position)
                 }
             },
-            onClick = { position -> handleItemClick(position) }
+            onClick = { position -> handleItemClick(position) },
+            onGesture = { gestureType, position, xFraction, yFraction ->
+                handleReaderGesture(gestureType, position, xFraction, yFraction)
+            }
         )
         webtoonAdapter = WebtoonAdapter(
             tapListener = object : WebtoonAdapter.OnWebtoonTapListener {
@@ -175,7 +194,8 @@ class PhotoViewActivity : AppCompatActivity() {
         adapter.setMaxZoomPercent((maxReaderZoomScale * 100).toInt())
         
         setupFastScroll()
-        
+        setupGestureControlOverlay()
+
         // 监听滑动事件，更新当前图片索引和标题
         binding.recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
@@ -185,7 +205,7 @@ class PhotoViewActivity : AppCompatActivity() {
                 }
                 updateCurrentPosition()
                 
-                // 检查是否需要加载下一�?
+                // 检查是否需要加载下一�?
                 val layoutManager = recyclerView.layoutManager as? LinearLayoutManager
                 if (layoutManager != null && photos.isNotEmpty()) {
                     val lastVisible = layoutManager.findLastVisibleItemPosition()
@@ -216,18 +236,26 @@ class PhotoViewActivity : AppCompatActivity() {
         }
         binding.recyclerView.setMaxScale(maxReaderZoomScale)
         
-        // 设置单击监听，用于显�?隐藏工具�?
+        // 设置单击监听，用于显�?隐藏工具�?
         binding.recyclerView.onTapListener = object : ZoomableRecyclerView.OnTapListener {
-            override fun onSingleTap() {
-                // 如果当前工具栏可见，单击可以隐藏它（沉浸模式�?
+            override fun onSingleTap(xFraction: Float, yFraction: Float): Boolean {
+                val position = (binding.recyclerView.layoutManager as? LinearLayoutManager)
+                    ?.findFirstVisibleItemPosition()
+                    ?.takeIf { it != RecyclerView.NO_POSITION }
+                    ?: currentIndex
+                if (handleReaderGesture(GestureType.SINGLE_TAP, position, xFraction, yFraction)) {
+                    return true
+                }
                 if (!isSelectionMode && !isImmersiveMode) {
                     toggleImmersiveMode(true)
+                    return true
                 }
+                return false
             }
 
             override fun onLongPress() {
-                // 只有在沉浸模式（全屏）下，长按才呼出工具�?
-                // 如果已经在非沉浸模式下，长按是为了进入多选模式，这里不处理，�?Adapter 处理
+                // 只有在沉浸模式（全屏）下，长按才呼出工具�?
+                // 如果已经在非沉浸模式下，长按是为了进入多选模式，这里不处理，�?Adapter 处理
                 if (!isSelectionMode && isImmersiveMode) {
                     toggleImmersiveMode(false)
                 }
@@ -251,25 +279,25 @@ class PhotoViewActivity : AppCompatActivity() {
             val thumbHeight = binding.fastScrollThumb.height
             val paddingTop = binding.fastScrollContainer.paddingTop
             val paddingBottom = binding.fastScrollContainer.paddingBottom
-            
+
             // 可滚动的有效高度
             val effectiveHeight = totalHeight - paddingTop - paddingBottom
             val maxScrollY = effectiveHeight - thumbHeight
             if (maxScrollY <= 0) {
                 return@setOnTouchListener false
             }
-            
+
             when (event.action) {
                 MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
                     isDraggingFastScroll = true
-                    // 计算 Y 坐标在容器内的百分比（相对于有效滚动区域�?
+                    // 计算 Y 坐标在容器内的百分比（相对于有效滚动区域�?
                     var y = event.y - paddingTop - thumbHeight / 2f
                     if (y < 0) y = 0f
                     if (y > maxScrollY) y = maxScrollY.toFloat()
-                    
-                    // 设置滑块位置（需要加�?paddingTop�?
+
+                    // 设置滑块位置（需要加�?paddingTop�?
                     binding.fastScrollThumb.y = y + paddingTop
-                    
+
                     // 计算滚动到的位置
                     val percentage = y / maxScrollY
                     val totalItems = photos.size
@@ -287,6 +315,212 @@ class PhotoViewActivity : AppCompatActivity() {
                 else -> false
             }
         }
+    }
+
+    private fun setupGestureControlOverlay() {
+        gestureControlOverlay = findViewById(R.id.gestureControlOverlay)
+        gestureControlCard = findViewById(R.id.gestureControlCard)
+        gestureControlGrid = findViewById(R.id.gestureControlGrid)
+        gestureControlEnabledSwitch = findViewById(R.id.gestureControlEnabledSwitch)
+        gestureControlSelectedZoneLabel = findViewById(R.id.gestureControlSelectedZoneLabel)
+        gestureControlSingleTapRow = findViewById(R.id.gestureControlSingleTapSetting)
+        gestureControlDoubleTapRow = findViewById(R.id.gestureControlDoubleTapSetting)
+        gestureControlLongPressRow = findViewById(R.id.gestureControlLongPressSetting)
+
+        gestureControlOverlay.setOnClickListener { hideGestureControlOverlay() }
+        gestureControlCard.setOnClickListener { }
+        ViewCompat.setOnApplyWindowInsetsListener(gestureControlOverlay) { _, insets ->
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            gestureControlOverlay.setPadding(0, systemBars.top, 0, systemBars.bottom)
+            insets
+        }
+        ViewCompat.requestApplyInsets(gestureControlOverlay)
+
+        gestureControlEnabledSwitch.setOnCheckedChangeListener { _, isChecked ->
+            if (gestureControlConfig.enabled == isChecked) return@setOnCheckedChangeListener
+            gestureControlConfig = gestureControlConfig.copy(enabled = isChecked).normalize()
+            settingsManager.setReaderGestureControlConfig(gestureControlConfig)
+            renderGestureOverlay()
+        }
+
+        setupGestureActionRow(
+            row = gestureControlSingleTapRow,
+            iconRes = R.drawable.ic_ior_info_circle,
+            titleRes = R.string.gesture_control_single_tap,
+            gestureType = GestureType.SINGLE_TAP
+        )
+        setupGestureActionRow(
+            row = gestureControlDoubleTapRow,
+            iconRes = R.drawable.ic_ior_zoom_in,
+            titleRes = R.string.gesture_control_double_tap,
+            gestureType = GestureType.DOUBLE_TAP
+        )
+        setupGestureActionRow(
+            row = gestureControlLongPressRow,
+            iconRes = R.drawable.ic_ior_check_circle,
+            titleRes = R.string.gesture_control_long_press,
+            gestureType = GestureType.LONG_PRESS
+        )
+
+        buildGestureGrid()
+        renderGestureOverlay()
+    }
+
+    private fun setupGestureActionRow(row: View, iconRes: Int, titleRes: Int, gestureType: GestureType) {
+        row.findViewById<android.widget.ImageView>(R.id.icon).setImageResource(iconRes)
+        row.findViewById<android.widget.TextView>(R.id.title).setText(titleRes)
+        row.findViewById<android.widget.TextView>(R.id.summary).visibility = View.GONE
+        row.findViewById<android.widget.ImageView>(R.id.chevron).visibility = View.VISIBLE
+        row.findViewById<com.google.android.material.switchmaterial.SwitchMaterial>(R.id.switch_widget).visibility = View.GONE
+        row.minimumHeight = resources.getDimensionPixelSize(R.dimen.gesture_control_action_row_min_height)
+        row.setOnClickListener {
+            showGestureActionDialog(gestureType)
+        }
+    }
+
+    private fun buildGestureGrid() {
+        gestureControlGrid.removeAllViews()
+        gestureZoneViews.clear()
+        GestureZone.entries.forEachIndexed { index, zone ->
+            val zoneView = layoutInflater.inflate(R.layout.item_gesture_zone, gestureControlGrid, false)
+            val row = index / 3
+            val column = index % 3
+            val params = android.widget.GridLayout.LayoutParams(
+                android.widget.GridLayout.spec(row, 1f),
+                android.widget.GridLayout.spec(column, 1f)
+            ).apply {
+                width = 0
+                height = resources.getDimensionPixelSize(R.dimen.gesture_control_zone_card_height)
+                val zoneMargin = resources.getDimensionPixelSize(R.dimen.gesture_control_zone_card_margin)
+                setMargins(zoneMargin, zoneMargin, zoneMargin, zoneMargin)
+            }
+            zoneView.layoutParams = params
+            zoneView.setOnClickListener {
+                selectedGestureZone = zone
+                renderGestureOverlay()
+            }
+            gestureControlGrid.addView(zoneView)
+            gestureZoneViews[zone] = zoneView
+        }
+    }
+
+    private fun renderGestureOverlay() {
+        gestureControlEnabledSwitch.setOnCheckedChangeListener(null)
+        gestureControlEnabledSwitch.isChecked = gestureControlConfig.enabled
+        gestureControlEnabledSwitch.setOnCheckedChangeListener { _, isChecked ->
+            if (gestureControlConfig.enabled == isChecked) return@setOnCheckedChangeListener
+            gestureControlConfig = gestureControlConfig.copy(enabled = isChecked).normalize()
+            settingsManager.setReaderGestureControlConfig(gestureControlConfig)
+            renderGestureOverlay()
+        }
+
+        val selectedConfig = zoneConfig(selectedGestureZone)
+        gestureControlSelectedZoneLabel.text = zoneLabel(selectedGestureZone)
+        updateGestureActionRowSummary(gestureControlSingleTapRow, GestureAction.fromCode(selectedConfig.singleTapAction))
+        updateGestureActionRowSummary(gestureControlDoubleTapRow, GestureAction.fromCode(selectedConfig.doubleTapAction))
+        updateGestureActionRowSummary(gestureControlLongPressRow, GestureAction.fromCode(selectedConfig.longPressAction))
+
+        gestureZoneViews.forEach { (zone, view) ->
+            val config = zoneConfig(zone)
+            view.isSelected = zone == selectedGestureZone
+            val card = view as com.google.android.material.card.MaterialCardView
+            val strokeColor = if (zone == selectedGestureZone) {
+                ContextCompat.getColor(this, R.color.primary)
+            } else {
+                ContextCompat.getColor(this, R.color.outline)
+            }
+            card.strokeColor = strokeColor
+            view.findViewById<android.widget.TextView>(R.id.zoneName).text = zoneLabel(zone)
+            view.findViewById<android.widget.TextView>(R.id.zoneSummary).text = buildZoneSummary(config)
+            view.alpha = if (gestureControlConfig.enabled) 1f else 0.7f
+        }
+    }
+
+    private fun updateGestureActionRowSummary(row: View, action: GestureAction) {
+        row.findViewById<android.widget.TextView>(R.id.summary).text = gestureActionLabel(action)
+    }
+
+    private fun zoneConfig(zone: GestureZone): GestureZoneConfig {
+        return gestureControlConfig.zones.firstOrNull { it.zone == zone.code }
+            ?: GestureZoneConfig(zone.code)
+    }
+
+    private fun buildZoneSummary(config: GestureZoneConfig): String {
+        return listOf(
+            getString(R.string.gesture_control_grid_single_tap) + ": " + gestureActionCompactLabel(GestureAction.fromCode(config.singleTapAction)),
+            getString(R.string.gesture_control_grid_double_tap) + ": " + gestureActionCompactLabel(GestureAction.fromCode(config.doubleTapAction)),
+            getString(R.string.gesture_control_grid_long_press) + ": " + gestureActionCompactLabel(GestureAction.fromCode(config.longPressAction))
+        ).joinToString("\n")
+    }
+
+    private fun zoneLabel(zone: GestureZone): String {
+        return when (zone) {
+            GestureZone.TOP_LEFT -> getString(R.string.gesture_control_zone_top_left)
+            GestureZone.TOP_CENTER -> getString(R.string.gesture_control_zone_top_center)
+            GestureZone.TOP_RIGHT -> getString(R.string.gesture_control_zone_top_right)
+            GestureZone.CENTER_LEFT -> getString(R.string.gesture_control_zone_center_left)
+            GestureZone.CENTER -> getString(R.string.gesture_control_zone_center)
+            GestureZone.CENTER_RIGHT -> getString(R.string.gesture_control_zone_center_right)
+            GestureZone.BOTTOM_LEFT -> getString(R.string.gesture_control_zone_bottom_left)
+            GestureZone.BOTTOM_CENTER -> getString(R.string.gesture_control_zone_bottom_center)
+            GestureZone.BOTTOM_RIGHT -> getString(R.string.gesture_control_zone_bottom_right)
+        }
+    }
+
+    private fun gestureActionLabel(action: GestureAction): String {
+        return when (action) {
+            GestureAction.NONE -> getString(R.string.gesture_control_action_none)
+            GestureAction.PHOTO_INFO -> getString(R.string.gesture_control_action_photo_info)
+            GestureAction.START_SLIDESHOW -> getString(R.string.gesture_control_action_start_slideshow)
+            GestureAction.PREVIOUS_PAGE -> getString(R.string.gesture_control_action_previous_page)
+            GestureAction.NEXT_PAGE -> getString(R.string.gesture_control_action_next_page)
+        }
+    }
+
+    private fun gestureActionCompactLabel(action: GestureAction): String {
+        return when (action) {
+            GestureAction.NONE -> getString(R.string.gesture_control_grid_action_none)
+            GestureAction.PHOTO_INFO -> getString(R.string.gesture_control_grid_action_photo_info)
+            GestureAction.START_SLIDESHOW -> getString(R.string.gesture_control_grid_action_start_slideshow)
+            GestureAction.PREVIOUS_PAGE -> getString(R.string.gesture_control_grid_action_previous_page)
+            GestureAction.NEXT_PAGE -> getString(R.string.gesture_control_grid_action_next_page)
+        }
+    }
+
+    private fun showGestureActionDialog(gestureType: GestureType) {
+        val actions = GestureAction.entries.toTypedArray()
+        val labels = actions.map(::gestureActionLabel).toTypedArray()
+        val selectedAction = when (gestureType) {
+            GestureType.SINGLE_TAP -> GestureAction.fromCode(zoneConfig(selectedGestureZone).singleTapAction)
+            GestureType.DOUBLE_TAP -> GestureAction.fromCode(zoneConfig(selectedGestureZone).doubleTapAction)
+            GestureType.LONG_PRESS -> GestureAction.fromCode(zoneConfig(selectedGestureZone).longPressAction)
+        }
+        val checkedIndex = actions.indexOf(selectedAction).coerceAtLeast(0)
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.gesture_control_choose_action) + " - " + when (gestureType) {
+                GestureType.SINGLE_TAP -> getString(R.string.gesture_control_single_tap)
+                GestureType.DOUBLE_TAP -> getString(R.string.gesture_control_double_tap)
+                GestureType.LONG_PRESS -> getString(R.string.gesture_control_long_press)
+            })
+            .setSingleChoiceItems(labels, checkedIndex) { dialog: DialogInterface, which: Int ->
+                settingsManager.updateReaderGestureAction(selectedGestureZone, gestureType, actions[which])
+                gestureControlConfig = settingsManager.getReaderGestureControlConfig().normalize()
+                renderGestureOverlay()
+                dialog.dismiss()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun showGestureControlOverlay() {
+        gestureControlConfig = settingsManager.getReaderGestureControlConfig().normalize()
+        renderGestureOverlay()
+        gestureControlOverlay.visibility = View.VISIBLE
+    }
+
+    private fun hideGestureControlOverlay() {
+        gestureControlOverlay.visibility = View.GONE
     }
 
     private fun updateFastScrollThumbPosition() {
@@ -344,7 +578,7 @@ class PhotoViewActivity : AppCompatActivity() {
         if (isImmersiveMode) return
         stopSlideshow()
         
-        // 如果刚刚才通过长按呼出了工具栏，则本次长按不再进入多选模式，防止一次操作触发两个功�?
+        // 如果刚刚才通过长按呼出了工具栏，则本次长按不再进入多选模式，防止一次操作触发两个功�?
         if (System.currentTimeMillis() - lastImmersiveToggleTime < 500) return
         
         isSelectionMode = true
@@ -363,7 +597,7 @@ class PhotoViewActivity : AppCompatActivity() {
         if (isSelectionMode) {
             adapter.toggleSelection(position)
             webtoonAdapter?.toggleSelection(position)
-            
+
             val count = if (isCardMode) adapter.getSelectedCount() else webtoonAdapter?.getSelectedCount() ?: 0
             if (count == 0) {
                 exitSelectionMode()
@@ -371,12 +605,113 @@ class PhotoViewActivity : AppCompatActivity() {
                 updateSelectionUI()
             }
         } else {
-            // 在卡片模式下，PhotoView 会拦截单击事件，我们需要在这里处理 UI 隐藏逻辑
-            // 如果当前工具栏可见，单击可以隐藏它（沉浸模式�?
             if (!isImmersiveMode) {
                 toggleImmersiveMode(true)
             }
         }
+    }
+
+    private fun handleReaderGesture(
+        gestureType: GestureType,
+        position: Int,
+        xFraction: Float,
+        yFraction: Float
+    ): Boolean {
+        if (!isCardMode || isSelectionMode || gestureControlOverlay.visibility == View.VISIBLE) {
+            return false
+        }
+        val config = gestureControlConfig.normalize()
+        if (!config.enabled) {
+            return false
+        }
+        val zone = zoneFromFractions(xFraction, yFraction)
+        val zoneConfig = config.zones.firstOrNull { it.zone == zone.code } ?: return false
+        val action = when (gestureType) {
+            GestureType.SINGLE_TAP -> GestureAction.fromCode(zoneConfig.singleTapAction)
+            GestureType.DOUBLE_TAP -> GestureAction.fromCode(zoneConfig.doubleTapAction)
+            GestureType.LONG_PRESS -> GestureAction.fromCode(zoneConfig.longPressAction)
+        }
+        if (action == GestureAction.NONE) {
+            return false
+        }
+        android.util.Log.d(
+            "PhotoViewActivity",
+            "gesture action gesture=$gestureType zone=${zone.code} action=${action.code} position=$position playing=$isSlideshowPlaying"
+        )
+        return executeReaderGestureAction(action, position)
+    }
+
+    private fun zoneFromFractions(xFraction: Float, yFraction: Float): GestureZone {
+        val column = (xFraction.coerceIn(0f, 0.9999f) * 3).toInt().coerceIn(0, 2)
+        val row = (yFraction.coerceIn(0f, 0.9999f) * 3).toInt().coerceIn(0, 2)
+        return GestureZone.fromGridPosition(row, column)
+    }
+
+    private fun executeReaderGestureAction(action: GestureAction, position: Int): Boolean {
+        return when (action) {
+            GestureAction.NONE -> false
+            GestureAction.PHOTO_INFO -> {
+                currentIndex = position
+                showPhotoDetails()
+                true
+            }
+            GestureAction.START_SLIDESHOW -> {
+                currentIndex = position
+                toggleSlideshow()
+                true
+            }
+            GestureAction.PREVIOUS_PAGE -> {
+                navigateCardPage(position - 1)
+            }
+            GestureAction.NEXT_PAGE -> {
+                navigateCardPage(position + 1)
+            }
+        }
+    }
+
+    private fun navigateCardPage(targetIndex: Int): Boolean {
+        if (!isCardMode || targetIndex !in photos.indices) {
+            return false
+        }
+        if (targetIndex == currentIndex) {
+            return true
+        }
+
+        val photo = photos[targetIndex]
+        val requestedId = photo.id
+        val requestedUri = photo.imageUri
+        val session = ++slideshowSessionId
+        val (width, height) = getCardImageLoadSize()
+        clearSlideshowDrawableTarget()
+
+        slideshowDrawableTarget = WebDavImageLoader.loadImageDrawable(
+            context = this,
+            imageUri = requestedUri,
+            isLocal = photo.isLocal,
+            limitSize = false,
+            width = width,
+            height = height,
+            onReady = { drawable ->
+                if (!isCardMode || session != slideshowSessionId || targetIndex !in photos.indices) {
+                    return@loadImageDrawable
+                }
+                val currentPhoto = photos[targetIndex]
+                if (currentPhoto.id != requestedId || currentPhoto.imageUri != requestedUri) {
+                    return@loadImageDrawable
+                }
+                performSlideshowCut(targetIndex, drawable)
+                binding.recyclerView.postDelayed({
+                    if (!isSlideshowPlaying && session == slideshowSessionId) {
+                        hideSlideshowOverlay()
+                    }
+                }, 250L)
+            },
+            onFailed = {
+                if (session != slideshowSessionId) return@loadImageDrawable
+                android.util.Log.w("PhotoViewActivity", "gesture image load failed index=$targetIndex uri=$requestedUri")
+            }
+        )
+        return true
     }
 
     private fun exitSelectionMode() {
@@ -403,9 +738,9 @@ class PhotoViewActivity : AppCompatActivity() {
             deleteMenuItem?.icon?.let { icon ->
                 androidx.core.graphics.drawable.DrawableCompat.setTint(icon, android.graphics.Color.RED)
             }
-            // 确保底栏删除图标为红�?
+            // 确保底栏删除图标为红�?
             binding.deleteButton.visibility = View.GONE
-            // 更新多选按钮图标颜色为主题�?
+            // 更新多选按钮图标颜色为主题�?
             binding.selectButton.imageTintList = primaryTint
             binding.favoriteButton.imageTintList = primaryTint
             invalidateOptionsMenu()
@@ -424,7 +759,7 @@ class PhotoViewActivity : AppCompatActivity() {
     override fun onCreateOptionsMenu(menu: android.view.Menu): Boolean {
         menuInflater.inflate(R.menu.main_menu, menu)
         OverflowMenuHelper.enableOptionalIcons(menu)
-        // 隐藏不需要的菜单�?
+        // 隐藏不需要的菜单�?
         menu.findItem(R.id.action_search)?.isVisible = false
         menu.findItem(R.id.action_select)?.isVisible = false
         menu.findItem(R.id.action_settings)?.isVisible = false
@@ -434,6 +769,8 @@ class PhotoViewActivity : AppCompatActivity() {
         shareMenuItem = menu.findItem(R.id.action_share)
         shareMenuItem?.isVisible = isSelectionMode
         shareMenuItem?.setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_NEVER)
+        gestureControlMenuItem = menu.findItem(R.id.action_gesture_control)
+        gestureControlMenuItem?.isVisible = isCardMode && !isSelectionMode
 
         deleteMenuItem = menu.findItem(R.id.action_delete)
         deleteMenuItem?.isVisible = isSelectionMode
@@ -443,7 +780,7 @@ class PhotoViewActivity : AppCompatActivity() {
             }
         }
 
-        // 初始化旋转锁定项状�?
+        // 初始化旋转锁定项状�?
         val rotationLockItem = menu.findItem(R.id.action_rotation_lock)
         rotationLockItem?.isChecked = settingsManager.isRotationLocked()
 
@@ -457,6 +794,7 @@ class PhotoViewActivity : AppCompatActivity() {
         shareMenuItem?.isVisible = isSelectionMode
         menu.findItem(R.id.action_share)?.isVisible = isSelectionMode
         menu.findItem(R.id.action_randomize_photos)?.isVisible = false
+        menu.findItem(R.id.action_gesture_control)?.isVisible = isCardMode && !isSelectionMode
         tintOverflowMenuIcons(menu)
         return super.onPrepareOptionsMenu(menu)
     }
@@ -468,12 +806,19 @@ class PhotoViewActivity : AppCompatActivity() {
     }
 
     private fun tintOverflowMenuIcons(menu: android.view.Menu) {
-        val normalColor = ContextCompat.getColor(this, R.color.onSurface)
+        val normalColor = if (isDarkModeEnabled()) {
+            android.graphics.Color.WHITE
+        } else {
+            ContextCompat.getColor(this, R.color.onSurface)
+        }
         val deleteColor = ContextCompat.getColor(this, R.color.primary_red)
         menu.findItem(R.id.action_share)?.icon?.mutate()?.let { icon ->
             androidx.core.graphics.drawable.DrawableCompat.setTint(icon, normalColor)
         }
         menu.findItem(R.id.action_rotation_lock)?.icon?.mutate()?.let { icon ->
+            androidx.core.graphics.drawable.DrawableCompat.setTint(icon, normalColor)
+        }
+        menu.findItem(R.id.action_gesture_control)?.icon?.mutate()?.let { icon ->
             androidx.core.graphics.drawable.DrawableCompat.setTint(icon, normalColor)
         }
         menu.findItem(R.id.action_delete)?.icon?.mutate()?.let { icon ->
@@ -500,6 +845,10 @@ class PhotoViewActivity : AppCompatActivity() {
                 item.isChecked = newLockedState
                 settingsManager.setRotationLocked(newLockedState)
                 applyRotationLock()
+                true
+            }
+            R.id.action_gesture_control -> {
+                showGestureControlOverlay()
                 true
             }
             else -> super.onOptionsItemSelected(item)
@@ -608,7 +957,7 @@ class PhotoViewActivity : AppCompatActivity() {
                         Toast.makeText(this@PhotoViewActivity, getString(R.string.delete_partial_failed), Toast.LENGTH_SHORT).show()
                     }
 
-                    // 更新列表并退出多选模�?
+                    // 更新列表并退出多选模�?
                     val newPhotos = photos.toMutableList()
                     newPhotos.removeAll(deletedPhotos)
                     photos = newPhotos
@@ -646,16 +995,16 @@ class PhotoViewActivity : AppCompatActivity() {
         // 显示沉浸模式按钮
         binding.immersiveButton.visibility = View.VISIBLE
 
-        // 切换到卡片模式：重置缩放，并禁用 ZoomableRecyclerView 的缩放功�?
-        // 防止�?Item 内部�?PhotoView 冲突
+        // 切换到卡片模式：重置缩放，并禁用 ZoomableRecyclerView 的缩放功�?
+        // 防止�?Item 内部�?PhotoView 冲突
         binding.recyclerView.resetScale(false)
-        binding.recyclerView.setMaxScale(1f) // 禁用 RecyclerView 层级的缩�?
+        binding.recyclerView.setMaxScale(1f) // 禁用 RecyclerView 层级的缩�?
         
         val rvLp = binding.recyclerView.layoutParams
         rvLp.width = android.view.ViewGroup.LayoutParams.MATCH_PARENT
         binding.recyclerView.layoutParams = rvLp
 
-        // 设置为水平布局，支持左右滑动，一页显示一张图�?
+        // 设置为水平布局，支持左右滑动，一页显示一张图�?
         val layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
         binding.recyclerView.layoutManager = layoutManager
         binding.recyclerView.adapter = adapter
@@ -676,7 +1025,7 @@ class PhotoViewActivity : AppCompatActivity() {
         // 隐藏沉浸模式按钮
         binding.immersiveButton.visibility = View.GONE
         
-        // 移除PagerSnapHelper的吸附效�?
+        // 移除PagerSnapHelper的吸附效�?
         pagerSnapHelper?.attachToRecyclerView(null)
         pagerSnapHelper = null
 
@@ -695,14 +1044,14 @@ class PhotoViewActivity : AppCompatActivity() {
 
 
     private fun setupBottomBar() {
-        // 设置线�?(Outlined) 风格图标
+        // 设置线�?(Outlined) 风格图标
             binding.detailButton.setImageResource(R.drawable.ic_ior_info_circle)
             binding.favoriteButton.setImageResource(R.drawable.ic_ior_star)
             binding.downloadButton.setImageResource(R.drawable.ic_ior_download)
             binding.deleteButton.setImageResource(R.drawable.ic_ior_trash)
             binding.selectButton.setImageResource(R.drawable.ic_ior_check_circle)
         
-        // 统一设置底栏按钮颜色：深色模式强制白色，其他模式使用主题�?
+        // 统一设置底栏按钮颜色：深色模式强制白色，其他模式使用主题�?
         val tintList = getBottomBarIconTint()
 
         
@@ -747,7 +1096,7 @@ class PhotoViewActivity : AppCompatActivity() {
             true
         }
 
-        // 多选按钮点击事�?
+        // 多选按钮点击事�?
         binding.selectButton.setOnClickListener {
             if (isSelectionMode) {
                 exitSelectionMode()
@@ -768,12 +1117,12 @@ class PhotoViewActivity : AppCompatActivity() {
             }
         }
         
-        // 初始隐藏下载按钮，仅在webtoon文件夹显�?
+        // 初始隐藏下载按钮，仅在webtoon文件夹显�?
         binding.downloadButton.visibility = if (isWebtoonFolder) View.VISIBLE else View.GONE
     }
     
     private fun toggleViewMode() {
-        // 先保存当前滚动位�?
+        // 先保存当前滚动位�?
         val layoutManager = binding.recyclerView.layoutManager as? LinearLayoutManager
         val currentScrollPosition = layoutManager?.findFirstVisibleItemPosition() ?: currentIndex
         
@@ -783,7 +1132,7 @@ class PhotoViewActivity : AppCompatActivity() {
             // Switch to card mode.
             setupCardMode()
             binding.fastScrollContainer.visibility = View.GONE
-            // 更新卡片模式适配器数�?
+            // 更新卡片模式适配器数�?
             adapter.setPhotos(photos)
             binding.recyclerView.adapter = adapter
         } else {
@@ -795,7 +1144,7 @@ class PhotoViewActivity : AppCompatActivity() {
                 binding.fastScrollContainer.visibility = View.VISIBLE
                 binding.recyclerView.post { updateFastScrollThumbPosition() }
             }
-            // 更新webtoon模式适配器数�?
+            // 更新webtoon模式适配器数�?
             webtoonAdapter?.setPhotos(photos)
             binding.recyclerView.adapter = webtoonAdapter
         }
@@ -803,7 +1152,7 @@ class PhotoViewActivity : AppCompatActivity() {
         // 更新模式切换按钮图标
         updateBottomBarIcons()
         
-        // 确保RecyclerView完全准备好后再滚�?
+        // 确保RecyclerView完全准备好后再滚�?
         binding.recyclerView.post {
             binding.recyclerView.scrollToPosition(currentScrollPosition)
             if (isCardMode) {
@@ -833,13 +1182,13 @@ class PhotoViewActivity : AppCompatActivity() {
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             
-            // 只有在非沉浸模式下才应用内边距，避免覆盖沉浸模式的全屏设�?
+            // 只有在非沉浸模式下才应用内边距，避免覆盖沉浸模式的全屏设�?
             if (!isImmersiveMode) {
                 // 应用栏设置顶部内边距，使其在状态栏下方显示
                 binding.appBarLayout.setPadding(0, systemBars.top, 0, 0)
                 // 底栏设置底部内边距，使其在导航栏上方显示
                 binding.bottomAppBar.setPadding(0, 0, 0, systemBars.bottom)
-                // 内容区域设置相应内边�?
+                // 内容区域设置相应内边�?
                 binding.recyclerView.setPadding(
                     binding.recyclerView.paddingLeft,
                     binding.recyclerView.paddingTop,
@@ -858,6 +1207,7 @@ class PhotoViewActivity : AppCompatActivity() {
         val controller = WindowCompat.getInsetsController(window, window.decorView)
         
         if (enabled) {
+            hideGestureControlOverlay()
             // 进入沉浸模式：隐藏状态栏、导航栏和标题栏
             controller.hide(WindowInsetsCompat.Type.systemBars())
             controller.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
@@ -888,6 +1238,10 @@ class PhotoViewActivity : AppCompatActivity() {
 
     private fun toggleSlideshow() {
         if (!isCardMode || isSelectionMode || photos.isEmpty()) return
+        android.util.Log.d(
+            "PhotoViewActivity",
+            "slideshow toggle currentIndex=$currentIndex playing=$isSlideshowPlaying"
+        )
         if (isSlideshowPlaying) {
             stopSlideshow()
         } else {
@@ -897,6 +1251,10 @@ class PhotoViewActivity : AppCompatActivity() {
 
     private fun startSlideshow() {
         if (!isCardMode || photos.size <= 1 || currentIndex >= photos.lastIndex) return
+        android.util.Log.d(
+            "PhotoViewActivity",
+            "slideshow start currentIndex=$currentIndex intervalMs=$slideshowIntervalMs"
+        )
         slideshowSessionId += 1
         isSlideshowAdvancePending = false
         preloadUpcomingCardImages(currentIndex)
@@ -907,6 +1265,10 @@ class PhotoViewActivity : AppCompatActivity() {
     }
 
     private fun stopSlideshow() {
+        android.util.Log.d(
+            "PhotoViewActivity",
+            "slideshow stop currentIndex=$currentIndex playing=$isSlideshowPlaying"
+        )
         slideshowSessionId += 1
         isSlideshowPlaying = false
         isSlideshowAdvancePending = false
@@ -1113,7 +1475,7 @@ class PhotoViewActivity : AppCompatActivity() {
     private fun observeMediaState() {
         lifecycleScope.launch {
             mediaViewModel.state.collect { state: MediaUiState ->
-                // 仅当会话匹配且图片列表确实发生变化时才更�?
+                // 仅当会话匹配且图片列表确实发生变化时才更�?
                 if (state.sessionKey.isNotEmpty()) {
                     val imageOnly = state.photos.filter { it.mediaType == MediaType.IMAGE }
                     if (imageOnly != photos) {
@@ -1121,7 +1483,7 @@ class PhotoViewActivity : AppCompatActivity() {
                         adapter.setPhotos(photos)
                         webtoonAdapter?.setPhotos(photos)
                         
-                        // 更新标题等信�?
+                        // 更新标题等信�?
                         if (currentIndex in photos.indices) {
                             binding.toolbar.title = photos[currentIndex].title
                             updateFavoriteButtonState()
@@ -1160,7 +1522,7 @@ class PhotoViewActivity : AppCompatActivity() {
     private fun loadData(savedInstanceState: Bundle?) {
         photos = PhotoCache.getPhotos()
         
-        // 优先�?savedInstanceState 恢复索引和模式，如果没有则从 intent 或默认值获�?
+        // 优先�?savedInstanceState 恢复索引和模式，如果没有则从 intent 或默认值获�?
         if (savedInstanceState != null) {
             currentIndex = savedInstanceState.getInt("EXTRA_CURRENT_INDEX", 0)
             isCardMode = savedInstanceState.getBoolean("EXTRA_IS_CARD_MODE", false)
@@ -1188,20 +1550,21 @@ class PhotoViewActivity : AppCompatActivity() {
             
         isFavorites = intent.getBooleanExtra("EXTRA_IS_FAVORITES", false)
         
-        // 检查是否为webtoon文件�?
+        // 检查是否为webtoon文件�?
         isWebtoonFolder = photos.isNotEmpty() && currentIndex in photos.indices && photos[currentIndex].title.contains("webtoon", ignoreCase = true)
         
-        // 根据恢复的模式设�?UI
+        // 根据恢复的模式设�?UI
         if (isCardMode) {
             setupCardMode()
         } else {
             setupWebtoonMode()
+            hideGestureControlOverlay()
         }
         
-        // 恢复沉浸模式状�?
+        // 恢复沉浸模式状�?
         toggleImmersiveMode(isImmersiveMode)
         
-        // 更新适配器数�?
+        // 更新适配器数�?
         adapter.setPhotos(photos)
         webtoonAdapter?.setPhotos(photos)
         
@@ -1222,11 +1585,11 @@ class PhotoViewActivity : AppCompatActivity() {
             val photo = photos[currentIndex]
             binding.toolbar.title = photo.title
             
-            // 初始化收藏按钮状�?
+            // 初始化收藏按钮状�?
             updateFavoriteButtonState()
         }
         
-        // 更新下载按钮可见�?
+        // 更新下载按钮可见�?
         binding.downloadButton.visibility = if (isWebtoonFolder) View.VISIBLE else View.GONE
     }
 
@@ -1429,12 +1792,12 @@ class PhotoViewActivity : AppCompatActivity() {
                         PhotoCache.setPhotos(newPhotos)
                         mediaViewModel.removePhotos(listOf(deletedPhoto))
                         
-                        // 更新适配器数�?
+                        // 更新适配器数�?
                         adapter.setPhotos(newPhotos)
                         webtoonAdapter?.setPhotos(newPhotos)
                         
                         if (newPhotos.isEmpty()) {
-                            // 没有图片了，返回上一�?
+                            // 没有图片了，返回上一�?
                             finish()
                         } else {
                             // 保持当前索引在有效范围内
@@ -1466,7 +1829,7 @@ class PhotoViewActivity : AppCompatActivity() {
     override fun onDestroy() {
         stopSlideshow()
         super.onDestroy()
-        // 不要在这里清�?PhotoCache，因为旋转屏幕可能会重新创建 Activity
+        // 不要在这里清�?PhotoCache，因为旋转屏幕可能会重新创建 Activity
     }
 }
 
