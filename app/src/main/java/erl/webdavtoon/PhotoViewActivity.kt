@@ -81,7 +81,6 @@ class PhotoViewActivity : AppCompatActivity() {
     private lateinit var gestureControlEnabledSwitch: com.google.android.material.materialswitch.MaterialSwitch
     private lateinit var gestureControlSelectedZoneLabel: android.widget.TextView
     private lateinit var gestureControlSingleTapRow: View
-    private lateinit var gestureControlDoubleTapRow: View
     private lateinit var gestureControlLongPressRow: View
     private val gestureZoneViews = linkedMapOf<GestureZone, View>()
     private val slideshowHandler = Handler(Looper.getMainLooper())
@@ -324,7 +323,6 @@ class PhotoViewActivity : AppCompatActivity() {
         gestureControlEnabledSwitch = findViewById(R.id.gestureControlEnabledSwitch)
         gestureControlSelectedZoneLabel = findViewById(R.id.gestureControlSelectedZoneLabel)
         gestureControlSingleTapRow = findViewById(R.id.gestureControlSingleTapSetting)
-        gestureControlDoubleTapRow = findViewById(R.id.gestureControlDoubleTapSetting)
         gestureControlLongPressRow = findViewById(R.id.gestureControlLongPressSetting)
 
         gestureControlOverlay.setOnClickListener { hideGestureControlOverlay() }
@@ -348,12 +346,6 @@ class PhotoViewActivity : AppCompatActivity() {
             iconRes = R.drawable.ic_ior_info_circle,
             titleRes = R.string.gesture_control_single_tap,
             gestureType = GestureType.SINGLE_TAP
-        )
-        setupGestureActionRow(
-            row = gestureControlDoubleTapRow,
-            iconRes = R.drawable.ic_ior_zoom_in,
-            titleRes = R.string.gesture_control_double_tap,
-            gestureType = GestureType.DOUBLE_TAP
         )
         setupGestureActionRow(
             row = gestureControlLongPressRow,
@@ -417,7 +409,6 @@ class PhotoViewActivity : AppCompatActivity() {
         val selectedConfig = zoneConfig(selectedGestureZone)
         gestureControlSelectedZoneLabel.text = zoneLabel(selectedGestureZone)
         updateGestureActionRowSummary(gestureControlSingleTapRow, GestureAction.fromCode(selectedConfig.singleTapAction))
-        updateGestureActionRowSummary(gestureControlDoubleTapRow, GestureAction.fromCode(selectedConfig.doubleTapAction))
         updateGestureActionRowSummary(gestureControlLongPressRow, GestureAction.fromCode(selectedConfig.longPressAction))
 
         gestureZoneViews.forEach { (zone, view) ->
@@ -448,7 +439,6 @@ class PhotoViewActivity : AppCompatActivity() {
     private fun buildZoneSummary(config: GestureZoneConfig): String {
         return listOf(
             getString(R.string.gesture_control_grid_single_tap) + ": " + gestureActionCompactLabel(GestureAction.fromCode(config.singleTapAction)),
-            getString(R.string.gesture_control_grid_double_tap) + ": " + gestureActionCompactLabel(GestureAction.fromCode(config.doubleTapAction)),
             getString(R.string.gesture_control_grid_long_press) + ": " + gestureActionCompactLabel(GestureAction.fromCode(config.longPressAction))
         ).joinToString("\n")
     }
@@ -472,6 +462,7 @@ class PhotoViewActivity : AppCompatActivity() {
             GestureAction.NONE -> getString(R.string.gesture_control_action_none)
             GestureAction.PHOTO_INFO -> getString(R.string.gesture_control_action_photo_info)
             GestureAction.START_SLIDESHOW -> getString(R.string.gesture_control_action_start_slideshow)
+            GestureAction.TOGGLE_IMMERSIVE -> getString(R.string.gesture_control_action_toggle_immersive)
             GestureAction.PREVIOUS_PAGE -> getString(R.string.gesture_control_action_previous_page)
             GestureAction.NEXT_PAGE -> getString(R.string.gesture_control_action_next_page)
         }
@@ -482,6 +473,7 @@ class PhotoViewActivity : AppCompatActivity() {
             GestureAction.NONE -> getString(R.string.gesture_control_grid_action_none)
             GestureAction.PHOTO_INFO -> getString(R.string.gesture_control_grid_action_photo_info)
             GestureAction.START_SLIDESHOW -> getString(R.string.gesture_control_grid_action_start_slideshow)
+            GestureAction.TOGGLE_IMMERSIVE -> getString(R.string.gesture_control_grid_action_toggle_immersive)
             GestureAction.PREVIOUS_PAGE -> getString(R.string.gesture_control_grid_action_previous_page)
             GestureAction.NEXT_PAGE -> getString(R.string.gesture_control_grid_action_next_page)
         }
@@ -620,6 +612,9 @@ class PhotoViewActivity : AppCompatActivity() {
         if (!isCardMode || isSelectionMode || gestureControlOverlay.visibility == View.VISIBLE) {
             return false
         }
+        if (gestureType == GestureType.DOUBLE_TAP) {
+            return false
+        }
         val config = gestureControlConfig.normalize()
         if (!config.enabled) {
             return false
@@ -658,6 +653,11 @@ class PhotoViewActivity : AppCompatActivity() {
             GestureAction.START_SLIDESHOW -> {
                 currentIndex = position
                 toggleSlideshow()
+                true
+            }
+            GestureAction.TOGGLE_IMMERSIVE -> {
+                currentIndex = position
+                toggleImmersiveMode(!isImmersiveMode)
                 true
             }
             GestureAction.PREVIOUS_PAGE -> {
@@ -1479,9 +1479,18 @@ class PhotoViewActivity : AppCompatActivity() {
                 if (state.sessionKey.isNotEmpty()) {
                     val imageOnly = state.photos.filter { it.mediaType == MediaType.IMAGE }
                     if (imageOnly != photos) {
+                        val previousPhotos = photos
+                        val isWebtoonAppend = !isCardMode &&
+                            previousPhotos.isNotEmpty() &&
+                            imageOnly.size > previousPhotos.size &&
+                            imageOnly.take(previousPhotos.size) == previousPhotos
                         photos = imageOnly
                         adapter.setPhotos(photos)
-                        webtoonAdapter?.setPhotos(photos)
+                        if (isWebtoonAppend) {
+                            webtoonAdapter?.appendPhotos(photos.drop(previousPhotos.size))
+                        } else {
+                            webtoonAdapter?.setPhotos(photos)
+                        }
                         
                         // 更新标题等信�?
                         if (currentIndex in photos.indices) {

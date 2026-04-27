@@ -1,12 +1,13 @@
 package erl.webdavtoon
 
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import erl.webdavtoon.databinding.ItemPhotoViewBinding
 
 /**
- * Webtoon 模式适配器
+ * 漫画模式适配器。
  */
 class WebtoonAdapter(
     private val tapListener: OnWebtoonTapListener? = null,
@@ -25,6 +26,13 @@ class WebtoonAdapter(
     fun setPhotos(newPhotos: List<Photo>) {
         photos = newPhotos
         notifyDataSetChanged()
+    }
+
+    fun appendPhotos(newPhotos: List<Photo>) {
+        if (newPhotos.isEmpty()) return
+        val start = photos.size
+        photos = photos + newPhotos
+        notifyItemRangeInserted(start, newPhotos.size)
     }
 
     fun setSelectionMode(enabled: Boolean) {
@@ -75,9 +83,7 @@ class WebtoonAdapter(
         private val onLongPress: (Int) -> Unit,
         private val onClick: (Int) -> Unit
     ) : RecyclerView.ViewHolder(binding.root) {
-        
-        private var selectionMode = false
-        
+
         init {
             binding.root.setOnLongClickListener {
                 onLongPress(bindingAdapterPosition)
@@ -86,10 +92,8 @@ class WebtoonAdapter(
         }
 
         fun bind(photo: Photo, isSelectionMode: Boolean, isSelected: Boolean) {
-            this.selectionMode = isSelectionMode
             val context = binding.root.context
-            
-            // 如果不是多选模式，禁用 click listener，让事件传给父容器 ZoomableRecyclerView
+
             if (!isSelectionMode) {
                 binding.root.setOnClickListener(null)
             } else {
@@ -100,29 +104,30 @@ class WebtoonAdapter(
 
             if (photo.isLocal) {
                 WebDavImageLoader.loadLocalImage(
-                    context,
-                    photo.imageUri,
-                    binding.imageView,
-                    binding.progressBar,
-                    limitSize = false // Webtoon模式下不限制图片大小，确保显示全图
+                    context = context,
+                    imageUri = photo.imageUri,
+                    imageView = binding.imageView,
+                    progressBar = binding.progressBar,
+                    limitSize = false,
+                    isWebtoonReader = true
                 )
             } else {
                 WebDavImageLoader.loadWebDavImage(
-                    context,
-                    photo.imageUri,
-                    binding.imageView,
-                    binding.progressBar,
-                    limitSize = false // Webtoon模式下不限制图片大小，确保显示全图
+                    context = context,
+                    imageUri = photo.imageUri,
+                    imageView = binding.imageView,
+                    progressBar = binding.progressBar,
+                    limitSize = false,
+                    isWebtoonReader = true
                 )
             }
 
-            // 更新多选 UI
             if (isSelectionMode) {
-                binding.selectionOverlay.visibility = if (isSelected) android.view.View.VISIBLE else android.view.View.GONE
-                binding.checkIcon.visibility = if (isSelected) android.view.View.VISIBLE else android.view.View.GONE
+                binding.selectionOverlay.visibility = if (isSelected) View.VISIBLE else View.GONE
+                binding.checkIcon.visibility = if (isSelected) View.VISIBLE else View.GONE
             } else {
-                binding.selectionOverlay.visibility = android.view.View.GONE
-                binding.checkIcon.visibility = android.view.View.GONE
+                binding.selectionOverlay.visibility = View.GONE
+                binding.checkIcon.visibility = View.GONE
             }
         }
     }

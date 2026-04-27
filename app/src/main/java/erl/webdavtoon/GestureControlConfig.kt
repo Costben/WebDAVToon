@@ -35,6 +35,7 @@ enum class GestureAction(val code: String) {
     NONE("none"),
     PHOTO_INFO("photo_info"),
     START_SLIDESHOW("start_slideshow"),
+    TOGGLE_IMMERSIVE("toggle_immersive"),
     PREVIOUS_PAGE("previous_page"),
     NEXT_PAGE("next_page");
 

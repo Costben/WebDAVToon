@@ -167,14 +167,16 @@ class PhotoDetailAdapter(
                     binding.imageView.context,
                     photo.imageUri,
                     binding.imageView,
-                    limitSize = false
+                    limitSize = false,
+                    isWebtoonReader = true
                 )
             } else {
                 WebDavImageLoader.loadWebDavImage(
                     binding.imageView.context,
                     photo.imageUri,
                     binding.imageView,
-                    limitSize = false
+                    limitSize = false,
+                    isWebtoonReader = true
                 )
             }
 
