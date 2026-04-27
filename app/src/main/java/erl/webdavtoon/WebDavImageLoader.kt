@@ -64,10 +64,17 @@ object WebDavImageLoader {
         imageView: ImageView,
         progressBar: ProgressBar? = null,
         limitSize: Boolean = true,
+        isWebtoonReader: Boolean = false,
         isWaterfall: Boolean = false,
         isFolderPreview: Boolean = false
     ) {
-        val requestOptions = buildRequestOptions(context, limitSize, isWaterfall, isFolderPreview)
+        val requestOptions = buildRequestOptions(
+            context = context,
+            limitSize = limitSize,
+            isWebtoonReader = isWebtoonReader,
+            isWaterfall = isWaterfall,
+            isFolderPreview = isFolderPreview
+        )
         val model = buildWebDavModel(context, imageUri)
 
         Glide.with(context)
@@ -81,12 +88,19 @@ object WebDavImageLoader {
         context: Context,
         imageUri: Uri,
         limitSize: Boolean = true,
+        isWebtoonReader: Boolean = false,
         isWaterfall: Boolean = false,
         isFolderPreview: Boolean = false,
         width: Int? = null,
         height: Int? = null
     ) {
-        val requestOptions = buildRequestOptions(context, limitSize, isWaterfall, isFolderPreview)
+        val requestOptions = buildRequestOptions(
+            context = context,
+            limitSize = limitSize,
+            isWebtoonReader = isWebtoonReader,
+            isWaterfall = isWaterfall,
+            isFolderPreview = isFolderPreview
+        )
         val model = buildWebDavModel(context, imageUri)
 
         val request = Glide.with(context)
@@ -175,10 +189,17 @@ object WebDavImageLoader {
         imageView: ImageView,
         progressBar: ProgressBar? = null,
         limitSize: Boolean = true,
+        isWebtoonReader: Boolean = false,
         isWaterfall: Boolean = false,
         isFolderPreview: Boolean = false
     ) {
-        val requestOptions = buildRequestOptions(context, limitSize, isWaterfall, isFolderPreview)
+        val requestOptions = buildRequestOptions(
+            context = context,
+            limitSize = limitSize,
+            isWebtoonReader = isWebtoonReader,
+            isWaterfall = isWaterfall,
+            isFolderPreview = isFolderPreview
+        )
 
         Glide.with(context)
             .load(imageUri)
@@ -191,12 +212,19 @@ object WebDavImageLoader {
         context: Context,
         imageUri: Uri,
         limitSize: Boolean = true,
+        isWebtoonReader: Boolean = false,
         isWaterfall: Boolean = false,
         isFolderPreview: Boolean = false,
         width: Int? = null,
         height: Int? = null
     ) {
-        val requestOptions = buildRequestOptions(context, limitSize, isWaterfall, isFolderPreview)
+        val requestOptions = buildRequestOptions(
+            context = context,
+            limitSize = limitSize,
+            isWebtoonReader = isWebtoonReader,
+            isWaterfall = isWaterfall,
+            isFolderPreview = isFolderPreview
+        )
 
         val request = Glide.with(context)
             .load(imageUri)
@@ -215,6 +243,7 @@ object WebDavImageLoader {
         imageUri: Uri,
         isLocal: Boolean,
         limitSize: Boolean = false,
+        isWebtoonReader: Boolean = false,
         isWaterfall: Boolean = false,
         isFolderPreview: Boolean = false,
         width: Int? = null,
@@ -222,7 +251,13 @@ object WebDavImageLoader {
         onReady: (Drawable) -> Unit,
         onFailed: () -> Unit
     ): Target<Drawable> {
-        val requestOptions = buildRequestOptions(context, limitSize, isWaterfall, isFolderPreview)
+        val requestOptions = buildRequestOptions(
+            context = context,
+            limitSize = limitSize,
+            isWebtoonReader = isWebtoonReader,
+            isWaterfall = isWaterfall,
+            isFolderPreview = isFolderPreview
+        )
         val model: Any = if (isLocal) imageUri else buildWebDavModel(context, imageUri)
         val targetWidth = width?.takeIf { it > 0 } ?: Target.SIZE_ORIGINAL
         val targetHeight = height?.takeIf { it > 0 } ?: Target.SIZE_ORIGINAL
@@ -857,6 +892,7 @@ object WebDavImageLoader {
     private fun buildRequestOptions(
         context: Context,
         limitSize: Boolean,
+        isWebtoonReader: Boolean,
         isWaterfall: Boolean,
         isFolderPreview: Boolean
     ): RequestOptions {
@@ -873,6 +909,15 @@ object WebDavImageLoader {
                 .downsample(DownsampleStrategy.AT_MOST)
                 .format(DecodeFormat.PREFER_RGB_565)
                 .priority(Priority.HIGH)
+                .dontAnimate()
+        } else if (isWebtoonReader) {
+            val displayMetrics = context.resources.displayMetrics
+            val targetWidth = displayMetrics.widthPixels.coerceAtLeast(1)
+            val targetHeight = (displayMetrics.heightPixels * 2).coerceAtLeast(displayMetrics.heightPixels)
+            requestOptions = requestOptions
+                .placeholder(R.drawable.ic_ior_media_image)
+                .override(targetWidth, targetHeight)
+                .downsample(DownsampleStrategy.AT_MOST)
                 .dontAnimate()
         } else if (isWaterfall) {
             requestOptions = requestOptions.placeholder(R.drawable.ic_ior_media_image)
