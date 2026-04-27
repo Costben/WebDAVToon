@@ -78,9 +78,6 @@
                     android:id="@+id/gestureControlSingleTapSetting"
                     layout="@layout/item_setting" />
 
-                <include
-                    android:id="@+id/gestureControlDoubleTapSetting"
-                    layout="@layout/item_setting" />
 
                 <include
                     android:id="@+id/gestureControlLongPressSetting"

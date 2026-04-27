@@ -2,7 +2,7 @@
 <resources>
     <string name="gesture_control">Gesture Control</string>
     <string name="gesture_control_title">Gesture Control</string>
-    <string name="gesture_control_summary">Configure single tap, double tap, and long press for each zone.</string>
+    <string name="gesture_control_summary">Configure single tap and long press for each zone.</string>
     <string name="gesture_control_enabled">Enable gesture control</string>
     <string name="gesture_control_disabled_action">Not set</string>
     <string name="gesture_control_choose_action">Choose action</string>
@@ -23,11 +23,13 @@
     <string name="gesture_control_zone_bottom_right">Bottom right</string>
     <string name="gesture_control_action_none">Not set</string>
     <string name="gesture_control_action_photo_info">Photo info</string>
+    <string name="gesture_control_action_toggle_immersive">Toggle immersive mode</string>
     <string name="gesture_control_action_start_slideshow">Toggle slideshow</string>
     <string name="gesture_control_action_previous_page">Previous image</string>
     <string name="gesture_control_action_next_page">Next image</string>
-    <string name="gesture_control_grid_action_none">Off</string>
+    <string name="gesture_control_grid_action_none">Not set</string>
     <string name="gesture_control_grid_action_photo_info">Info</string>
+    <string name="gesture_control_grid_action_toggle_immersive">Immersive</string>
     <string name="gesture_control_grid_action_start_slideshow">Slideshow</string>
     <string name="gesture_control_grid_action_previous_page">Prev image</string>
     <string name="gesture_control_grid_action_next_page">Next image</string>
