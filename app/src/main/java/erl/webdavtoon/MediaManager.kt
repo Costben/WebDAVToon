@@ -9,11 +9,27 @@ import java.util.Locale
 import kotlin.random.Random
 
 /**
- * 集中管理媒体库的分页加载逻辑，供 MainActivity �?PhotoViewActivity 共享
+ * 集中管理媒体库分页加载逻辑，供 MainActivity 与 PhotoViewActivity 共享
+±äº«
  */
 object MediaManager {
     private const val PAGE_SIZE = 120
     var mediaViewModel: MediaViewModel? = null
+
+    private data class OrderedMediaCache(
+        val sessionKey: String,
+        val folderPath: String,
+        val isRemote: Boolean,
+        val isRecursive: Boolean,
+        val isFavorites: Boolean,
+        val query: MediaQuery,
+        val clusterShuffleSeed: Long,
+        val photoShuffleSeed: Long,
+        val items: List<Photo>
+    )
+
+    @Volatile
+    private var orderedMediaCache: OrderedMediaCache? = null
 
     fun sortPhotos(
         photos: List<Photo>,
@@ -51,6 +67,7 @@ object MediaManager {
         result.addAll(flattenFolderGroups(grouped, sortedFolderPaths, randomizePhotos, photoShuffleSeed))
         return result
     }
+
     private fun sortMediaItems(photos: List<Photo>, sortOrder: Int): List<Photo> {
         return when (sortOrder) {
             SettingsManager.SORT_NAME_ASC -> photos.sortedBy { it.title.lowercase(Locale.ROOT) }
@@ -109,14 +126,20 @@ object MediaManager {
         if (state.isLoading || !state.hasMore) return
 
         viewModel.startAppend()
-
         loadPageInternal(context, scope, state, append = true, forceRefresh = false)
     }
 
-    fun refresh(context: Context, scope: CoroutineScope, sessionKey: String,
-                folderPath: String, isRemote: Boolean, isRecursive: Boolean,
-                isFavorites: Boolean, query: MediaQuery, reshuffleClusters: Boolean = false) {
-
+    fun refresh(
+        context: Context,
+        scope: CoroutineScope,
+        sessionKey: String,
+        folderPath: String,
+        isRemote: Boolean,
+        isRecursive: Boolean,
+        isFavorites: Boolean,
+        query: MediaQuery,
+        reshuffleClusters: Boolean = false
+    ) {
         val viewModel = mediaViewModel ?: return
         val currentState = viewModel.state.value
         val clusterShuffleSeed = if (reshuffleClusters || currentState.clusterShuffleSeed == 0L) {
@@ -139,9 +162,14 @@ object MediaManager {
             clusterShuffleSeed = clusterShuffleSeed,
             photoShuffleSeed = photoShuffleSeed
         )
+        orderedMediaCache = null
         val state = viewModel.state.value
 
         loadPageInternal(context, scope, state, append = false, forceRefresh = true)
+    }
+
+    fun invalidateOrderedMediaCache() {
+        orderedMediaCache = null
     }
 
     private fun loadPageInternal(
@@ -154,33 +182,13 @@ object MediaManager {
         scope.launch {
             try {
                 val settingsManager = SettingsManager(context)
-                val sortOrder = settingsManager.getPhotoSortOrder()
                 val page = withContext(Dispatchers.IO) {
-                    val allMedia = if (state.isFavorites) {
-                        settingsManager.getFavoritePhotos()
-                    } else if (state.isRemote) {
-                        RustWebDavPhotoRepository(settingsManager)
-                            .getPhotos(
-                                state.folderPath,
-                                state.isRecursive,
-                                forceRefresh
-                            )
-                    } else {
-                        LocalPhotoRepository(context)
-                            .getPhotos(
-                                state.folderPath,
-                                state.isRecursive,
-                                forceRefresh
-                            )
-                    }
-
-                    val ordered = sortPhotos(
-                        photos = allMedia.filter { matchesMediaQuery(it, state.currentQuery) },
-                        sortOrder = sortOrder,
-                        isRecursive = state.isRecursive,
-                        clusterShuffleSeed = state.clusterShuffleSeed,
-                        randomizePhotos = state.currentQuery.randomizePhotos,
-                        photoShuffleSeed = state.photoShuffleSeed
+                    val ordered = getOrderedMedia(
+                        context = context,
+                        settingsManager = settingsManager,
+                        state = state,
+                        forceRefresh = forceRefresh,
+                        append = append
                     )
 
                     val safeOffset = if (append) state.currentOffset.coerceAtLeast(0) else 0
@@ -194,12 +202,67 @@ object MediaManager {
                 val updatedState = viewModel.state.value
                 MediaStateCache.setState(updatedState)
                 PhotoCache.setPhotos(updatedState.photos)
-
             } catch (e: Exception) {
                 android.util.Log.e("MediaManager", "Load failed: ${e.message}", e)
                 mediaViewModel?.setError(e.message ?: e.toString())
             }
         }
+    }
+
+    private suspend fun getOrderedMedia(
+        context: Context,
+        settingsManager: SettingsManager,
+        state: MediaUiState,
+        forceRefresh: Boolean,
+        append: Boolean
+    ): List<Photo> {
+        if (append) {
+            val cached = orderedMediaCache
+            if (cached != null && cached.matches(state)) {
+                return cached.items
+            }
+        }
+
+        val sortOrder = settingsManager.getPhotoSortOrder()
+        val allMedia = if (state.isFavorites) {
+            settingsManager.getFavoritePhotos()
+        } else if (state.isRemote) {
+            RustWebDavPhotoRepository(settingsManager)
+                .getPhotos(
+                    state.folderPath,
+                    state.isRecursive,
+                    forceRefresh
+                )
+        } else {
+            LocalPhotoRepository(context)
+                .getPhotos(
+                    state.folderPath,
+                    state.isRecursive,
+                    forceRefresh
+                )
+        }
+
+        val ordered = sortPhotos(
+            photos = allMedia.filter { matchesMediaQuery(it, state.currentQuery) },
+            sortOrder = sortOrder,
+            isRecursive = state.isRecursive,
+            clusterShuffleSeed = state.clusterShuffleSeed,
+            randomizePhotos = state.currentQuery.randomizePhotos,
+            photoShuffleSeed = state.photoShuffleSeed
+        )
+
+        orderedMediaCache = OrderedMediaCache(
+            sessionKey = state.sessionKey,
+            folderPath = state.folderPath,
+            isRemote = state.isRemote,
+            isRecursive = state.isRecursive,
+            isFavorites = state.isFavorites,
+            query = state.currentQuery,
+            clusterShuffleSeed = state.clusterShuffleSeed,
+            photoShuffleSeed = state.photoShuffleSeed,
+            items = ordered
+        )
+        return ordered
     }
 
     private fun matchesMediaQuery(photo: Photo, query: MediaQuery): Boolean {
@@ -217,5 +280,16 @@ object MediaManager {
             if (!matched) return false
         }
         return true
+    }
+
+    private fun OrderedMediaCache.matches(state: MediaUiState): Boolean {
+        return sessionKey == state.sessionKey &&
+            folderPath == state.folderPath &&
+            isRemote == state.isRemote &&
+            isRecursive == state.isRecursive &&
+            isFavorites == state.isFavorites &&
+            query == state.currentQuery &&
+            clusterShuffleSeed == state.clusterShuffleSeed &&
+            photoShuffleSeed == state.photoShuffleSeed
     }
 }

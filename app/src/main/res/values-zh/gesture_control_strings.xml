@@ -2,7 +2,7 @@
 <resources>
     <string name="gesture_control">手势控制</string>
     <string name="gesture_control_title">手势控制</string>
-    <string name="gesture_control_summary">为每个区域配置单击、双击和长按操作。</string>
+    <string name="gesture_control_summary">为每个区域配置单击和长按操作。</string>
     <string name="gesture_control_enabled">启用手势控制</string>
     <string name="gesture_control_disabled_action">未设置</string>
     <string name="gesture_control_choose_action">选择操作</string>
@@ -23,11 +23,13 @@
     <string name="gesture_control_zone_bottom_right">右下</string>
     <string name="gesture_control_action_none">未设置</string>
     <string name="gesture_control_action_photo_info">图片详情</string>
+    <string name="gesture_control_action_toggle_immersive">切换沉浸模式</string>
     <string name="gesture_control_action_start_slideshow">切换幻灯片</string>
     <string name="gesture_control_action_previous_page">上一张</string>
     <string name="gesture_control_action_next_page">下一张</string>
-    <string name="gesture_control_grid_action_none">关闭</string>
+    <string name="gesture_control_grid_action_none">未设置</string>
     <string name="gesture_control_grid_action_photo_info">详情</string>
+    <string name="gesture_control_grid_action_toggle_immersive">沉浸模式</string>
     <string name="gesture_control_grid_action_start_slideshow">幻灯片</string>
     <string name="gesture_control_grid_action_previous_page">上一张</string>
     <string name="gesture_control_grid_action_next_page">下一张</string>
