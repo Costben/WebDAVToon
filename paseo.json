@@ -1,0 +1,47 @@
+{
+  "$schema": "https://paseo.sh/schemas/paseo.json",
+  "worktree": {
+    "setup": [
+      "powershell -NoProfile -ExecutionPolicy Bypass -File scripts\\paseo-worktree-setup.ps1"
+    ],
+    "teardown": []
+  },
+  "scripts": {
+    "setup": {
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts\\paseo-worktree-setup.ps1"
+    },
+    "compile": {
+      "command": ".\\gradlew.bat :app:compileDebugKotlin --console=plain"
+    },
+    "build": {
+      "command": ".\\gradlew.bat :app:assembleDebug --console=plain"
+    },
+    "debug-apk": {
+      "command": ".\\gradlew.bat :app:assembleDebug --console=plain"
+    },
+    "test": {
+      "command": ".\\gradlew.bat :app:testDebugUnitTest --console=plain"
+    },
+    "rust-test": {
+      "command": "cargo test --manifest-path rust-core\\Cargo.toml"
+    },
+    "unit-test": {
+      "command": ".\\gradlew.bat :app:testDebugUnitTest --console=plain"
+    },
+    "lint": {
+      "command": ".\\gradlew.bat :app:lintDebug --console=plain"
+    },
+    "clean-worktree": {
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts\\paseo-teardown.ps1 -WorkspaceRoot ."
+    },
+    "adb-install": {
+      "command": "adb install -r .\\webdavtoon-debug.apk"
+    },
+    "adb-launch": {
+      "command": "adb shell am start -n erl.webdavtoon/.FolderViewActivity"
+    },
+    "adb-logcat": {
+      "command": "adb logcat -v time FolderAdapter:D RustWebDavPhotoRepo:D FolderViewActivity:D SubFolderActivity:D WebDavImageLoader:D WebDAVToon:D *:S"
+    }
+  }
+}
