@@ -172,6 +172,20 @@ object MediaManager {
         orderedMediaCache = null
     }
 
+    fun removePhotosFromCaches(photosToRemove: List<Photo>) {
+        if (photosToRemove.isEmpty()) return
+
+        val removedIds = photosToRemove.mapTo(mutableSetOf()) { it.id }
+        orderedMediaCache = orderedMediaCache?.let { cached ->
+            val filteredItems = cached.items.filterNot { it.id in removedIds }
+            if (filteredItems.size == cached.items.size) {
+                cached
+            } else {
+                cached.copy(items = filteredItems)
+            }
+        }
+    }
+
     private fun loadPageInternal(
         context: Context,
         scope: CoroutineScope,

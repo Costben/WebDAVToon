@@ -71,6 +71,7 @@ class PhotoViewActivity : AppCompatActivity() {
     private var lastPreloadedCardIndex = RecyclerView.NO_POSITION
     private var isSlideshowAdvancePending = false
     private var slideshowSessionId = 0
+    private var pendingDeleteScrollAnchor: DeleteScrollAnchor? = null
     private var slideshowDrawableTarget: com.bumptech.glide.request.target.Target<Drawable>? = null
     private var gestureControlConfig = ReaderGestureControlConfig.defaultConfig()
     private var selectedGestureZone = GestureZone.CENTER
@@ -957,18 +958,25 @@ class PhotoViewActivity : AppCompatActivity() {
                         Toast.makeText(this@PhotoViewActivity, getString(R.string.delete_partial_failed), Toast.LENGTH_SHORT).show()
                     }
 
-                    // 更新列表并退出多选模�?
-                    val newPhotos = photos.toMutableList()
-                    newPhotos.removeAll(deletedPhotos)
+                    val sourcePhotos = photos
+                    pendingDeleteScrollAnchor = DeleteScrollAnchorHelper.forDeletedPhotos(
+                        deletedPhotos = deletedPhotos,
+                        sourcePhotos = sourcePhotos,
+                        fallbackPosition = currentIndex,
+                        recyclerView = binding.recyclerView
+                    )
+                    val deletedIds = deletedPhotos.mapTo(mutableSetOf()) { it.id }
+                    val newPhotos = photos.filterNot { it.id in deletedIds }
                     photos = newPhotos
-                    
-                    // 更新缓存和状态，以便 MainActivity 同步更新
+
                     PhotoCache.setPhotos(newPhotos)
+                    MediaManager.removePhotosFromCaches(deletedPhotos)
                     mediaViewModel.removePhotos(deletedPhotos)
-                    
+                    MediaStateCache.setState(mediaViewModel.state.value)
+
                     adapter.setPhotos(newPhotos)
                     webtoonAdapter?.setPhotos(newPhotos)
-                    
+
                     exitSelectionMode()
 
                     if (newPhotos.isEmpty()) {
@@ -977,13 +985,12 @@ class PhotoViewActivity : AppCompatActivity() {
                         if (currentIndex >= newPhotos.size) {
                             currentIndex = newPhotos.size - 1
                         }
-                        if (isCardMode) {
-                            binding.recyclerView.scrollToPosition(currentIndex)
+                        pendingDeleteScrollAnchor?.let { anchor ->
+                            currentIndex = anchor.position.coerceIn(0, newPhotos.size - 1)
                         }
-                    }
-
-                    if (deletedPhotos.isNotEmpty()) {
-                        refreshCurrentMediaPage()
+                        restorePendingDeleteScrollAnchor(newPhotos.size)
+                        binding.toolbar.title = newPhotos[currentIndex].title
+                        updateFavoriteButtonState()
                     }
                 }
             }
@@ -1491,6 +1498,7 @@ class PhotoViewActivity : AppCompatActivity() {
                         } else {
                             webtoonAdapter?.setPhotos(photos)
                         }
+                        restorePendingDeleteScrollAnchor(photos.size)
                         
                         // 更新标题等信�?
                         if (currentIndex in photos.indices) {
@@ -1517,6 +1525,12 @@ class PhotoViewActivity : AppCompatActivity() {
             isFavorites = state.isFavorites,
             query = state.currentQuery
         )
+    }
+
+    private fun restorePendingDeleteScrollAnchor(itemCount: Int) {
+        val anchor = pendingDeleteScrollAnchor ?: return
+        pendingDeleteScrollAnchor = null
+        DeleteScrollAnchorHelper.restore(binding.recyclerView, anchor, itemCount)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -1791,35 +1805,37 @@ class PhotoViewActivity : AppCompatActivity() {
                     if (success) {
                         WebDavImageLoader.clearCache(this@PhotoViewActivity)
                         Toast.makeText(this@PhotoViewActivity, getString(R.string.delete_success), Toast.LENGTH_SHORT).show()
-                        // 从列表中移除图片并更新UI
-                        val newPhotos = photos.toMutableList()
-                        val deletedPhoto = photos[currentIndex]
-                        newPhotos.removeAt(currentIndex)
+                        val sourcePhotos = photos
+                        pendingDeleteScrollAnchor = DeleteScrollAnchorHelper.forDeletedPhotos(
+                            deletedPhotos = listOf(photo),
+                            sourcePhotos = sourcePhotos,
+                            fallbackPosition = currentIndex,
+                            recyclerView = binding.recyclerView
+                        )
+                        val deletedPhoto = photo
+                        val newPhotos = photos.filterNot { it.id == deletedPhoto.id }
                         photos = newPhotos
                         
-                        // 更新缓存和状态，以便 MainActivity 同步更新
                         PhotoCache.setPhotos(newPhotos)
+                        MediaManager.removePhotosFromCaches(listOf(deletedPhoto))
                         mediaViewModel.removePhotos(listOf(deletedPhoto))
+                        MediaStateCache.setState(mediaViewModel.state.value)
                         
-                        // 更新适配器数�?
                         adapter.setPhotos(newPhotos)
                         webtoonAdapter?.setPhotos(newPhotos)
                         
                         if (newPhotos.isEmpty()) {
-                            // 没有图片了，返回上一�?
                             finish()
                         } else {
-                            // 保持当前索引在有效范围内
                             if (currentIndex >= newPhotos.size) {
                                 currentIndex = newPhotos.size - 1
                             }
-                            // 如果是卡片模式，RecyclerView可能需要更新当前显示的图片
-                            if (isCardMode) {
-                                binding.recyclerView.scrollToPosition(currentIndex)
+                            pendingDeleteScrollAnchor?.let { anchor ->
+                                currentIndex = anchor.position.coerceIn(0, newPhotos.size - 1)
                             }
-                            // 更新标题
+                            restorePendingDeleteScrollAnchor(newPhotos.size)
                             binding.toolbar.title = newPhotos[currentIndex].title
-                            refreshCurrentMediaPage()
+                            updateFavoriteButtonState()
                         }
                     } else {
                         Toast.makeText(this@PhotoViewActivity, getString(R.string.delete_failed), Toast.LENGTH_SHORT).show()
