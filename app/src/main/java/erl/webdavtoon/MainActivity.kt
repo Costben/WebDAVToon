@@ -55,6 +55,7 @@ class MainActivity : AppCompatActivity() {
     private var shareMenuItem: android.view.MenuItem? = null
     private var deleteMenuItem: android.view.MenuItem? = null
     private var favoriteMenuItem: android.view.MenuItem? = null
+    private var pendingDeleteScrollAnchor: DeleteScrollAnchor? = null
 
     private val settingsLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -250,6 +251,7 @@ class MainActivity : AppCompatActivity() {
                 binding.swipeRefreshLayout.isRefreshing = state.isLoading && state.photos.isNotEmpty()
                 photoAdapter.setPhotos(displayedPhotos)
                 MediaStateCache.setState(state.copy(photos = displayedPhotos))
+                restorePendingDeleteScrollAnchor(displayedPhotos.size)
             }
         }
     }
@@ -272,6 +274,12 @@ class MainActivity : AppCompatActivity() {
 
     private fun loadNextPage() {
         MediaManager.loadNextPage(this, lifecycleScope)
+    }
+
+    private fun restorePendingDeleteScrollAnchor(itemCount: Int) {
+        val anchor = pendingDeleteScrollAnchor ?: return
+        pendingDeleteScrollAnchor = null
+        DeleteScrollAnchorHelper.restore(binding.recyclerView, anchor, itemCount)
     }
 
     private fun buildSessionKey(): String {
@@ -737,25 +745,33 @@ class MainActivity : AppCompatActivity() {
                         LocalPhotoRepository(this@MainActivity)
                     }
 
-                    val successCount = withContext(Dispatchers.IO) {
-                        var count = 0
+                    val sourcePhotos = MediaManager.mediaViewModel?.state?.value?.photos.orEmpty()
+                    val deletedPhotos = withContext(Dispatchers.IO) {
+                        val deleted = mutableListOf<Photo>()
                         selectedPhotos.forEach { photo ->
                             if (repository.deletePhoto(photo)) {
-                                count++
+                                deleted.add(photo)
                             }
                         }
-                        if (count > 0) {
+                        if (deleted.isNotEmpty()) {
                             WebDavImageLoader.clearCache(this@MainActivity)
                         }
-                        count
+                        deleted
                     }
 
-                    if (successCount > 0) {
-                        android.widget.Toast.makeText(this@MainActivity, getString(R.string.deleted_count, successCount), android.widget.Toast.LENGTH_SHORT).show()
+                    if (deletedPhotos.isNotEmpty()) {
+                        android.widget.Toast.makeText(this@MainActivity, getString(R.string.deleted_count, deletedPhotos.size), android.widget.Toast.LENGTH_SHORT).show()
+                        pendingDeleteScrollAnchor = DeleteScrollAnchorHelper.forDeletedPhotos(
+                            deletedPhotos = deletedPhotos,
+                            sourcePhotos = sourcePhotos,
+                            recyclerView = binding.recyclerView
+                        )
                         photoAdapter.setSelectionMode(false)
                         isLongPressSelection = false
                         updateSelectionTitle(-1)
-                        refreshMedia()
+                        MediaManager.removePhotosFromCaches(deletedPhotos)
+                        MediaManager.mediaViewModel?.removePhotos(deletedPhotos)
+                        MediaManager.mediaViewModel?.state?.value?.let(MediaStateCache::setState)
                     } else {
                         android.widget.Toast.makeText(this@MainActivity, getString(R.string.delete_failed), android.widget.Toast.LENGTH_SHORT).show()
                     }

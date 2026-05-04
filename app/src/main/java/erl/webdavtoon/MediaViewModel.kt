@@ -81,9 +81,16 @@ class MediaViewModel(
     }
 
     fun removePhotos(photosToRemove: List<Photo>) {
-        val currentPhotos = _state.value.photos.toMutableList()
-        currentPhotos.removeAll(photosToRemove)
-        _state.value = _state.value.copy(photos = currentPhotos)
+        if (photosToRemove.isEmpty()) return
+
+        val current = _state.value
+        val removedIds = photosToRemove.mapTo(mutableSetOf()) { it.id }
+        val currentPhotos = current.photos.filterNot { it.id in removedIds }
+        val removedLoadedCount = current.photos.size - currentPhotos.size
+        _state.value = current.copy(
+            photos = currentPhotos,
+            currentOffset = (current.currentOffset - removedLoadedCount).coerceAtLeast(0)
+        )
     }
 
     fun currentSessionKey(): String = savedStateHandle[sessionKeyKey] ?: _state.value.sessionKey
