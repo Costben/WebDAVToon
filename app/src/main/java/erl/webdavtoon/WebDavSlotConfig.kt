@@ -7,7 +7,8 @@ data class WebDavSlotConfig(
     val port: Int = 443,
     val username: String = "",
     val rememberPassword: Boolean = true,
-    val alias: String = ""
+    val alias: String = "",
+    val isPrivate: Boolean = false
 )
 
 data class LegacyWebDavSlotConfig(

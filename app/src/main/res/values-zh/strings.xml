@@ -106,6 +106,17 @@
     <string name="delete_server">删除服务器</string>
     <string name="delete_server_message">确定要删除这个服务器吗？</string>
     <string name="server_deleted">服务器已删除</string>
+    <string name="duplicate_server">复制服务器</string>
+    <string name="server_duplicated">服务器已复制</string>
+    <string name="private_server">隐私服务器</string>
+    <string name="exit_privacy_mode">退出隐私模式</string>
+    <string name="biometric_title">安全验证</string>
+    <string name="biometric_subtitle">请验证身份</string>
+    <string name="biometric_negative">取消</string>
+    <string name="privacy_exit_policy_title">隐私模式退出方式</string>
+    <string name="privacy_exit_policy_on_background">应用切后台时</string>
+    <string name="privacy_exit_policy_on_process_death">进程关闭时</string>
+    <string name="privacy_exit_policy_manual_only">仅手动退出</string>
     <string name="deleted_folders_count">已删除 %1$d 个文件夹</string>
     <string name="storage_permission_required">浏览本地照片需要存储权限</string>
     <string name="rust_core_not_initialized">警告：Rust 核心未初始化，远程功能可能无法使用</string>

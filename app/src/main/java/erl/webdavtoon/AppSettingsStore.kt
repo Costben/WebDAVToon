@@ -46,6 +46,8 @@ class AppSettingsStore(context: Context) {
         val ROTATION_LOCKED = booleanPreferencesKey("rotation_locked")
         val MIGRATED_TO_DATASTORE = booleanPreferencesKey("migrated_to_datastore")
         val WEBDAV_SECRET_MIGRATED = booleanPreferencesKey("webdav_secret_migrated")
+        val PRIVACY_MODE_EXIT_POLICY = stringPreferencesKey("privacy_mode_exit_policy")
+        val PRIVACY_MODE_ACTIVE = booleanPreferencesKey("privacy_mode_active")
 
         private val initLock = Any()
         private val cache = ConcurrentHashMap<String, Any>()

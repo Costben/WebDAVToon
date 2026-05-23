@@ -225,6 +225,15 @@ class SettingsManager(context: Context) {
     }
 
     fun getAllSlots(): List<Int> {
+        val all = getWebDavSlots()
+        val filtered = all.filter { (_, config) -> config.isPrivate == PrivacyModeState.isPrivacyMode }
+            .keys.sorted()
+        return if (filtered.isEmpty()) {
+            if (PrivacyModeState.isPrivacyMode) emptyList() else listOf(0)
+        } else filtered
+    }
+
+    fun getAllSlotsUnfiltered(): List<Int> {
         val slots = getWebDavSlots().keys.sorted()
         return if (slots.isEmpty()) listOf(0) else slots
     }
@@ -266,6 +275,10 @@ class SettingsManager(context: Context) {
     fun getWebDavAlias(slot: Int = getCurrentSlot()): String = getWebDavSlot(slot)?.alias ?: ""
     fun setWebDavAlias(alias: String, slot: Int = getCurrentSlot()) = upsertWebDavSlot(slot) { copy(alias = alias) }
 
+    fun isWebDavPrivate(slot: Int = getCurrentSlot()): Boolean = getWebDavSlot(slot)?.isPrivate ?: false
+    fun setWebDavPrivate(isPrivate: Boolean, slot: Int = getCurrentSlot()) =
+        upsertWebDavSlot(slot) { copy(isPrivate = isPrivate) }
+
     fun isWebDavEnabled(slot: Int = getCurrentSlot()): Boolean = getWebDavSlot(slot)?.enabled ?: false
     fun setWebDavEnabled(enabled: Boolean, slot: Int = getCurrentSlot()) =
         upsertWebDavSlot(slot) { copy(enabled = enabled) }
@@ -280,7 +293,8 @@ class SettingsManager(context: Context) {
         password: String,
         rememberPassword: Boolean,
         enabled: Boolean = true,
-        switchToSlotOnSave: Boolean = false
+        switchToSlotOnSave: Boolean = false,
+        isPrivate: Boolean = false
     ) {
         val slots = getWebDavSlots()
         val current = slots[slot] ?: WebDavSlotConfig()
@@ -291,7 +305,8 @@ class SettingsManager(context: Context) {
             port = port,
             username = username,
             rememberPassword = rememberPassword,
-            enabled = enabled
+            enabled = enabled,
+            isPrivate = isPrivate
         )
         saveWebDavSlots(slots, if (switchToSlotOnSave) slot else null)
         credentialPolicy.savePassword(slot, rememberPassword, password)

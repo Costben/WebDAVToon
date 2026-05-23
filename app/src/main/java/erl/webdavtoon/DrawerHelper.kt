@@ -2,17 +2,25 @@ package erl.webdavtoon
 
 import android.animation.ObjectAnimator
 import android.annotation.SuppressLint
+import android.app.KeyguardManager
+import android.content.Context
 import android.content.Intent
+import android.graphics.Rect
+import android.os.Build
 import android.util.TypedValue
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewParent
+import android.widget.ImageView
 import android.widget.TextView
 import android.widget.ArrayAdapter
 import android.widget.Toast
 import androidx.appcompat.app.ActionBarDrawerToggle
 import androidx.appcompat.app.AppCompatActivity
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
 import androidx.core.view.GravityCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -42,11 +50,22 @@ object DrawerHelper {
         drawerLayout.addDrawerListener(toggle)
         toggle.syncState()
 
+        expandDrawerEdgeArea(drawerLayout)
+
         val serverList = navView.findViewById<RecyclerView>(R.id.server_list)
         val addServerBtn = navView.findViewById<View>(R.id.nav_add_server)
         val favoritesBtn = navView.findViewById<View>(R.id.nav_favorites)
         val settingsBtn = navView.findViewById<View>(R.id.nav_settings)
         val headerView = navView.findViewById<View>(R.id.nav_header)
+        val privacyIndicator = headerView?.findViewById<ImageView>(R.id.privacy_indicator)
+        val exitPrivacyBtn = navView.findViewById<View>(R.id.nav_exit_privacy)
+
+        fun refreshPrivacyUI() {
+            val isPrivacy = PrivacyModeState.isPrivacyMode
+            privacyIndicator?.visibility = if (isPrivacy) View.VISIBLE else View.GONE
+            exitPrivacyBtn?.visibility = if (isPrivacy) View.VISIBLE else View.GONE
+        }
+        refreshPrivacyUI()
 
         // Handle System Windows Insets (Status Bar)
         ViewCompat.setOnApplyWindowInsetsListener(navView) { v, insets ->
@@ -79,6 +98,10 @@ object DrawerHelper {
                 // Refresh list after edit
                 (serverList.adapter as? ServerAdapter)?.refreshData()
             }
+        }, { slot ->
+            // Duplicate server
+            duplicateSlot(activity, settingsManager, slot)
+            (serverList.adapter as? ServerAdapter)?.refreshData()
         })
         
         serverList.layoutManager = LinearLayoutManager(activity)
@@ -86,11 +109,37 @@ object DrawerHelper {
 
         // Static Buttons
         addServerBtn.setOnClickListener {
-            val slots = settingsManager.getAllSlots()
+            val slots = settingsManager.getAllSlotsUnfiltered()
             val nextSlot = (slots.maxOrNull() ?: -1) + 1
             showWebDavConfigDialog(activity, settingsManager, nextSlot) {
                 (serverList.adapter as? ServerAdapter)?.refreshData()
             }
+        }
+
+        addServerBtn.setOnLongClickListener {
+            if (PrivacyModeState.isPrivacyMode) {
+                return@setOnLongClickListener false
+            }
+            tryEnterPrivacyMode(activity) {
+                (serverList.adapter as? ServerAdapter)?.refreshData()
+                refreshPrivacyUI()
+            }
+            true
+        }
+
+        exitPrivacyBtn?.setOnClickListener {
+            PrivacyModeState.exit(activity)
+            // After exit, currentSlot may point at a private slot; switch it to the first
+            // available normal slot before restarting the Activity so the restarted UI
+            // immediately loads non-private content.
+            val normalSlots = settingsManager.getAllSlots()
+            val newCurrent = normalSlots.firstOrNull() ?: 0
+            if (settingsManager.getCurrentSlot() != newCurrent) {
+                settingsManager.setCurrentSlot(newCurrent)
+            }
+            val intent = Intent(activity, FolderViewActivity::class.java)
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
+            activity.startActivity(intent)
         }
 
         favoritesBtn.setOnClickListener {
@@ -107,6 +156,55 @@ object DrawerHelper {
         }
     }
 
+    private fun expandDrawerEdgeArea(drawerLayout: DrawerLayout) {
+        val targetEdgePx = drawerLayout.resources.displayMetrics.widthPixels / 3
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            drawerLayout.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
+                val rect = Rect(0, 0, targetEdgePx, v.height)
+                v.systemGestureExclusionRects = listOf(rect)
+            }
+            val rect = Rect(0, 0, targetEdgePx, drawerLayout.height)
+            drawerLayout.systemGestureExclusionRects = listOf(rect)
+        }
+    }
+
+    private fun tryEnterPrivacyMode(activity: AppCompatActivity, onSuccess: () -> Unit) {
+        val km = activity.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+        if (km?.isDeviceSecure != true) {
+            return
+        }
+
+        val executor = ContextCompat.getMainExecutor(activity)
+        val prompt = BiometricPrompt(
+            activity,
+            executor,
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    PrivacyModeState.enter(activity)
+                    onSuccess()
+                }
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) = Unit
+                override fun onAuthenticationFailed() = Unit
+            }
+        )
+
+        val info = BiometricPrompt.PromptInfo.Builder()
+            .setTitle(activity.getString(R.string.biometric_title))
+            .setSubtitle(activity.getString(R.string.biometric_subtitle))
+            .setAllowedAuthenticators(
+                BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                    BiometricManager.Authenticators.DEVICE_CREDENTIAL
+            )
+            .build()
+
+        try {
+            prompt.authenticate(info)
+        } catch (_: Throwable) {
+            // Silent failure — privacy mode entry is a no-op when BiometricPrompt is unavailable.
+        }
+    }
+
     private fun showWebDavConfigDialog(
         activity: AppCompatActivity,
         settingsManager: SettingsManager,
@@ -114,12 +212,12 @@ object DrawerHelper {
         onSaved: () -> Unit
     ) {
         val dialogBinding = DialogServerConfigWebdavBinding.inflate(activity.layoutInflater)
-        val slotExisted = settingsManager.getAllSlots().contains(slot)
+        val slotExisted = settingsManager.getAllSlotsUnfiltered().contains(slot)
 
         val protocols = arrayOf("http", "https")
         val adapter = ArrayAdapter(activity, android.R.layout.simple_dropdown_item_1line, protocols)
         dialogBinding.protocolEdit.setAdapter(adapter)
-        
+
         // Load existing data for this slot
         dialogBinding.aliasEdit.setText(settingsManager.getWebDavAlias(slot))
         dialogBinding.protocolEdit.setText(settingsManager.getWebDavProtocol(slot), false)
@@ -129,10 +227,29 @@ object DrawerHelper {
         dialogBinding.passwordEdit.setText(settingsManager.getWebDavPassword(slot))
         dialogBinding.rememberPasswordCheck.isChecked = settingsManager.isWebDavRememberPassword(slot)
 
+        if (PrivacyModeState.isPrivacyMode) {
+            dialogBinding.privateServerCheck.visibility = View.VISIBLE
+            dialogBinding.privateServerCheck.isChecked = if (slotExisted) {
+                settingsManager.isWebDavPrivate(slot)
+            } else {
+                true
+            }
+        } else {
+            dialogBinding.privateServerCheck.visibility = View.GONE
+            dialogBinding.privateServerCheck.isChecked = false
+        }
+
         val dialog = MaterialAlertDialogBuilder(activity)
             .setTitle(activity.getString(R.string.webdav_config, slot))
             .setView(dialogBinding.root)
             .setPositiveButton(R.string.save) { _, _ ->
+                val isPrivate = if (PrivacyModeState.isPrivacyMode) {
+                    dialogBinding.privateServerCheck.isChecked
+                } else if (slotExisted) {
+                    settingsManager.isWebDavPrivate(slot)
+                } else {
+                    false
+                }
                 settingsManager.saveWebDavConfiguration(
                     slot = slot,
                     alias = dialogBinding.aliasEdit.text.toString(),
@@ -143,7 +260,8 @@ object DrawerHelper {
                     password = dialogBinding.passwordEdit.text.toString(),
                     rememberPassword = dialogBinding.rememberPasswordCheck.isChecked,
                     enabled = true,
-                    switchToSlotOnSave = !slotExisted
+                    switchToSlotOnSave = !slotExisted,
+                    isPrivate = isPrivate
                 )
 
                 onSaved()
@@ -207,28 +325,56 @@ object DrawerHelper {
 
         dialog.show()
     }
+
+    private fun duplicateSlot(
+        activity: AppCompatActivity,
+        settingsManager: SettingsManager,
+        sourceSlot: Int
+    ) {
+        val slots = settingsManager.getAllSlotsUnfiltered()
+        val newSlot = (slots.maxOrNull() ?: -1) + 1
+        val sourceAlias = settingsManager.getWebDavAlias(sourceSlot)
+        val newAlias = sourceAlias + " Copy"
+
+        settingsManager.saveWebDavConfiguration(
+            slot = newSlot,
+            alias = newAlias,
+            protocol = settingsManager.getWebDavProtocol(sourceSlot),
+            url = settingsManager.getWebDavUrl(sourceSlot),
+            port = settingsManager.getWebDavPort(sourceSlot),
+            username = settingsManager.getWebDavUsername(sourceSlot),
+            password = settingsManager.getWebDavPassword(sourceSlot),
+            rememberPassword = settingsManager.isWebDavRememberPassword(sourceSlot),
+            enabled = settingsManager.isWebDavEnabled(sourceSlot),
+            switchToSlotOnSave = false,
+            isPrivate = settingsManager.isWebDavPrivate(sourceSlot)
+        )
+
+        Toast.makeText(activity, activity.getString(R.string.server_duplicated), Toast.LENGTH_SHORT).show()
+    }
 }
 
 class ServerAdapter(
     private val context: android.content.Context,
     private val settingsManager: SettingsManager,
     private val onClick: (Int) -> Unit,
-    private val onEdit: (Int) -> Unit
+    private val onEdit: (Int) -> Unit,
+    private val onCopy: (Int) -> Unit
 ) : RecyclerView.Adapter<ServerAdapter.ViewHolder>() {
 
     private var slots = settingsManager.getAllSlots().toMutableList()
     private var currentSlot = settingsManager.getCurrentSlot()
-    
+
     fun refreshData() {
         slots = settingsManager.getAllSlots().toMutableList()
         currentSlot = settingsManager.getCurrentSlot()
         notifyDataSetChanged()
     }
-    
+
     // Swipe State
     private var openPosition: Int = RecyclerView.NO_POSITION
-    private val swipeThreshold = dpToPx(52f) // Drag at least half way to snap open (104/2)
-    private val maxSwipe = dpToPx(104f) // Width of buttons area + gaps (8+40+8+40+8)
+    private val swipeThreshold = dpToPx(76f) // Drag at least half way to snap open (152/2)
+    private val maxSwipe = dpToPx(152f) // Width of buttons area + gaps (8+40+8+40+8+40+8)
 
     private fun dpToPx(dp: Float): Float {
         return TypedValue.applyDimension(
@@ -242,6 +388,7 @@ class ServerAdapter(
         val title: TextView = view.findViewById(R.id.server_title)
         val content: View = view.findViewById(R.id.item_content)
         val editBtn: View = view.findViewById(R.id.btn_edit)
+        val copyBtn: View = view.findViewById(R.id.btn_copy)
         val deleteBtn: View = view.findViewById(R.id.btn_delete)
     }
 
@@ -354,7 +501,12 @@ class ServerAdapter(
             onEdit(slot)
             closeItem(holder)
         }
-        
+
+        holder.copyBtn.setOnClickListener {
+            onCopy(slot)
+            closeItem(holder)
+        }
+
         holder.deleteBtn.setOnClickListener {
             MaterialAlertDialogBuilder(context)
             .setTitle(R.string.delete_server)
