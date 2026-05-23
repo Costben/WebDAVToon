@@ -14,5 +14,6 @@ data class FavoritePhotoEntity(
     val dateModified: Long,
     val size: Long,
     val folderPath: String,
-    val addedAt: Long = System.currentTimeMillis()
+    val addedAt: Long = System.currentTimeMillis(),
+    val isPrivate: Boolean = false
 )

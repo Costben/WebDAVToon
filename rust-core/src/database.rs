@@ -172,6 +172,14 @@ impl Database {
         Ok(())
     }
 
+    pub fn clear_all_cache(&mut self) -> Result<()> {
+        let tx = self.conn.transaction()?;
+        tx.execute("DELETE FROM photos", [])?;
+        tx.execute("DELETE FROM folders", [])?;
+        tx.commit()?;
+        Ok(())
+    }
+
     pub fn save_folders(&mut self, parent_path: &str, folders: &[Folder]) -> Result<()> {
         let tx = self.conn.transaction()?;
 
