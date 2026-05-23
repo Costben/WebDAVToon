@@ -1,7 +1,9 @@
 package erl.webdavtoon
 
+import android.app.Activity
 import android.app.Application
 import android.content.Context
+import android.os.Bundle
 import android.util.Base64
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
@@ -24,6 +26,8 @@ class WebDAVToonApplication : Application() {
         LogManager.initialize(this)
         AppDatabase.getInstance(this)
         FavoritePhotoStore.getInstance(this)
+        PrivacyModeState.initFromPrefs(this)
+        registerActivityLifecycleCallbacks(PrivacyLifecycleObserver(this))
         runBlocking(Dispatchers.IO) {
             ConfigMigration.migrateIfNeeded(this@WebDAVToonApplication)
             WebDavCredentialMigration.migrateIfNeeded(this@WebDAVToonApplication)

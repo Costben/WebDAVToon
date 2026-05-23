@@ -46,7 +46,7 @@ class SettingsActivity : AppCompatActivity() {
 
         if (intent.getBooleanExtra("EXTRA_SHOW_ADD_SERVER", false)) {
             // Find next empty slot or just append
-            val slots = settingsManager.getAllSlots()
+            val slots = settingsManager.getAllSlotsUnfiltered()
             val nextSlot = (slots.maxOrNull() ?: -1) + 1
             settingsManager.setCurrentSlot(nextSlot)
             showWebDavConfigDialog()
@@ -175,6 +175,12 @@ class SettingsActivity : AppCompatActivity() {
             root.setOnClickListener { showClearCacheConfirmation() }
         }
 
+        binding.settingPrivacyExitPolicy.apply {
+            icon.setImageResource(R.drawable.ic_lock)
+            title.text = getString(R.string.privacy_exit_policy_title)
+            root.setOnClickListener { showPrivacyExitPolicyDialog() }
+        }
+
         binding.settingAbout.apply {
             icon.setImageResource(R.drawable.ic_ior_info_circle)
             title.text = getString(R.string.about)
@@ -246,6 +252,33 @@ class SettingsActivity : AppCompatActivity() {
 
         binding.settingAbout.title.text = getString(R.string.about)
         binding.settingAbout.summary.text = getString(R.string.app_version_format, BuildConfig.VERSION_NAME)
+
+        binding.settingPrivacyExitPolicy.title.text = getString(R.string.privacy_exit_policy_title)
+        binding.settingPrivacyExitPolicy.summary.text = privacyExitPolicyLabel(PrivacyModeState.exitPolicy)
+        binding.settingPrivacyExitPolicy.root.visibility =
+            if (PrivacyModeState.isPrivacyMode) View.VISIBLE else View.GONE
+    }
+
+    private fun privacyExitPolicyLabel(policy: PrivacyModeState.ExitPolicy): String = when (policy) {
+        PrivacyModeState.ExitPolicy.ON_BACKGROUND -> getString(R.string.privacy_exit_policy_on_background)
+        PrivacyModeState.ExitPolicy.ON_PROCESS_DEATH -> getString(R.string.privacy_exit_policy_on_process_death)
+        PrivacyModeState.ExitPolicy.MANUAL_ONLY -> getString(R.string.privacy_exit_policy_manual_only)
+    }
+
+    private fun showPrivacyExitPolicyDialog() {
+        val policies = PrivacyModeState.ExitPolicy.entries.toTypedArray()
+        val labels = policies.map { privacyExitPolicyLabel(it) }.toTypedArray()
+        val currentIndex = policies.indexOf(PrivacyModeState.exitPolicy).coerceAtLeast(0)
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.privacy_exit_policy_title)
+            .setSingleChoiceItems(labels, currentIndex) { dialog, which ->
+                PrivacyModeState.setExitPolicy(this, policies[which])
+                refreshUi()
+                dialog.dismiss()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
     }
 
     private fun showWebDavConfigDialog() {
@@ -275,7 +308,8 @@ class SettingsActivity : AppCompatActivity() {
                     username = dialogBinding.usernameEdit.text.toString(),
                     password = dialogBinding.passwordEdit.text.toString(),
                     rememberPassword = dialogBinding.rememberPasswordCheck.isChecked,
-                    enabled = true
+                    enabled = true,
+                    isPrivate = settingsManager.isWebDavPrivate()
                 )
 
                 refreshUi()

@@ -24,12 +24,12 @@ class FavoritePhotoStore private constructor(context: Context) {
 
     fun isFavorite(photoId: String): Boolean {
         ensureInitialized()
-        return favorites.any { it.id == photoId }
+        return favorites.any { it.id == photoId && it.isPrivate == PrivacyModeState.isPrivacyMode }
     }
 
     fun add(photo: Photo) {
         ensureInitialized()
-        val entity = photo.toFavoriteEntity()
+        val entity = photo.toFavoriteEntity().copy(isPrivate = PrivacyModeState.isPrivacyMode)
         favorites = favorites.filterNot { it.id == entity.id } + entity
         scope.launch {
             AppDatabase.getInstance(appContext).favoritePhotoDao().insert(entity)
@@ -46,7 +46,9 @@ class FavoritePhotoStore private constructor(context: Context) {
 
     fun getAll(): List<Photo> {
         ensureInitialized()
-        return favorites.map { it.toPhoto() }
+        return favorites
+            .filter { it.isPrivate == PrivacyModeState.isPrivacyMode }
+            .map { it.toPhoto() }
     }
 
     fun refresh() {

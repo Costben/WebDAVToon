@@ -177,6 +177,7 @@
                 android:textStyle="bold" />
 
             <include layout="@layout/item_setting" android:id="@+id/setting_clear_cache" />
+            <include layout="@layout/item_setting" android:id="@+id/setting_privacy_exit_policy" />
             <include layout="@layout/item_setting" android:id="@+id/setting_about" />
 
         </LinearLayout>

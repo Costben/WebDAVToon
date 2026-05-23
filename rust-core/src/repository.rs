@@ -19,6 +19,7 @@ pub struct Repository {
     remote: Option<RemoteService>,
     db: Option<Arc<Mutex<Database>>>,
     rt: Arc<Runtime>,
+    current_endpoint: Option<String>,
 }
 
 impl Repository {
@@ -42,6 +43,7 @@ impl Repository {
             remote: None,
             db,
             rt: Arc::new(rt),
+            current_endpoint: None,
         }
     }
 
@@ -51,9 +53,26 @@ impl Repository {
         username: String,
         password: String,
     ) -> Result<(), RepoError> {
+        let identity = format!("{}|{}", endpoint, username);
+        let changed = self.current_endpoint.as_deref() != Some(identity.as_str());
+
         let service = RemoteService::new_webdav(&endpoint, &username, &password)
             .map_err(RepoError::Remote)?;
         self.remote = Some(service);
+
+        if changed {
+            if let Some(db) = &self.db {
+                if let Ok(mut db) = db.lock() {
+                    if let Err(e) = db.clear_all_cache() {
+                        log::warn!("Failed to clear cache on endpoint switch: {:?}", e);
+                    } else {
+                        log::info!("Cleared cache on endpoint switch to {}", endpoint);
+                    }
+                }
+            }
+            self.current_endpoint = Some(identity);
+        }
+
         Ok(())
     }
 
