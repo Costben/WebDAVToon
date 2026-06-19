@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="edit">Edit</string>
+    <string name="comfyui_server">ComfyUI edit server</string>
+    <string name="comfyui_server_url_hint">http://192.168.31.199:3000</string>
+    <string name="comfyui_server_url_invalid">Enter a valid http:// or https:// URL</string>
+    <string name="comfyui_edit_title">Send to ComfyUI</string>
+    <string name="comfyui_workflow">Workflow</string>
+    <string name="comfyui_prompt">Prompt</string>
+    <string name="comfyui_prompt_hint">Describe the edit</string>
+    <string name="comfyui_prompt_required">Enter an edit prompt</string>
+    <string name="comfyui_preset">Preset</string>
+    <string name="comfyui_no_preset">No preset</string>
+    <string name="comfyui_submit">Submit</string>
+    <string name="comfyui_loading_config">Loading ComfyUI config...</string>
+    <string name="comfyui_configure_first">Configure the ComfyUI server address in Settings first</string>
+    <string name="comfyui_connect_failed">Could not connect to the server. Check the network and address.</string>
+    <string name="comfyui_connect_failed_detail">URL: %1$s\n\nReason: %2$s</string>
+    <string name="comfyui_submit_failed">Edit submit failed: %1$s</string>
+    <string name="comfyui_submit_success">Submitted %1$d image(s) to the edit queue</string>
+    <string name="comfyui_submit_partial">Submitted %1$d/%2$d image(s), %3$d failed</string>
+    <string name="comfyui_download_failed">Image download failed: %1$s</string>
+</resources>

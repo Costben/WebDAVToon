@@ -53,6 +53,7 @@ class MainActivity : AppCompatActivity() {
     private var optionsMenu: android.view.Menu? = null
     private var infoMenuItem: android.view.MenuItem? = null
     private var shareMenuItem: android.view.MenuItem? = null
+    private var editMenuItem: android.view.MenuItem? = null
     private var deleteMenuItem: android.view.MenuItem? = null
     private var favoriteMenuItem: android.view.MenuItem? = null
     private var pendingDeleteScrollAnchor: DeleteScrollAnchor? = null
@@ -326,6 +327,8 @@ class MainActivity : AppCompatActivity() {
         infoMenuItem?.isVisible = photoAdapter.isSelectionMode()
         shareMenuItem = menu.findItem(R.id.action_share)
         shareMenuItem?.isVisible = photoAdapter.isSelectionMode()
+        editMenuItem = menu.findItem(R.id.action_edit)
+        editMenuItem?.isVisible = photoAdapter.isSelectionMode()
         deleteMenuItem = menu.findItem(R.id.action_delete)
         deleteMenuItem?.isVisible = photoAdapter.isSelectionMode()
         favoriteMenuItem = menu.findItem(R.id.action_favorite)
@@ -398,6 +401,10 @@ class MainActivity : AppCompatActivity() {
                 shareSelectedPhotos()
                 true
             }
+            R.id.action_edit -> {
+                editSelectedPhotos()
+                true
+            }
             R.id.action_favorite -> {
                 updateSelectedFavorites()
                 true
@@ -458,6 +465,7 @@ class MainActivity : AppCompatActivity() {
         if (count < 0) {
             infoMenuItem?.isVisible = false
             shareMenuItem?.isVisible = false
+            editMenuItem?.isVisible = false
             deleteMenuItem?.isVisible = false
             favoriteMenuItem?.isVisible = false
             deleteMenuItem?.title = getString(R.string.delete)
@@ -482,6 +490,7 @@ class MainActivity : AppCompatActivity() {
         } else {
             infoMenuItem?.isVisible = true
             shareMenuItem?.isVisible = true
+            editMenuItem?.isVisible = true
             deleteMenuItem?.isVisible = true
             favoriteMenuItem?.isVisible = true
             tintDeleteAction()
@@ -584,6 +593,7 @@ class MainActivity : AppCompatActivity() {
 
         listOf(
             R.id.action_share,
+            R.id.action_edit,
             R.id.action_favorite,
             R.id.action_info,
             R.id.action_select,
@@ -630,6 +640,21 @@ class MainActivity : AppCompatActivity() {
                 android.widget.Toast.makeText(this@MainActivity, getString(R.string.download_failed), android.widget.Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    private fun editSelectedPhotos() {
+        val selectedPhotos = photoAdapter.getSelectedPhotos()
+        if (selectedPhotos.isEmpty()) return
+        EditDialogHelper.show(
+            activity = this,
+            selectedPhotos = selectedPhotos,
+            settingsManager = settingsManager,
+            onSubmitted = {
+                photoAdapter.setSelectionMode(false)
+                isLongPressSelection = false
+                updateSelectionTitle(-1)
+            }
+        )
     }
 
     private fun buildLocalShareIntent(selectedPhotos: List<Photo>): Intent {

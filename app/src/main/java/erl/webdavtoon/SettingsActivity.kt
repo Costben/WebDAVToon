@@ -168,6 +168,12 @@ class SettingsActivity : AppCompatActivity() {
             root.setOnClickListener { showVideoExternalPlayerModeDialog() }
         }
 
+        binding.settingAutoWorkflow.apply {
+            icon.setImageResource(R.drawable.ic_ior_edit_pencil)
+            title.text = getString(R.string.comfyui_server)
+            root.setOnClickListener { showAutoWorkflowUrlDialog() }
+        }
+
         binding.settingClearCache.apply {
             icon.setImageResource(R.drawable.ic_ior_bin)
             title.text = getString(R.string.clear_cache)
@@ -249,6 +255,11 @@ class SettingsActivity : AppCompatActivity() {
             else ->
                 getString(R.string.video_external_player_mode_system_default)
         }
+
+        val autoWorkflowUrl = settingsManager.getAutoWorkflowUrl()
+        binding.settingAutoWorkflow.title.text = getString(R.string.comfyui_server)
+        binding.settingAutoWorkflow.summary.text =
+            autoWorkflowUrl.ifBlank { getString(R.string.not_configured) }
 
         binding.settingAbout.title.text = getString(R.string.about)
         binding.settingAbout.summary.text = getString(R.string.app_version_format, BuildConfig.VERSION_NAME)
@@ -640,6 +651,43 @@ class SettingsActivity : AppCompatActivity() {
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
+    }
+
+    private fun showAutoWorkflowUrlDialog() {
+        val inputLayout = com.google.android.material.textfield.TextInputLayout(this).apply {
+            hint = getString(R.string.comfyui_server_url_hint)
+            setPadding(48, 16, 48, 0)
+        }
+        val editText = com.google.android.material.textfield.TextInputEditText(inputLayout.context).apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+            setSingleLine(true)
+            setText(settingsManager.getAutoWorkflowUrl())
+            selectAll()
+        }
+        inputLayout.addView(editText)
+
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.comfyui_server)
+            .setView(inputLayout)
+            .setPositiveButton(R.string.save, null)
+            .setNegativeButton(R.string.cancel, null)
+            .create()
+
+        dialog.setOnShowListener {
+            dialog.getButton(android.content.DialogInterface.BUTTON_POSITIVE).setOnClickListener {
+                val rawUrl = editText.text?.toString().orEmpty().trim()
+                if (rawUrl.isNotEmpty() && !EditService.isValidUrl(rawUrl)) {
+                    inputLayout.error = getString(R.string.comfyui_server_url_invalid)
+                    return@setOnClickListener
+                }
+                inputLayout.error = null
+                settingsManager.setAutoWorkflowUrl(rawUrl)
+                refreshUi()
+                dialog.dismiss()
+            }
+        }
+
+        dialog.show()
     }
 
     private fun showClearCacheConfirmation() {        MaterialAlertDialogBuilder(this)

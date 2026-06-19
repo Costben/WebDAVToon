@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="edit">编辑</string>
+    <string name="comfyui_server">ComfyUI 编辑服务器</string>
+    <string name="comfyui_server_url_hint">http://192.168.31.199:3000</string>
+    <string name="comfyui_server_url_invalid">请输入有效的 http:// 或 https:// 地址</string>
+    <string name="comfyui_edit_title">发送到 ComfyUI 编辑</string>
+    <string name="comfyui_workflow">工作流</string>
+    <string name="comfyui_prompt">Prompt</string>
+    <string name="comfyui_prompt_hint">输入编辑指令</string>
+    <string name="comfyui_prompt_required">请输入编辑指令</string>
+    <string name="comfyui_preset">预设</string>
+    <string name="comfyui_no_preset">不使用预设</string>
+    <string name="comfyui_submit">提交</string>
+    <string name="comfyui_loading_config">正在加载 ComfyUI 配置...</string>
+    <string name="comfyui_configure_first">请先在设置中配置 ComfyUI 服务器地址</string>
+    <string name="comfyui_connect_failed">无法连接服务器，请检查网络和地址</string>
+    <string name="comfyui_connect_failed_detail">地址：%1$s\n\n原因：%2$s</string>
+    <string name="comfyui_submit_failed">编辑提交失败：%1$s</string>
+    <string name="comfyui_submit_success">已提交 %1$d 张图片到编辑队列</string>
+    <string name="comfyui_submit_partial">已提交 %1$d/%2$d 张，%3$d 张失败</string>
+    <string name="comfyui_download_failed">图片下载失败：%1$s</string>
+</resources>

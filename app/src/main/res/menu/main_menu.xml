@@ -9,11 +9,18 @@
         app:showAsAction="always"
         android:visible="false" />
     <item
+        android:id="@+id/action_edit"
+        android:title="@string/edit"
+        android:icon="@drawable/ic_ior_edit_pencil"
+        android:orderInCategory="2"
+        app:showAsAction="always"
+        android:visible="false" />
+    <item
         android:id="@+id/action_favorite"
         android:title="@string/favorites"
         android:icon="@drawable/ic_ior_star"
-        android:orderInCategory="2"
-        app:showAsAction="always"
+        android:orderInCategory="3"
+        app:showAsAction="never"
         android:visible="false" />
     <item
         android:id="@+id/action_info"
