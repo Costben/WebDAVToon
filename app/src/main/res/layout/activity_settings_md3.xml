@@ -157,6 +157,10 @@
                 android:id="@+id/setting_video_external_mode"
                 layout="@layout/item_setting" />
 
+            <include
+                android:id="@+id/setting_auto_workflow"
+                layout="@layout/item_setting" />
+
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"

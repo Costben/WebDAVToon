@@ -64,6 +64,7 @@ class PhotoViewActivity : AppCompatActivity() {
     private var isFavorites = false
     private var deleteMenuItem: android.view.MenuItem? = null
     private var shareMenuItem: android.view.MenuItem? = null
+    private var editMenuItem: android.view.MenuItem? = null
     private var isDraggingFastScroll = false
     private var isInitialLoad = true
     private var isSlideshowPlaying = false
@@ -770,6 +771,9 @@ class PhotoViewActivity : AppCompatActivity() {
         shareMenuItem = menu.findItem(R.id.action_share)
         shareMenuItem?.isVisible = isSelectionMode
         shareMenuItem?.setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_NEVER)
+        editMenuItem = menu.findItem(R.id.action_edit)
+        editMenuItem?.isVisible = isSelectionMode
+        editMenuItem?.setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_ALWAYS)
         gestureControlMenuItem = menu.findItem(R.id.action_gesture_control)
         gestureControlMenuItem?.isVisible = isCardMode && !isSelectionMode
 
@@ -793,7 +797,9 @@ class PhotoViewActivity : AppCompatActivity() {
     override fun onPrepareOptionsMenu(menu: android.view.Menu): Boolean {
         OverflowMenuHelper.enableOptionalIcons(menu)
         shareMenuItem?.isVisible = isSelectionMode
+        editMenuItem?.isVisible = isSelectionMode
         menu.findItem(R.id.action_share)?.isVisible = isSelectionMode
+        menu.findItem(R.id.action_edit)?.isVisible = isSelectionMode
         menu.findItem(R.id.action_randomize_photos)?.isVisible = false
         menu.findItem(R.id.action_gesture_control)?.isVisible = isCardMode && !isSelectionMode
         tintOverflowMenuIcons(menu)
@@ -816,6 +822,9 @@ class PhotoViewActivity : AppCompatActivity() {
         menu.findItem(R.id.action_share)?.icon?.mutate()?.let { icon ->
             androidx.core.graphics.drawable.DrawableCompat.setTint(icon, normalColor)
         }
+        menu.findItem(R.id.action_edit)?.icon?.mutate()?.let { icon ->
+            androidx.core.graphics.drawable.DrawableCompat.setTint(icon, normalColor)
+        }
         menu.findItem(R.id.action_rotation_lock)?.icon?.mutate()?.let { icon ->
             androidx.core.graphics.drawable.DrawableCompat.setTint(icon, normalColor)
         }
@@ -835,6 +844,10 @@ class PhotoViewActivity : AppCompatActivity() {
         return when (item.itemId) {
             R.id.action_share -> {
                 shareSelectedPhotos()
+                true
+            }
+            R.id.action_edit -> {
+                editSelectedPhotos()
                 true
             }
             R.id.action_delete -> {
@@ -874,6 +887,19 @@ class PhotoViewActivity : AppCompatActivity() {
                 Toast.makeText(this@PhotoViewActivity, getString(R.string.download_failed), Toast.LENGTH_SHORT).show()
             }
         }
+    }
+
+    private fun editSelectedPhotos() {
+        val selectedPhotos = if (isCardMode) adapter.getSelectedPhotos() else webtoonAdapter?.getSelectedPhotos() ?: emptyList()
+        if (selectedPhotos.isEmpty()) return
+        EditDialogHelper.show(
+            activity = this,
+            selectedPhotos = selectedPhotos,
+            settingsManager = settingsManager,
+            onSubmitted = {
+                exitSelectionMode()
+            }
+        )
     }
 
     private fun buildFileShareIntent(selectedPhotos: List<Photo>, uris: List<Uri>): Intent {

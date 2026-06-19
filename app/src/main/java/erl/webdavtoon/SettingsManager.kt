@@ -42,6 +42,7 @@ class SettingsManager(context: Context) {
         const val KEY_READER_MAX_ZOOM_PERCENT = "reader_max_zoom_percent"
         const val KEY_DEFAULT_READER_MODE = "default_reader_mode"
         const val KEY_VIDEO_EXTERNAL_PLAYER_MODE = "video_external_player_mode"
+        const val KEY_AUTO_WORKFLOW_URL = "auto_workflow_url"
         const val KEY_READER_GESTURE_CONTROL_JSON = "reader_gesture_control_json"
         const val KEY_ROTATION_LOCKED = "rotation_locked"
 
@@ -150,6 +151,12 @@ class SettingsManager(context: Context) {
                 else -> VIDEO_EXTERNAL_PLAYER_MODE_SYSTEM_DEFAULT
             }
         )
+
+    fun getAutoWorkflowUrl(): String =
+        appSettings.getOrDefaultString(AppSettingsStore.AUTO_WORKFLOW_URL, "")
+
+    fun setAutoWorkflowUrl(url: String) =
+        appSettings.putString(AppSettingsStore.AUTO_WORKFLOW_URL, url.trim().trimEnd('/'))
 
     fun isRotationLocked(): Boolean =
         appSettings.getOrDefaultBoolean(AppSettingsStore.ROTATION_LOCKED, false)
