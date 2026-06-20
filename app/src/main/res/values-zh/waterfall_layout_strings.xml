@@ -1,0 +1,5 @@
+<resources>
+    <string name="waterfall_layout_mode">&#x7011;&#x5E03;&#x6D41;&#x5E03;&#x5C40;</string>
+    <string name="waterfall_layout_follow_zoom">&#x8DDF;&#x624B;&#x7F29;&#x653E;&#x5E03;&#x5C40;</string>
+    <string name="waterfall_layout_legacy">&#x65E7;&#x7248;&#x5E03;&#x5C40;</string>
+</resources>

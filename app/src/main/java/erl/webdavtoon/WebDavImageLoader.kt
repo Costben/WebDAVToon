@@ -44,6 +44,7 @@ object WebDavImageLoader {
     private const val DEFAULT_REMOTE_VIDEO_SOURCE_CACHE_BYTES = 64L * 1024L * 1024L
     private const val AVI_REMOTE_VIDEO_SOURCE_CACHE_BYTES = 8L * 1024L * 1024L
     private const val LOCAL_IMAGE_PREVIEW_SAMPLE_MAX_PX = 96
+    private const val WATERFALL_MAX_TARGET_PIXELS = 900_000
     private const val VIDEO_BITMAP_CACHE_VERSION = 6
     private val remoteVideoThumbCache = object : LruCache<String, Bitmap>(24) {}
     private val localVideoThumbCache = object : LruCache<String, Bitmap>(24) {}
@@ -66,21 +67,33 @@ object WebDavImageLoader {
         limitSize: Boolean = true,
         isWebtoonReader: Boolean = false,
         isWaterfall: Boolean = false,
-        isFolderPreview: Boolean = false
+        isFolderPreview: Boolean = false,
+        width: Int? = null,
+        height: Int? = null,
+        onDimensionsReady: ((width: Int, height: Int) -> Unit)? = null
     ) {
         val requestOptions = buildRequestOptions(
             context = context,
             limitSize = limitSize,
             isWebtoonReader = isWebtoonReader,
             isWaterfall = isWaterfall,
-            isFolderPreview = isFolderPreview
+            isFolderPreview = isFolderPreview,
+            width = width,
+            height = height
         )
         val model = buildWebDavModel(context, imageUri)
 
         Glide.with(context)
             .load(model)
             .apply(requestOptions)
-            .listener(defaultDrawableListener("WebDAV", progressBar))
+            .listener(
+                defaultDrawableListener(
+                    tag = "WebDAV",
+                    progressBar = progressBar,
+                    logReady = !isWaterfall,
+                    onDimensionsReady = onDimensionsReady
+                )
+            )
             .into(imageView)
     }
 
@@ -99,7 +112,9 @@ object WebDavImageLoader {
             limitSize = limitSize,
             isWebtoonReader = isWebtoonReader,
             isWaterfall = isWaterfall,
-            isFolderPreview = isFolderPreview
+            isFolderPreview = isFolderPreview,
+            width = width,
+            height = height
         )
         val model = buildWebDavModel(context, imageUri)
 
@@ -191,20 +206,32 @@ object WebDavImageLoader {
         limitSize: Boolean = true,
         isWebtoonReader: Boolean = false,
         isWaterfall: Boolean = false,
-        isFolderPreview: Boolean = false
+        isFolderPreview: Boolean = false,
+        width: Int? = null,
+        height: Int? = null,
+        onDimensionsReady: ((width: Int, height: Int) -> Unit)? = null
     ) {
         val requestOptions = buildRequestOptions(
             context = context,
             limitSize = limitSize,
             isWebtoonReader = isWebtoonReader,
             isWaterfall = isWaterfall,
-            isFolderPreview = isFolderPreview
+            isFolderPreview = isFolderPreview,
+            width = width,
+            height = height
         )
 
         Glide.with(context)
             .load(imageUri)
             .apply(requestOptions)
-            .listener(defaultDrawableListener("Local", progressBar))
+            .listener(
+                defaultDrawableListener(
+                    tag = "Local",
+                    progressBar = progressBar,
+                    logReady = !isWaterfall,
+                    onDimensionsReady = onDimensionsReady
+                )
+            )
             .into(imageView)
     }
 
@@ -223,7 +250,9 @@ object WebDavImageLoader {
             limitSize = limitSize,
             isWebtoonReader = isWebtoonReader,
             isWaterfall = isWaterfall,
-            isFolderPreview = isFolderPreview
+            isFolderPreview = isFolderPreview,
+            width = width,
+            height = height
         )
 
         val request = Glide.with(context)
@@ -256,7 +285,9 @@ object WebDavImageLoader {
             limitSize = limitSize,
             isWebtoonReader = isWebtoonReader,
             isWaterfall = isWaterfall,
-            isFolderPreview = isFolderPreview
+            isFolderPreview = isFolderPreview,
+            width = width,
+            height = height
         )
         val model: Any = if (isLocal) imageUri else buildWebDavModel(context, imageUri)
         val targetWidth = width?.takeIf { it > 0 } ?: Target.SIZE_ORIGINAL
@@ -894,7 +925,9 @@ object WebDavImageLoader {
         limitSize: Boolean,
         isWebtoonReader: Boolean,
         isWaterfall: Boolean,
-        isFolderPreview: Boolean
+        isFolderPreview: Boolean,
+        width: Int? = null,
+        height: Int? = null
     ): RequestOptions {
         var requestOptions = RequestOptions()
             .diskCacheStrategy(DiskCacheStrategy.ALL)
@@ -920,22 +953,41 @@ object WebDavImageLoader {
                 .downsample(DownsampleStrategy.AT_MOST)
                 .dontAnimate()
         } else if (isWaterfall) {
-            requestOptions = requestOptions.placeholder(R.drawable.ic_ior_media_image)
-            val settings = SettingsManager(context)
-            requestOptions = when (settings.getWaterfallQualityMode()) {
-                SettingsManager.WATERFALL_MODE_MAX_WIDTH -> {
-                    val maxWidth = settings.getWaterfallMaxWidth()
-                    requestOptions
-                        .override(maxWidth, Target.SIZE_ORIGINAL)
-                        .downsample(DownsampleStrategy.AT_MOST)
-                }
+            requestOptions = requestOptions
+                .placeholder(R.drawable.ic_ior_media_image)
+                .dontAnimate()
+            val targetWidth = width?.takeIf { it > 0 }
+            val targetHeight = height?.takeIf { it > 0 }
+            requestOptions = if (targetWidth != null && targetHeight != null) {
+                val settings = SettingsManager(context)
+                val targetSize = WaterfallThumbnailSizeResolver.resolve(
+                    displayWidth = targetWidth,
+                    displayHeight = targetHeight,
+                    qualityMode = settings.getWaterfallQualityMode(),
+                    percent = settings.getWaterfallPercent(),
+                    maxWidth = settings.getWaterfallMaxWidth(),
+                    maxTargetPixels = WATERFALL_MAX_TARGET_PIXELS
+                )
+                requestOptions
+                    .override(targetSize.width, targetSize.height)
+                    .downsample(DownsampleStrategy.AT_MOST)
+            } else {
+                val settings = SettingsManager(context)
+                when (settings.getWaterfallQualityMode()) {
+                    SettingsManager.WATERFALL_MODE_MAX_WIDTH -> {
+                        val maxWidth = settings.getWaterfallMaxWidth()
+                        requestOptions
+                            .override(maxWidth, Target.SIZE_ORIGINAL)
+                            .downsample(DownsampleStrategy.AT_MOST)
+                    }
 
-                else -> {
-                    val percent = settings.getWaterfallPercent().coerceIn(10, 100)
-                    requestOptions
-                        .override(Target.SIZE_ORIGINAL)
-                        .sizeMultiplier(percent / 100f)
-                        .downsample(DownsampleStrategy.AT_MOST)
+                    else -> {
+                        val percent = settings.getWaterfallPercent().coerceIn(10, 100)
+                        requestOptions
+                            .override(Target.SIZE_ORIGINAL)
+                            .sizeMultiplier(percent / 100f)
+                            .downsample(DownsampleStrategy.AT_MOST)
+                    }
                 }
             }
         } else if (limitSize) {
@@ -1027,7 +1079,12 @@ object WebDavImageLoader {
         }
     }
 
-    private fun defaultDrawableListener(tag: String, progressBar: ProgressBar?): RequestListener<Drawable> {
+    private fun defaultDrawableListener(
+        tag: String,
+        progressBar: ProgressBar?,
+        logReady: Boolean = true,
+        onDimensionsReady: ((width: Int, height: Int) -> Unit)? = null
+    ): RequestListener<Drawable> {
         return object : RequestListener<Drawable> {
             override fun onLoadFailed(
                 e: GlideException?,
@@ -1048,10 +1105,17 @@ object WebDavImageLoader {
                 dataSource: DataSource,
                 isFirstResource: Boolean
             ): Boolean {
-                android.util.Log.d(
-                    "WebDavImageLoader",
-                    "$tag image ready source=$dataSource first=$isFirstResource model=$model"
-                )
+                val intrinsicWidth = resource.intrinsicWidth
+                val intrinsicHeight = resource.intrinsicHeight
+                if (intrinsicWidth > 0 && intrinsicHeight > 0) {
+                    onDimensionsReady?.invoke(intrinsicWidth, intrinsicHeight)
+                }
+                if (logReady) {
+                    android.util.Log.d(
+                        "WebDavImageLoader",
+                        "$tag image ready source=$dataSource first=$isFirstResource model=$model"
+                    )
+                }
                 progressBar?.visibility = View.GONE
                 return false
             }
