@@ -72,4 +72,5 @@ reference/
 
 # Local-only agent / HOTL docs
 /hotl-workflow-*.md
+.hotl/
 /docs/plans/
