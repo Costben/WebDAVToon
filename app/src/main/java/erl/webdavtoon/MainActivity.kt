@@ -1,5 +1,6 @@
 package erl.webdavtoon
 
+import android.animation.ValueAnimator
 import android.Manifest
 import android.content.ClipData
 import android.content.Intent
@@ -8,6 +9,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
@@ -31,6 +33,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 class MainActivity : AppCompatActivity() {
 
@@ -43,11 +47,43 @@ class MainActivity : AppCompatActivity() {
         isLongPressSelection = value
     }
 
+    fun shouldSuppressPhotoInteraction(): Boolean {
+        return isPinchZooming || SystemClock.uptimeMillis() < suppressPhotoInteractionUntilMs
+    }
+
     private var folderPath: String = ""
     private var isRemote: Boolean = false
     private var isRecursive: Boolean = false
     private var isFavorites: Boolean = false
+    private var waterfallLayoutMode: String = SettingsManager.WATERFALL_LAYOUT_FOLLOW_ZOOM
     private var scaleDetector: android.view.ScaleGestureDetector? = null
+    private var waterfallLayoutManager: FollowZoomWaterfallLayoutManager? = null
+    private var zoomStartColumns = 2f
+    private var zoomGestureScale = 1f
+    private var isPinchZooming = false
+    private var isConsumingMultiTouchSequence = false
+    private var pendingPinchTouchPoints: List<Pair<Float, Float>> = emptyList()
+    private var suppressPhotoInteractionUntilMs = 0L
+    private var snapAnimator: ValueAnimator? = null
+    private var pendingZoomColumns: Float? = null
+    private var pendingZoomFocusX = 0f
+    private var pendingZoomFocusY = 0f
+    private var isZoomFramePosted = false
+    private var isAspectRatioRelayoutPosted = false
+    private val applyPendingZoomFrame = Runnable {
+        isZoomFramePosted = false
+        val columns = pendingZoomColumns ?: return@Runnable
+        pendingZoomColumns = null
+        waterfallLayoutManager?.previewVirtualColumns(
+            columns = columns,
+            focusX = pendingZoomFocusX,
+            focusY = pendingZoomFocusY
+        )
+    }
+    private val applyPendingAspectRatioRelayout = Runnable {
+        isAspectRatioRelayoutPosted = false
+        waterfallLayoutManager?.notifyAspectRatiosChanged()
+    }
 
     private var currentQuery = MediaQuery()
     private var optionsMenu: android.view.Menu? = null
@@ -64,7 +100,8 @@ class MainActivity : AppCompatActivity() {
         if (result.resultCode == RESULT_OK) {
             val columns = settingsManager.getPhotoGridColumns()
             UiState.setGridColumns(columns)
-            (binding.recyclerView.layoutManager as? StaggeredGridLayoutManager)?.spanCount = columns
+            applyWaterfallLayoutPreference()
+            applyWaterfallColumns(columns)
             refreshMedia()
         }
     }
@@ -148,35 +185,9 @@ class MainActivity : AppCompatActivity() {
         supportActionBar?.title = if (isRecursive && !isFavorites) "$displayTitle ${getString(R.string.all_suffix)}" else displayTitle
         binding.toolbar.setNavigationOnClickListener { onBackPressedDispatcher.onBackPressed() }
 
-        val columns = settingsManager.getPhotoGridColumns()
-        binding.recyclerView.layoutManager = StaggeredGridLayoutManager(columns, StaggeredGridLayoutManager.VERTICAL)
-        binding.recyclerView.setItemViewCacheSize(30)
-        binding.recyclerView.setHasFixedSize(true)
+        binding.recyclerView.setItemViewCacheSize(16)
+        binding.recyclerView.itemAnimator = null
 
-        // 使用简单的缩放手势处理器，仅用于改变列数，不使用叠加层
-        scaleDetector = android.view.ScaleGestureDetector(this, object : android.view.ScaleGestureDetector.SimpleOnScaleGestureListener() {
-            private var lastScaleTime = 0L
-            override fun onScale(detector: android.view.ScaleGestureDetector): Boolean {
-                val currentTime = System.currentTimeMillis()
-                if (currentTime - lastScaleTime < 300) return false // 防止缩放太快导致卡顿
-
-                val scaleFactor = detector.scaleFactor
-                val currentColumns = (binding.recyclerView.layoutManager as? StaggeredGridLayoutManager)?.spanCount ?: 1
-                
-                if (scaleFactor > 1.2f && currentColumns > 1) {
-                    // 放大手势 -> 减少列数
-                    updateGridColumns(currentColumns - 1)
-                    lastScaleTime = currentTime
-                    return true
-                } else if (scaleFactor < 0.8f && currentColumns < 5) {
-                    // 缩小手势 -> 增加列数
-                    updateGridColumns(currentColumns + 1)
-                    lastScaleTime = currentTime
-                    return true
-                }
-                return false
-            }
-        })
 
         photoAdapter = PhotoAdapter(
             onPhotoClick = onPhotoClick@{ photos, position ->
@@ -208,9 +219,13 @@ class MainActivity : AppCompatActivity() {
                     isLongPressSelection = false
                     updateSelectionTitle(-1)
                 }
+            },
+            onPhotoDimensionsResolved = { photoId, width, height ->
+                onPhotoDimensionsResolved(photoId, width, height)
             }
         )
         binding.recyclerView.adapter = photoAdapter
+        applyWaterfallLayoutPreference()
         binding.swipeRefreshLayout.setOnRefreshListener {
             refreshMedia(reshuffleClusters = true)
         }
@@ -218,11 +233,10 @@ class MainActivity : AppCompatActivity() {
         binding.recyclerView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                 if (dy <= 0) return
-                val layout = recyclerView.layoutManager as? StaggeredGridLayoutManager ?: return
-                val last = layout.findLastVisibleItemPositions(null).maxOrNull() ?: return
+                val last = getLastVisibleAdapterPosition(recyclerView)
                 val total = photoAdapter.itemCount
                 if (total == 0) return
-                if (last >= total - 24) {
+                if (last != RecyclerView.NO_POSITION && last >= total - 24) {
                     loadNextPage()
                 }
             }
@@ -250,7 +264,10 @@ class MainActivity : AppCompatActivity() {
                 }
                 val displayedPhotos = state.photos
                 binding.swipeRefreshLayout.isRefreshing = state.isLoading && state.photos.isNotEmpty()
-                photoAdapter.setPhotos(displayedPhotos)
+                val photosChanged = photoAdapter.setPhotos(displayedPhotos)
+                if (photosChanged) {
+                    waterfallLayoutManager?.notifyAspectRatiosChanged()
+                }
                 MediaStateCache.setState(state.copy(photos = displayedPhotos))
                 restorePendingDeleteScrollAnchor(displayedPhotos.size)
             }
@@ -259,10 +276,273 @@ class MainActivity : AppCompatActivity() {
 
 
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-        if (ev.pointerCount > 1) {
-            scaleDetector?.onTouchEvent(ev)
+        val detector = scaleDetector
+        val action = ev.actionMasked
+        val isMultiTouchEvent = ev.pointerCount > 1
+        if (isMultiTouchEvent || isConsumingMultiTouchSequence || isPinchZooming || detector?.isInProgress == true) {
+            if (!isConsumingMultiTouchSequence && isMultiTouchEvent) {
+                isConsumingMultiTouchSequence = true
+                suppressPhotoInteractionUntilMs = SystemClock.uptimeMillis() + 700L
+                cancelActiveRecyclerTouch(ev)
+            }
+            if (isMultiTouchEvent) {
+                pendingPinchTouchPoints = ev.toRecyclerTouchPoints()
+            }
+            detector?.onTouchEvent(ev)
+            if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+                isConsumingMultiTouchSequence = false
+                pendingPinchTouchPoints = emptyList()
+                suppressPhotoInteractionUntilMs = SystemClock.uptimeMillis() + 700L
+                binding.swipeRefreshLayout.isEnabled = true
+                binding.recyclerView.parent?.requestDisallowInterceptTouchEvent(false)
+            }
+            return true
         }
         return super.dispatchTouchEvent(ev)
+    }
+
+    private fun cancelActiveRecyclerTouch(ev: MotionEvent) {
+        if (!::binding.isInitialized) return
+        val cancelEvent = MotionEvent.obtain(ev).apply {
+            action = MotionEvent.ACTION_CANCEL
+        }
+        super.dispatchTouchEvent(cancelEvent)
+        cancelEvent.recycle()
+        binding.recyclerView.cancelPendingInputEvents()
+        binding.recyclerView.isPressed = false
+    }
+
+    private fun MotionEvent.toRecyclerTouchPoints(): List<Pair<Float, Float>> {
+        if (!::binding.isInitialized) return emptyList()
+        return List(pointerCount) { index ->
+            (getX(index) - binding.recyclerView.left) to (getY(index) - binding.recyclerView.top)
+        }
+    }
+
+    private fun applyWaterfallLayoutPreference() {
+        if (!::binding.isInitialized || !::photoAdapter.isInitialized) return
+        val preferredMode = settingsManager.getWaterfallLayoutMode()
+        if (preferredMode == waterfallLayoutMode && binding.recyclerView.layoutManager != null) return
+
+        waterfallLayoutMode = preferredMode
+        snapAnimator?.cancel()
+        pendingZoomColumns = null
+        isPinchZooming = false
+        isConsumingMultiTouchSequence = false
+        pendingPinchTouchPoints = emptyList()
+        binding.swipeRefreshLayout.isEnabled = true
+        binding.recyclerView.parent?.requestDisallowInterceptTouchEvent(false)
+
+        when (waterfallLayoutMode) {
+            SettingsManager.WATERFALL_LAYOUT_LEGACY -> installLegacyWaterfallLayout()
+            else -> installFollowZoomWaterfallLayout()
+        }
+    }
+
+    private fun installFollowZoomWaterfallLayout() {
+        val columns = settingsManager.getPhotoGridColumns().coerceIn(1, 4)
+        binding.recyclerView.setHasFixedSize(true)
+        waterfallLayoutManager = FollowZoomWaterfallLayoutManager(
+            spacingPx = resources.getDimensionPixelSize(R.dimen.waterfall_item_spacing),
+            aspectRatioProvider = photoAdapterAspectRatioProvider()
+        ).also { layoutManager ->
+            layoutManager.setVirtualColumns(columns.toFloat())
+            binding.recyclerView.layoutManager = layoutManager
+        }
+        photoAdapter.setLayoutMode(PhotoAdapter.LayoutMode.FOLLOW_ZOOM)
+        installFollowZoomScaleDetector(columns)
+    }
+
+    private fun installLegacyWaterfallLayout() {
+        val columns = settingsManager.getPhotoGridColumns().coerceIn(1, 4)
+        binding.recyclerView.setHasFixedSize(false)
+        waterfallLayoutManager = null
+        binding.recyclerView.layoutManager =
+            StaggeredGridLayoutManager(columns, StaggeredGridLayoutManager.VERTICAL)
+        photoAdapter.setLegacyColumnCount(columns)
+        photoAdapter.setLayoutMode(PhotoAdapter.LayoutMode.LEGACY)
+        installLegacyScaleDetector()
+    }
+
+    private fun installFollowZoomScaleDetector(initialColumns: Int) {
+        scaleDetector = android.view.ScaleGestureDetector(
+            this,
+            object : android.view.ScaleGestureDetector.SimpleOnScaleGestureListener() {
+                override fun onScaleBegin(detector: android.view.ScaleGestureDetector): Boolean {
+                    snapAnimator?.cancel()
+                    zoomStartColumns = waterfallLayoutManager?.getVirtualColumns() ?: initialColumns.toFloat()
+                    zoomGestureScale = 1f
+                    isPinchZooming = true
+                    suppressPhotoInteractionUntilMs = SystemClock.uptimeMillis() + 400L
+                    binding.swipeRefreshLayout.isEnabled = false
+                    binding.recyclerView.parent?.requestDisallowInterceptTouchEvent(true)
+                    waterfallLayoutManager?.beginInteractiveZoom(
+                        focusX = detector.focusX,
+                        focusY = detector.focusY - binding.recyclerView.top,
+                        touchPoints = pendingPinchTouchPoints
+                    )
+                    return true
+                }
+
+                override fun onScale(detector: android.view.ScaleGestureDetector): Boolean {
+                    zoomGestureScale *= detector.scaleFactor
+                    val targetColumns = (zoomStartColumns / zoomGestureScale).coerceIn(1f, 4f)
+                    scheduleVirtualColumnsUpdate(
+                        columns = targetColumns,
+                        focusX = detector.focusX,
+                        focusY = detector.focusY - binding.recyclerView.top
+                    )
+                    return true
+                }
+
+                override fun onScaleEnd(detector: android.view.ScaleGestureDetector) {
+                    isPinchZooming = false
+                    suppressPhotoInteractionUntilMs = SystemClock.uptimeMillis() + 250L
+                    applyPendingZoomNow()
+                    val currentColumns = waterfallLayoutManager?.getVirtualColumns() ?: initialColumns.toFloat()
+                    snapToGridColumns(
+                        columns = currentColumns.roundToInt().coerceIn(1, 4),
+                        focusX = detector.focusX,
+                        focusY = detector.focusY - binding.recyclerView.top
+                    )
+                    binding.swipeRefreshLayout.isEnabled = true
+                    binding.recyclerView.parent?.requestDisallowInterceptTouchEvent(false)
+                }
+            }
+        )
+    }
+
+    private fun installLegacyScaleDetector() {
+        scaleDetector = android.view.ScaleGestureDetector(
+            this,
+            object : android.view.ScaleGestureDetector.SimpleOnScaleGestureListener() {
+                private var lastScaleTime = 0L
+
+                override fun onScale(detector: android.view.ScaleGestureDetector): Boolean {
+                    val currentTime = SystemClock.uptimeMillis()
+                    if (currentTime - lastScaleTime < 300L) return false
+
+                    val scaleFactor = detector.scaleFactor
+                    val currentColumns =
+                        (binding.recyclerView.layoutManager as? StaggeredGridLayoutManager)?.spanCount ?: 1
+                    val nextColumns = when {
+                        scaleFactor > 1.2f && currentColumns > 1 -> currentColumns - 1
+                        scaleFactor < 0.8f && currentColumns < 4 -> currentColumns + 1
+                        else -> return false
+                    }
+
+                    updateGridColumns(nextColumns)
+                    lastScaleTime = currentTime
+                    return true
+                }
+            }
+        )
+    }
+
+    private fun getLastVisibleAdapterPosition(recyclerView: RecyclerView): Int {
+        return when (val layout = recyclerView.layoutManager) {
+            is FollowZoomWaterfallLayoutManager -> layout.getLastVisibleAdapterPosition()
+            is StaggeredGridLayoutManager -> layout.findLastVisibleItemPositions(null).maxOrNull()
+                ?: RecyclerView.NO_POSITION
+            else -> RecyclerView.NO_POSITION
+        }
+    }
+
+    private fun photoAdapterAspectRatioProvider(): (Int) -> Float = { position ->
+        if (::photoAdapter.isInitialized) {
+            photoAdapter.getPhotoAspectRatio(position)
+        } else {
+            1f
+        }
+    }
+
+    private fun onPhotoDimensionsResolved(photoId: String, width: Int, height: Int) {
+        if (!::photoAdapter.isInitialized || !::binding.isInitialized) return
+        if (!photoAdapter.updateResolvedDimensions(photoId, width, height)) return
+        if (waterfallLayoutMode == SettingsManager.WATERFALL_LAYOUT_LEGACY) return
+        if (isAspectRatioRelayoutPosted) return
+
+        isAspectRatioRelayoutPosted = true
+        ViewCompat.postOnAnimation(binding.recyclerView, applyPendingAspectRatioRelayout)
+    }
+
+    private fun scheduleVirtualColumnsUpdate(columns: Float, focusX: Float, focusY: Float) {
+        pendingZoomColumns = columns
+        pendingZoomFocusX = focusX
+        pendingZoomFocusY = focusY
+        if (isZoomFramePosted || !::binding.isInitialized) return
+
+        isZoomFramePosted = true
+        ViewCompat.postOnAnimation(binding.recyclerView, applyPendingZoomFrame)
+    }
+
+    private fun applyPendingZoomNow() {
+        if (!::binding.isInitialized) return
+        binding.recyclerView.removeCallbacks(applyPendingZoomFrame)
+        isZoomFramePosted = false
+        val columns = pendingZoomColumns ?: return
+        pendingZoomColumns = null
+        waterfallLayoutManager?.previewVirtualColumns(
+            columns = columns,
+            focusX = pendingZoomFocusX,
+            focusY = pendingZoomFocusY
+        )
+    }
+
+    private fun snapToGridColumns(columns: Int, focusX: Float, focusY: Float) {
+        val clampedColumns = columns.coerceIn(1, 4)
+        settingsManager.setPhotoGridColumns(clampedColumns)
+        UiState.setGridColumns(clampedColumns)
+        val layoutManager = waterfallLayoutManager ?: return
+        applyPendingZoomNow()
+        val start = layoutManager.getVirtualColumns()
+        if (abs(start - clampedColumns.toFloat()) < 0.001f) {
+            layoutManager.commitInteractiveZoom(clampedColumns.toFloat(), focusX, focusY)
+            layoutManager.endInteractiveZoom()
+            return
+        }
+
+        snapAnimator?.cancel()
+        snapAnimator = ValueAnimator.ofFloat(start, clampedColumns.toFloat()).apply {
+            duration = 180L
+            interpolator = android.view.animation.DecelerateInterpolator()
+            addUpdateListener { animator ->
+                layoutManager.previewVirtualColumns(
+                    columns = animator.animatedValue as Float,
+                    focusX = focusX,
+                    focusY = focusY
+                )
+            }
+            addListener(object : android.animation.AnimatorListenerAdapter() {
+                private var wasCancelled = false
+
+                override fun onAnimationEnd(animation: android.animation.Animator) {
+                    if (!wasCancelled) {
+                        layoutManager.commitInteractiveZoom(clampedColumns.toFloat(), focusX, focusY)
+                    }
+                    layoutManager.endInteractiveZoom()
+                }
+
+                override fun onAnimationCancel(animation: android.animation.Animator) {
+                    wasCancelled = true
+                    layoutManager.commitInteractiveZoom(layoutManager.getVirtualColumns(), focusX, focusY)
+                }
+            })
+            start()
+        }
+    }
+
+    private fun applyWaterfallColumns(columns: Int) {
+        val clampedColumns = columns.coerceIn(1, 4)
+        when (waterfallLayoutMode) {
+            SettingsManager.WATERFALL_LAYOUT_LEGACY -> {
+                (binding.recyclerView.layoutManager as? StaggeredGridLayoutManager)?.spanCount = clampedColumns
+                photoAdapter.setLegacyColumnCount(clampedColumns)
+            }
+            else -> {
+                waterfallLayoutManager?.setVirtualColumns(clampedColumns.toFloat())
+            }
+        }
     }
 
     private fun refreshMedia(reshuffleClusters: Boolean = false) {
@@ -441,9 +721,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateGridColumns(columns: Int): Boolean {
-        settingsManager.setPhotoGridColumns(columns)
-        UiState.setGridColumns(columns)
-        (binding.recyclerView.layoutManager as? StaggeredGridLayoutManager)?.spanCount = columns
+        val clampedColumns = columns.coerceIn(1, 4)
+        settingsManager.setPhotoGridColumns(clampedColumns)
+        UiState.setGridColumns(clampedColumns)
+        applyPendingZoomNow()
+        applyWaterfallColumns(clampedColumns)
         return true
     }
 
