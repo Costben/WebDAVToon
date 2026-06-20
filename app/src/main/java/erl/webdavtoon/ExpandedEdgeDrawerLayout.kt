@@ -21,7 +21,7 @@ class ExpandedEdgeDrawerLayout @JvmOverloads constructor(
     private var triggered = false
 
     private val edgeWidth: Int
-        get() = resources.displayMetrics.widthPixels / 3
+        get() = (resources.displayMetrics.widthPixels * widthFraction).toInt()
 
     override fun onInterceptTouchEvent(ev: MotionEvent): Boolean {
         // Let DrawerLayout's built-in detection handle whatever it can first.
@@ -39,7 +39,8 @@ class ExpandedEdgeDrawerLayout @JvmOverloads constructor(
 
         when (ev.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                if (ev.x <= edgeWidth) {
+                // edgeWidth <= 0 means the swipe-to-open area is disabled entirely.
+                if (edgeWidth > 0 && ev.x <= edgeWidth) {
                     trackingStartX = ev.x
                     trackingStartY = ev.y
                     trackingActive = true
@@ -69,5 +70,24 @@ class ExpandedEdgeDrawerLayout @JvmOverloads constructor(
         triggered = false
         trackingStartX = -1f
         trackingStartY = -1f
+    }
+
+    companion object {
+        const val DEFAULT_EDGE_FRACTION = 1f / 3f
+
+        /**
+         * Fraction (0f..1f) of the screen width that acts as the swipe-to-open trigger area.
+         * Process-wide and @Volatile so a change in Settings takes effect immediately without
+         * recreating the host Activity. 0f disables swipe-to-open entirely.
+         */
+        @Volatile
+        var widthFraction: Float = DEFAULT_EDGE_FRACTION
+            set(value) {
+                field = value.coerceIn(0f, 1f)
+            }
+
+        fun setWidthPercent(percent: Int) {
+            widthFraction = percent.coerceIn(0, 100) / 100f
+        }
     }
 }

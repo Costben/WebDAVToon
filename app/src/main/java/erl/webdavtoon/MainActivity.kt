@@ -167,6 +167,12 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         MediaManager.mediaViewModel = androidx.lifecycle.ViewModelProvider(this)[MediaViewModel::class.java]
+        applyWaterfallFilenamePreference()
+    }
+
+    private fun applyWaterfallFilenamePreference() {
+        if (!::photoAdapter.isInitialized) return
+        photoAdapter.setShowFilenames(settingsManager.shouldShowWaterfallFilenames())
     }
 
     private fun setupUi() {
@@ -321,6 +327,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun applyWaterfallLayoutPreference() {
         if (!::binding.isInitialized || !::photoAdapter.isInitialized) return
+        applyWaterfallFilenamePreference()
         val preferredMode = settingsManager.getWaterfallLayoutMode()
         if (preferredMode == waterfallLayoutMode && binding.recyclerView.layoutManager != null) return
 

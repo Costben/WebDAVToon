@@ -1,0 +1,7 @@
+<resources>
+    <string name="drawer_edge_width">侧栏滑出区域</string>
+    <string name="drawer_edge_width_dialog_title">侧栏滑动触发区宽度</string>
+    <string name="drawer_edge_width_hint">0–100（占屏幕宽度百分比）</string>
+    <string name="drawer_edge_width_summary_percent">占屏幕宽度 %1$d%%</string>
+    <string name="drawer_edge_width_summary_disabled">已关闭（禁用滑动）</string>
+</resources>

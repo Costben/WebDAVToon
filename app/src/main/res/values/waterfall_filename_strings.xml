@@ -1,0 +1,5 @@
+<resources>
+    <string name="waterfall_show_filenames">Show filenames in waterfall</string>
+    <string name="waterfall_show_filenames_enabled">Filenames are shown under images</string>
+    <string name="waterfall_show_filenames_disabled">Filenames are hidden in the waterfall</string>
+</resources>

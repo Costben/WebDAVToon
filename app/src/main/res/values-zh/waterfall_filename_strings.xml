@@ -1,0 +1,5 @@
+<resources>
+    <string name="waterfall_show_filenames">显示瀑布流文件名</string>
+    <string name="waterfall_show_filenames_enabled">图片下方会显示文件名</string>
+    <string name="waterfall_show_filenames_disabled">瀑布流中不显示文件名</string>
+</resources>

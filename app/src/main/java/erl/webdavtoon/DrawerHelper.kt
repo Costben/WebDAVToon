@@ -50,6 +50,8 @@ object DrawerHelper {
         drawerLayout.addDrawerListener(toggle)
         toggle.syncState()
 
+        // Apply the user-configured swipe trigger width (% of screen) before expanding the edge area.
+        ExpandedEdgeDrawerLayout.setWidthPercent(SettingsManager(activity).getDrawerEdgeWidthPercent())
         expandDrawerEdgeArea(drawerLayout)
 
         val serverList = navView.findViewById<RecyclerView>(R.id.server_list)
@@ -157,15 +159,24 @@ object DrawerHelper {
     }
 
     private fun expandDrawerEdgeArea(drawerLayout: DrawerLayout) {
-        val targetEdgePx = drawerLayout.resources.displayMetrics.widthPixels / 3
+        val targetEdgePx =
+            (drawerLayout.resources.displayMetrics.widthPixels * ExpandedEdgeDrawerLayout.widthFraction).toInt()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             drawerLayout.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
-                val rect = Rect(0, 0, targetEdgePx, v.height)
-                v.systemGestureExclusionRects = listOf(rect)
+                if (targetEdgePx <= 0) {
+                    v.systemGestureExclusionRects = emptyList()
+                } else {
+                    val rect = Rect(0, 0, targetEdgePx, v.height)
+                    v.systemGestureExclusionRects = listOf(rect)
+                }
             }
-            val rect = Rect(0, 0, targetEdgePx, drawerLayout.height)
-            drawerLayout.systemGestureExclusionRects = listOf(rect)
+            if (targetEdgePx <= 0) {
+                drawerLayout.systemGestureExclusionRects = emptyList()
+            } else {
+                val rect = Rect(0, 0, targetEdgePx, drawerLayout.height)
+                drawerLayout.systemGestureExclusionRects = listOf(rect)
+            }
         }
     }
 

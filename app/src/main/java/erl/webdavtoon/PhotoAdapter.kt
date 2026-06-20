@@ -24,6 +24,7 @@ class PhotoAdapter(
     private var isSingleColumn = false
     private var layoutMode = LayoutMode.FOLLOW_ZOOM
     private var legacyColumnCount = 2
+    private var showFilenames = true
     private var attachedRecyclerView: RecyclerView? = null
     private var isSelectionMode = false
     private val selectedPositions = mutableSetOf<Int>()
@@ -50,6 +51,12 @@ class PhotoAdapter(
     fun setImmersiveMode(immersive: Boolean, singleColumn: Boolean) {
         isImmersiveMode = immersive
         isSingleColumn = singleColumn
+        notifyDataSetChanged()
+    }
+
+    fun setShowFilenames(show: Boolean) {
+        if (showFilenames == show) return
+        showFilenames = show
         notifyDataSetChanged()
     }
 
@@ -145,6 +152,7 @@ class PhotoAdapter(
             photo = photo,
             isImmersiveMode = isImmersiveMode,
             isSingleColumn = isSingleColumn,
+            showFilenames = showFilenames,
             isSelectionMode = isSelectionMode,
             isSelected = isSelected,
             displaySize = displaySize
@@ -229,12 +237,13 @@ class PhotoAdapter(
             photo: Photo,
             isImmersiveMode: Boolean,
             isSingleColumn: Boolean,
+            showFilenames: Boolean,
             isSelectionMode: Boolean,
             isSelected: Boolean,
             displaySize: WaterfallDisplaySize?
         ) {
             binding.titleTextView.text = photo.title
-            binding.titleTextView.visibility = if (isImmersiveMode) View.GONE else View.VISIBLE
+            binding.titleTextView.visibility = if (!showFilenames || isImmersiveMode) View.GONE else View.VISIBLE
             displaySize?.let { size ->
                 binding.imageView.layoutParams = binding.imageView.layoutParams.apply {
                     width = ViewGroup.LayoutParams.MATCH_PARENT
