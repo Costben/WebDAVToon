@@ -1,0 +1,5 @@
+<resources>
+    <string name="waterfall_layout_mode">Waterfall layout</string>
+    <string name="waterfall_layout_follow_zoom">Follow-zoom layout</string>
+    <string name="waterfall_layout_legacy">Legacy layout</string>
+</resources>

@@ -44,6 +44,7 @@ object DeleteScrollAnchorHelper {
             when (val layoutManager = recyclerView.layoutManager) {
                 is LinearLayoutManager -> layoutManager.scrollToPositionWithOffset(targetPosition, anchor.offset)
                 is StaggeredGridLayoutManager -> layoutManager.scrollToPositionWithOffset(targetPosition, anchor.offset)
+                is FollowZoomWaterfallLayoutManager -> layoutManager.scrollToPositionWithOffset(targetPosition, anchor.offset)
                 else -> recyclerView.scrollToPosition(targetPosition)
             }
         }

@@ -9,81 +9,67 @@
     app:strokeWidth="0dp"
     app:strokeColor="?attr/colorPrimary">
 
-    <androidx.constraintlayout.widget.ConstraintLayout
+    <ImageView
+        android:id="@+id/imageView"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="match_parent"
+        android:adjustViewBounds="false"
+        android:scaleType="fitCenter" />
 
-        <ImageView
-            android:id="@+id/imageView"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:adjustViewBounds="true"
-            android:scaleType="fitCenter"
-            app:layout_constraintTop_toTopOf="parent" />
+    <TextView
+        android:id="@+id/titleTextView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="#80000000"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:padding="4dp"
+        android:textColor="@android:color/white"
+        android:textSize="12sp" />
 
-        <TextView
-            android:id="@+id/titleTextView"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="#80000000"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:padding="4dp"
-            android:textColor="@android:color/white"
-            android:textSize="12sp"
-            app:layout_constraintBottom_toBottomOf="@id/imageView" />
+    <View
+        android:id="@+id/selectionOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#40000000"
+        android:visibility="gone" />
 
-        <View
-            android:id="@+id/selectionOverlay"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:background="#40000000"
-            android:visibility="gone"
-            app:layout_constraintTop_toTopOf="@id/imageView"
-            app:layout_constraintBottom_toBottomOf="@id/imageView"
-            app:layout_constraintStart_toStartOf="@id/imageView"
-            app:layout_constraintEnd_toEndOf="@id/imageView" />
+    <ImageView
+        android:id="@+id/checkIcon"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_gravity="top|end"
+        android:layout_margin="8dp"
+        android:src="@drawable/ic_ior_check_circle"
+        android:visibility="gone"
+        app:tint="?attr/colorPrimary" />
 
-        <ImageView
-            android:id="@+id/checkIcon"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:layout_margin="8dp"
-            android:src="@drawable/ic_ior_check_circle"
-            android:visibility="gone"
-            app:tint="?attr/colorPrimary"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
+    <ImageView
+        android:id="@+id/videoIndicator"
+        android:layout_width="22dp"
+        android:layout_height="22dp"
+        android:layout_gravity="top|start"
+        android:layout_margin="6dp"
+        android:background="@android:color/transparent"
+        android:padding="2dp"
+        android:src="@drawable/ic_ior_play"
+        android:visibility="gone"
+        app:tint="@android:color/white" />
 
-        <ImageView
-            android:id="@+id/videoIndicator"
-            android:layout_width="22dp"
-            android:layout_height="22dp"
-            android:layout_margin="6dp"
-            android:padding="2dp"
-            android:src="@drawable/ic_ior_play"
-            app:tint="@android:color/white"
-            android:background="@android:color/transparent"
-            android:visibility="gone"
-            app:layout_constraintTop_toTopOf="@id/imageView"
-            app:layout_constraintStart_toStartOf="@id/imageView" />
-
-        <TextView
-            android:id="@+id/videoDurationTextView"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_margin="6dp"
-            android:background="#99000000"
-            android:paddingStart="6dp"
-            android:paddingTop="2dp"
-            android:paddingEnd="6dp"
-            android:paddingBottom="2dp"
-            android:textColor="@android:color/white"
-            android:textSize="10sp"
-            android:visibility="gone"
-            app:layout_constraintBottom_toBottomOf="@id/imageView"
-            app:layout_constraintEnd_toEndOf="@id/imageView" />
-
-    </androidx.constraintlayout.widget.ConstraintLayout>
+    <TextView
+        android:id="@+id/videoDurationTextView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="6dp"
+        android:background="#99000000"
+        android:paddingStart="6dp"
+        android:paddingTop="2dp"
+        android:paddingEnd="6dp"
+        android:paddingBottom="2dp"
+        android:textColor="@android:color/white"
+        android:textSize="10sp"
+        android:visibility="gone" />
 
 </com.google.android.material.card.MaterialCardView>
