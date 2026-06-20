@@ -40,6 +40,7 @@ class SettingsManager(context: Context) {
         const val KEY_WATERFALL_PERCENT = "waterfall_percent"
         const val KEY_WATERFALL_MAX_WIDTH = "waterfall_max_width"
         const val KEY_WATERFALL_LAYOUT_MODE = "waterfall_layout_mode"
+        const val KEY_WATERFALL_SHOW_FILENAMES = "waterfall_show_filenames"
         const val KEY_READER_MAX_ZOOM_PERCENT = "reader_max_zoom_percent"
         const val KEY_DEFAULT_READER_MODE = "default_reader_mode"
         const val KEY_VIDEO_EXTERNAL_PLAYER_MODE = "video_external_player_mode"
@@ -51,6 +52,7 @@ class SettingsManager(context: Context) {
         const val WATERFALL_MODE_MAX_WIDTH = "max_width"
         const val WATERFALL_LAYOUT_FOLLOW_ZOOM = "follow_zoom"
         const val WATERFALL_LAYOUT_LEGACY = "legacy"
+        const val DEFAULT_DRAWER_EDGE_WIDTH_PERCENT = 33
         const val DEFAULT_READER_MODE_WEBTOON = "webtoon"
         const val DEFAULT_READER_MODE_CARD = "card"
         const val VIDEO_EXTERNAL_PLAYER_MODE_SYSTEM_DEFAULT = "system_default"
@@ -123,6 +125,21 @@ class SettingsManager(context: Context) {
 
     fun setWaterfallLayoutMode(mode: String) =
         appSettings.putString(AppSettingsStore.WATERFALL_LAYOUT_MODE, normalizeWaterfallLayoutMode(mode))
+
+    fun shouldShowWaterfallFilenames(): Boolean =
+        appSettings.getOrDefaultBoolean(AppSettingsStore.WATERFALL_SHOW_FILENAMES, true)
+
+    fun setShowWaterfallFilenames(show: Boolean) =
+        appSettings.putBoolean(AppSettingsStore.WATERFALL_SHOW_FILENAMES, show)
+
+    fun getDrawerEdgeWidthPercent(): Int =
+        appSettings.getOrDefaultInt(
+            AppSettingsStore.DRAWER_EDGE_WIDTH_PERCENT,
+            DEFAULT_DRAWER_EDGE_WIDTH_PERCENT
+        ).coerceIn(0, 100)
+
+    fun setDrawerEdgeWidthPercent(percent: Int) =
+        appSettings.putInt(AppSettingsStore.DRAWER_EDGE_WIDTH_PERCENT, percent.coerceIn(0, 100))
 
     fun getReaderMaxZoomPercent(): Int =
         appSettings.getOrDefaultInt(AppSettingsStore.READER_MAX_ZOOM_PERCENT, 300)

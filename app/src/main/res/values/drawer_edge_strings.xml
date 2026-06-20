@@ -1,0 +1,7 @@
+<resources>
+    <string name="drawer_edge_width">Sidebar swipe area</string>
+    <string name="drawer_edge_width_dialog_title">Sidebar swipe trigger width</string>
+    <string name="drawer_edge_width_hint">0–100 (% of screen width)</string>
+    <string name="drawer_edge_width_summary_percent">%1$d%% of screen width</string>
+    <string name="drawer_edge_width_summary_disabled">Disabled (swipe off)</string>
+</resources>

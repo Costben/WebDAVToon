@@ -144,10 +144,31 @@ class SettingsActivity : AppCompatActivity() {
             root.setOnClickListener { showWaterfallLayoutModeDialog() }
         }
 
+        binding.settingDrawerEdgeWidth.apply {
+            icon.setImageResource(R.drawable.ic_ior_open_select_hand_gesture)
+            title.text = getString(R.string.drawer_edge_width)
+            root.setOnClickListener { showDrawerEdgeWidthDialog() }
+        }
+
         binding.settingSortOrder.apply {
             icon.setImageResource(R.drawable.ic_ior_sort)
             title.text = getString(R.string.sort_order)
             root.setOnClickListener { showSortOrderDialog() }
+        }
+
+        binding.settingWaterfallFilenames.apply {
+            icon.setImageResource(R.drawable.ic_ior_media_image)
+            title.text = getString(R.string.waterfall_show_filenames)
+            chevron.visibility = View.GONE
+            switchWidget.visibility = View.VISIBLE
+            root.setOnClickListener {
+                switchWidget.isChecked = !switchWidget.isChecked
+            }
+            switchWidget.setOnCheckedChangeListener { _, isChecked ->
+                settingsManager.setShowWaterfallFilenames(isChecked)
+                refreshUi()
+                setResult(RESULT_OK)
+            }
         }
 
         binding.settingThumbnailQuality.apply {
@@ -231,6 +252,14 @@ class SettingsActivity : AppCompatActivity() {
         binding.settingWaterfallLayout.summary.text =
             waterfallLayoutModeLabel(settingsManager.getWaterfallLayoutMode())
 
+        binding.settingDrawerEdgeWidth.title.text = getString(R.string.drawer_edge_width)
+        val edgePercent = settingsManager.getDrawerEdgeWidthPercent()
+        binding.settingDrawerEdgeWidth.summary.text = if (edgePercent <= 0) {
+            getString(R.string.drawer_edge_width_summary_disabled)
+        } else {
+            getString(R.string.drawer_edge_width_summary_percent, edgePercent)
+        }
+
         val sortOrder = when (settingsManager.getSortOrder()) {
             0 -> getString(R.string.sort_name_asc)
             1 -> getString(R.string.sort_name_desc)
@@ -240,6 +269,14 @@ class SettingsActivity : AppCompatActivity() {
         }
         binding.settingSortOrder.title.text = getString(R.string.sort_order)
         binding.settingSortOrder.summary.text = sortOrder
+
+        binding.settingWaterfallFilenames.title.text = getString(R.string.waterfall_show_filenames)
+        binding.settingWaterfallFilenames.summary.text = if (settingsManager.shouldShowWaterfallFilenames()) {
+            getString(R.string.waterfall_show_filenames_enabled)
+        } else {
+            getString(R.string.waterfall_show_filenames_disabled)
+        }
+        binding.settingWaterfallFilenames.switchWidget.isChecked = settingsManager.shouldShowWaterfallFilenames()
 
         binding.settingThumbnailQuality.title.text = getString(R.string.thumbnail_quality)
         binding.settingThumbnailQuality.summary.text = when (settingsManager.getWaterfallQualityMode()) {
@@ -630,6 +667,31 @@ class SettingsActivity : AppCompatActivity() {
                 val percent = editText.text.toString().toIntOrNull()?.coerceIn(100, 500)
                 if (percent != null) {
                     settingsManager.setReaderMaxZoomPercent(percent)
+                    refreshUi()
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun showDrawerEdgeWidthDialog() {
+        val editText = android.widget.EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_NUMBER
+            hint = getString(R.string.drawer_edge_width_hint)
+            setText(settingsManager.getDrawerEdgeWidthPercent().toString())
+            selectAll()
+            setPadding(64, 32, 64, 32)
+        }
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.drawer_edge_width_dialog_title)
+            .setView(editText)
+            .setPositiveButton(R.string.save) { _, _ ->
+                val percent = editText.text.toString().toIntOrNull()?.coerceIn(0, 100)
+                if (percent != null) {
+                    settingsManager.setDrawerEdgeWidthPercent(percent)
+                    // Apply immediately so the swipe trigger area updates without recreating the host Activity.
+                    ExpandedEdgeDrawerLayout.setWidthPercent(percent)
                     refreshUi()
                 }
             }
