@@ -15,6 +15,7 @@ import android.view.Gravity
 import android.view.View
 import android.widget.EditText
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.coordinatorlayout.widget.CoordinatorLayout
@@ -73,6 +74,37 @@ class PhotoViewActivity : AppCompatActivity() {
     private var isSlideshowAdvancePending = false
     private var slideshowSessionId = 0
     private var pendingDeleteScrollAnchor: DeleteScrollAnchor? = null
+
+    private data class PendingLocalMediaDelete(
+        val photos: List<Photo>,
+        val sourcePhotos: List<Photo>,
+        val fallbackPosition: Int,
+        val exitSelectionAfterDelete: Boolean
+    )
+
+    private var pendingLocalMediaDelete: PendingLocalMediaDelete? = null
+
+    private val localMediaDeleteLauncher = registerForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        val pending = pendingLocalMediaDelete ?: return@registerForActivityResult
+        pendingLocalMediaDelete = null
+        if (result.resultCode != RESULT_OK) return@registerForActivityResult
+
+        lifecycleScope.launch {
+            val deletedPhotos = LocalMediaDeleteRequest.awaitDeletedPhotos(
+                context = this@PhotoViewActivity,
+                photos = pending.photos
+            )
+            showDeleteResultToast(deletedPhotos.size, pending.photos.size, selectedDelete = pending.exitSelectionAfterDelete)
+            applyDeletedPhotos(
+                deletedPhotos = deletedPhotos,
+                sourcePhotos = pending.sourcePhotos,
+                fallbackPosition = pending.fallbackPosition,
+                exitSelectionAfterDelete = pending.exitSelectionAfterDelete
+            )
+        }
+    }
     private var slideshowDrawableTarget: com.bumptech.glide.request.target.Target<Drawable>? = null
     private var gestureControlConfig = ReaderGestureControlConfig.defaultConfig()
     private var selectedGestureZone = GestureZone.CENTER
@@ -961,67 +993,104 @@ class PhotoViewActivity : AppCompatActivity() {
             .setTitle(R.string.delete_photos)
             .setMessage(getString(R.string.delete_photos_message, selectedPhotos.size))
             .setPositiveButton(R.string.delete) { _, _ ->
+                val sourcePhotos = photos
+                if (selectedPhotos.all { it.isLocal } && LocalMediaDeleteRequest.requiresSystemRequest()) {
+                    val request = runCatching {
+                        LocalMediaDeleteRequest.create(this@PhotoViewActivity, selectedPhotos)
+                    }.getOrNull()
+
+                    if (request == null) {
+                        Toast.makeText(this@PhotoViewActivity, getString(R.string.delete_failed), Toast.LENGTH_SHORT).show()
+                        return@setPositiveButton
+                    }
+
+                    pendingLocalMediaDelete = PendingLocalMediaDelete(
+                        photos = selectedPhotos,
+                        sourcePhotos = sourcePhotos,
+                        fallbackPosition = currentIndex,
+                        exitSelectionAfterDelete = true
+                    )
+                    localMediaDeleteLauncher.launch(request)
+                    return@setPositiveButton
+                }
+
                 val settingsManager = SettingsManager(this)
                 lifecycleScope.launch {
-                    var allSuccess = true
                     val deletedPhotos = mutableListOf<Photo>()
                     selectedPhotos.forEach { photo ->
                         val success = FileUtils.deleteImage(this@PhotoViewActivity, photo, settingsManager)
                         if (success) {
                             deletedPhotos.add(photo)
-                        } else {
-                            allSuccess = false
                         }
                     }
 
-                    if (deletedPhotos.isNotEmpty()) {
-                        WebDavImageLoader.clearCache(this@PhotoViewActivity)
-                    }
-
-                    if (allSuccess) {
-                        Toast.makeText(this@PhotoViewActivity, getString(R.string.delete_success), Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(this@PhotoViewActivity, getString(R.string.delete_partial_failed), Toast.LENGTH_SHORT).show()
-                    }
-
-                    val sourcePhotos = photos
-                    pendingDeleteScrollAnchor = DeleteScrollAnchorHelper.forDeletedPhotos(
+                    showDeleteResultToast(deletedPhotos.size, selectedPhotos.size, selectedDelete = true)
+                    applyDeletedPhotos(
                         deletedPhotos = deletedPhotos,
                         sourcePhotos = sourcePhotos,
                         fallbackPosition = currentIndex,
-                        recyclerView = binding.recyclerView
+                        exitSelectionAfterDelete = true
                     )
-                    val deletedIds = deletedPhotos.mapTo(mutableSetOf()) { it.id }
-                    val newPhotos = photos.filterNot { it.id in deletedIds }
-                    photos = newPhotos
-
-                    PhotoCache.setPhotos(newPhotos)
-                    MediaManager.removePhotosFromCaches(deletedPhotos)
-                    mediaViewModel.removePhotos(deletedPhotos)
-                    MediaStateCache.setState(mediaViewModel.state.value)
-
-                    adapter.setPhotos(newPhotos)
-                    webtoonAdapter?.setPhotos(newPhotos)
-
-                    exitSelectionMode()
-
-                    if (newPhotos.isEmpty()) {
-                        finish()
-                    } else {
-                        if (currentIndex >= newPhotos.size) {
-                            currentIndex = newPhotos.size - 1
-                        }
-                        pendingDeleteScrollAnchor?.let { anchor ->
-                            currentIndex = anchor.position.coerceIn(0, newPhotos.size - 1)
-                        }
-                        restorePendingDeleteScrollAnchor(newPhotos.size)
-                        binding.toolbar.title = newPhotos[currentIndex].title
-                        updateFavoriteButtonState()
-                    }
                 }
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
+    }
+
+    private fun showDeleteResultToast(deletedCount: Int, requestedCount: Int, selectedDelete: Boolean) {
+        val message = when {
+            deletedCount == 0 -> getString(R.string.delete_failed)
+            selectedDelete && deletedCount < requestedCount -> getString(R.string.delete_partial_failed)
+            selectedDelete -> getString(R.string.delete_success)
+            else -> getString(R.string.delete_success)
+        }
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun applyDeletedPhotos(
+        deletedPhotos: List<Photo>,
+        sourcePhotos: List<Photo>,
+        fallbackPosition: Int,
+        exitSelectionAfterDelete: Boolean
+    ) {
+        if (deletedPhotos.isEmpty()) return
+
+        WebDavImageLoader.clearCache(this)
+        pendingDeleteScrollAnchor = DeleteScrollAnchorHelper.forDeletedPhotos(
+            deletedPhotos = deletedPhotos,
+            sourcePhotos = sourcePhotos,
+            fallbackPosition = fallbackPosition,
+            recyclerView = binding.recyclerView
+        )
+        val deletedIds = deletedPhotos.mapTo(mutableSetOf()) { it.id }
+        val newPhotos = photos.filterNot { it.id in deletedIds }
+        photos = newPhotos
+
+        PhotoCache.setPhotos(newPhotos)
+        MediaManager.removePhotosFromCaches(deletedPhotos)
+        mediaViewModel.removePhotos(deletedPhotos)
+        MediaStateCache.setState(mediaViewModel.state.value)
+
+        adapter.setPhotos(newPhotos)
+        webtoonAdapter?.setPhotos(newPhotos)
+
+        if (exitSelectionAfterDelete) {
+            exitSelectionMode()
+        }
+
+        if (newPhotos.isEmpty()) {
+            finish()
+        } else {
+            if (currentIndex >= newPhotos.size) {
+                currentIndex = newPhotos.size - 1
+            }
+            pendingDeleteScrollAnchor?.let { anchor ->
+                currentIndex = anchor.position.coerceIn(0, newPhotos.size - 1)
+            }
+            restorePendingDeleteScrollAnchor(newPhotos.size)
+            binding.toolbar.title = newPhotos[currentIndex].title
+            updateFavoriteButtonState()
+        }
     }
 
     private fun setupCardMode() {
@@ -1823,46 +1892,40 @@ class PhotoViewActivity : AppCompatActivity() {
             .setMessage(R.string.delete_photo_message)
             .setPositiveButton(R.string.delete) { _, _ ->
                 val photo = photos[currentIndex]
+                val sourcePhotos = photos
+                if (photo.isLocal && LocalMediaDeleteRequest.requiresSystemRequest()) {
+                    val request = runCatching {
+                        LocalMediaDeleteRequest.create(this@PhotoViewActivity, listOf(photo))
+                    }.getOrNull()
+
+                    if (request == null) {
+                        Toast.makeText(this@PhotoViewActivity, getString(R.string.delete_failed), Toast.LENGTH_SHORT).show()
+                        return@setPositiveButton
+                    }
+
+                    pendingLocalMediaDelete = PendingLocalMediaDelete(
+                        photos = listOf(photo),
+                        sourcePhotos = sourcePhotos,
+                        fallbackPosition = currentIndex,
+                        exitSelectionAfterDelete = false
+                    )
+                    localMediaDeleteLauncher.launch(request)
+                    return@setPositiveButton
+                }
+
                 val settingsManager = SettingsManager(this)
                 
                 lifecycleScope.launch {
                     val success = FileUtils.deleteImage(this@PhotoViewActivity, photo, settingsManager)
                     
                     if (success) {
-                        WebDavImageLoader.clearCache(this@PhotoViewActivity)
                         Toast.makeText(this@PhotoViewActivity, getString(R.string.delete_success), Toast.LENGTH_SHORT).show()
-                        val sourcePhotos = photos
-                        pendingDeleteScrollAnchor = DeleteScrollAnchorHelper.forDeletedPhotos(
+                        applyDeletedPhotos(
                             deletedPhotos = listOf(photo),
                             sourcePhotos = sourcePhotos,
                             fallbackPosition = currentIndex,
-                            recyclerView = binding.recyclerView
+                            exitSelectionAfterDelete = false
                         )
-                        val deletedPhoto = photo
-                        val newPhotos = photos.filterNot { it.id == deletedPhoto.id }
-                        photos = newPhotos
-                        
-                        PhotoCache.setPhotos(newPhotos)
-                        MediaManager.removePhotosFromCaches(listOf(deletedPhoto))
-                        mediaViewModel.removePhotos(listOf(deletedPhoto))
-                        MediaStateCache.setState(mediaViewModel.state.value)
-                        
-                        adapter.setPhotos(newPhotos)
-                        webtoonAdapter?.setPhotos(newPhotos)
-                        
-                        if (newPhotos.isEmpty()) {
-                            finish()
-                        } else {
-                            if (currentIndex >= newPhotos.size) {
-                                currentIndex = newPhotos.size - 1
-                            }
-                            pendingDeleteScrollAnchor?.let { anchor ->
-                                currentIndex = anchor.position.coerceIn(0, newPhotos.size - 1)
-                            }
-                            restorePendingDeleteScrollAnchor(newPhotos.size)
-                            binding.toolbar.title = newPhotos[currentIndex].title
-                            updateFavoriteButtonState()
-                        }
                     } else {
                         Toast.makeText(this@PhotoViewActivity, getString(R.string.delete_failed), Toast.LENGTH_SHORT).show()
                     }

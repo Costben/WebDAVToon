@@ -94,6 +94,29 @@ class MainActivity : AppCompatActivity() {
     private var favoriteMenuItem: android.view.MenuItem? = null
     private var pendingDeleteScrollAnchor: DeleteScrollAnchor? = null
 
+    private data class PendingLocalMediaDelete(
+        val photos: List<Photo>,
+        val sourcePhotos: List<Photo>
+    )
+
+    private var pendingLocalMediaDelete: PendingLocalMediaDelete? = null
+
+    private val localMediaDeleteLauncher = registerForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        val pending = pendingLocalMediaDelete ?: return@registerForActivityResult
+        pendingLocalMediaDelete = null
+        if (result.resultCode != RESULT_OK) return@registerForActivityResult
+
+        lifecycleScope.launch {
+            val deletedPhotos = LocalMediaDeleteRequest.awaitDeletedPhotos(
+                context = this@MainActivity,
+                photos = pending.photos
+            )
+            handleDeletedPhotos(deletedPhotos, pending.sourcePhotos)
+        }
+    }
+
     private val settingsLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -1052,6 +1075,25 @@ class MainActivity : AppCompatActivity() {
             .setTitle(R.string.delete_photos)
             .setMessage(getString(R.string.delete_photos_message, selectedPhotos.size))
             .setPositiveButton(R.string.delete) { _, _ ->
+                val sourcePhotos = MediaManager.mediaViewModel?.state?.value?.photos.orEmpty()
+                if (!isRemote && selectedPhotos.all { it.isLocal } && LocalMediaDeleteRequest.requiresSystemRequest()) {
+                    val request = runCatching {
+                        LocalMediaDeleteRequest.create(this@MainActivity, selectedPhotos)
+                    }.getOrNull()
+
+                    if (request == null) {
+                        android.widget.Toast.makeText(this@MainActivity, getString(R.string.delete_failed), android.widget.Toast.LENGTH_SHORT).show()
+                        return@setPositiveButton
+                    }
+
+                    pendingLocalMediaDelete = PendingLocalMediaDelete(
+                        photos = selectedPhotos,
+                        sourcePhotos = sourcePhotos
+                    )
+                    localMediaDeleteLauncher.launch(request)
+                    return@setPositiveButton
+                }
+
                 lifecycleScope.launch {
                     val repository: PhotoRepository = if (isRemote) {
                         RustWebDavPhotoRepository(settingsManager)
@@ -1059,7 +1101,6 @@ class MainActivity : AppCompatActivity() {
                         LocalPhotoRepository(this@MainActivity)
                     }
 
-                    val sourcePhotos = MediaManager.mediaViewModel?.state?.value?.photos.orEmpty()
                     val deletedPhotos = withContext(Dispatchers.IO) {
                         val deleted = mutableListOf<Photo>()
                         selectedPhotos.forEach { photo ->
@@ -1073,26 +1114,31 @@ class MainActivity : AppCompatActivity() {
                         deleted
                     }
 
-                    if (deletedPhotos.isNotEmpty()) {
-                        android.widget.Toast.makeText(this@MainActivity, getString(R.string.deleted_count, deletedPhotos.size), android.widget.Toast.LENGTH_SHORT).show()
-                        pendingDeleteScrollAnchor = DeleteScrollAnchorHelper.forDeletedPhotos(
-                            deletedPhotos = deletedPhotos,
-                            sourcePhotos = sourcePhotos,
-                            recyclerView = binding.recyclerView
-                        )
-                        photoAdapter.setSelectionMode(false)
-                        isLongPressSelection = false
-                        updateSelectionTitle(-1)
-                        MediaManager.removePhotosFromCaches(deletedPhotos)
-                        MediaManager.mediaViewModel?.removePhotos(deletedPhotos)
-                        MediaManager.mediaViewModel?.state?.value?.let(MediaStateCache::setState)
-                    } else {
-                        android.widget.Toast.makeText(this@MainActivity, getString(R.string.delete_failed), android.widget.Toast.LENGTH_SHORT).show()
-                    }
+                    handleDeletedPhotos(deletedPhotos, sourcePhotos)
                 }
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
+    }
+
+    private fun handleDeletedPhotos(deletedPhotos: List<Photo>, sourcePhotos: List<Photo>) {
+        if (deletedPhotos.isEmpty()) {
+            android.widget.Toast.makeText(this, getString(R.string.delete_failed), android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        android.widget.Toast.makeText(this, getString(R.string.deleted_count, deletedPhotos.size), android.widget.Toast.LENGTH_SHORT).show()
+        pendingDeleteScrollAnchor = DeleteScrollAnchorHelper.forDeletedPhotos(
+            deletedPhotos = deletedPhotos,
+            sourcePhotos = sourcePhotos,
+            recyclerView = binding.recyclerView
+        )
+        photoAdapter.setSelectionMode(false)
+        isLongPressSelection = false
+        updateSelectionTitle(-1)
+        MediaManager.removePhotosFromCaches(deletedPhotos)
+        MediaManager.mediaViewModel?.removePhotos(deletedPhotos)
+        MediaManager.mediaViewModel?.state?.value?.let(MediaStateCache::setState)
     }
 }
 
