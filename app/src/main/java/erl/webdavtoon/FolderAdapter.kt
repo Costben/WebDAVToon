@@ -12,12 +12,19 @@ import erl.webdavtoon.databinding.ItemFolderBinding
 class FolderAdapter(
     private val onFolderClick: (Folder) -> Unit,
     private val onSelectionChanged: (Int) -> Unit,
-    private val onRemotePreviewNeeded: ((Folder) -> Unit)? = null
+    private val onRemotePreviewNeeded: ((Folder) -> Unit)? = null,
+    private val remotePreviewGeneration: () -> String = { "" }
 ) : RecyclerView.Adapter<FolderAdapter.FolderViewHolder>() {
+
+    private data class RemotePreviewKey(
+        val generation: String,
+        val path: String
+    )
 
     private var folders: List<Folder> = emptyList()
     private val selectedFolderPaths = linkedSetOf<String>()
-    private val requestedPreviewPaths = hashSetOf<String>()
+    private val requestedPreviewKeys = hashSetOf<RemotePreviewKey>()
+    private val remotePreviewCache = mutableMapOf<RemotePreviewKey, List<Uri>>()
     var isSelectionMode = false
         private set
 
@@ -26,8 +33,15 @@ class FolderAdapter(
     }
 
     fun setFolders(newFolders: List<Folder>) {
+        val generation = remotePreviewGeneration()
         val previousByPath = folders.associateBy { it.path }
         val mergedFolders = newFolders.map { incoming ->
+            if (needsRemotePreviewRefresh(incoming)) {
+                return@map incoming.copy(
+                    previewUris = remotePreviewCache[RemotePreviewKey(generation, incoming.path)].orEmpty()
+                )
+            }
+
             val previous = previousByPath[incoming.path]
             if (previous != null && incoming.previewUris.isEmpty() && previous.previewUris.isNotEmpty()) {
                 incoming.copy(previewUris = previous.previewUris)
@@ -41,14 +55,16 @@ class FolderAdapter(
             .filter { !it.isLocal && it.previewUris.isEmpty() }
             .map { it.path }
             .toSet()
+        val currentPaths = mergedFolders.map { it.path }.toSet()
         val previousSelectionCount = selectedFolderPaths.size
         val previousSelectionMode = isSelectionMode
 
         if (folders == mergedFolders) {
             folders = mergedFolders
-            selectedFolderPaths.retainAll(folders.map { it.path }.toSet())
-            requestedPreviewPaths.retainAll(folders.map { it.path }.toSet())
-            requestedPreviewPaths.removeAll(previewlessPaths)
+            selectedFolderPaths.retainAll(currentPaths)
+            requestedPreviewKeys.retainAll { it.path in currentPaths }
+            remotePreviewCache.keys.retainAll { it.path in currentPaths }
+            requestedPreviewKeys.removeAll { it.generation == generation && it.path in previewlessPaths }
             if (folders.isNotEmpty()) {
                 notifyItemRangeChanged(0, folders.size)
             }
@@ -71,9 +87,10 @@ class FolderAdapter(
         })
 
         folders = mergedFolders
-        selectedFolderPaths.retainAll(folders.map { it.path }.toSet())
-        requestedPreviewPaths.retainAll(folders.map { it.path }.toSet())
-        requestedPreviewPaths.removeAll(previewlessPaths)
+        selectedFolderPaths.retainAll(currentPaths)
+        requestedPreviewKeys.retainAll { it.path in currentPaths }
+        remotePreviewCache.keys.retainAll { it.path in currentPaths }
+        requestedPreviewKeys.removeAll { it.generation == generation && it.path in previewlessPaths }
         if (selectedFolderPaths.isEmpty() && isSelectionMode) {
             isSelectionMode = false
         }
@@ -138,9 +155,15 @@ class FolderAdapter(
         val index = folders.indexOfFirst { it.path == path }
         if (index == -1) return
 
+        val generation = remotePreviewGeneration()
+        val key = RemotePreviewKey(generation, path)
+        if (previewUris.isNotEmpty()) {
+            remotePreviewCache[key] = previewUris
+        }
+
         val current = folders[index]
         val updated = current.copy(
-            previewUris = if (previewUris.isNotEmpty()) previewUris else current.previewUris,
+            previewUris = remotePreviewCache[key] ?: if (previewUris.isNotEmpty()) previewUris else current.previewUris,
             hasSubFolders = hasSubFolders
         )
         if (updated == current) return
@@ -202,10 +225,17 @@ class FolderAdapter(
     private fun maybeRequestRemotePreview(position: Int) {
         if (position == RecyclerView.NO_POSITION || position >= folders.size) return
         val folder = folders[position]
-        if (folder.isLocal || folder.previewUris.isNotEmpty()) return
-        if (requestedPreviewPaths.add(folder.path)) {
+        if (!needsRemotePreviewRefresh(folder)) return
+
+        val key = RemotePreviewKey(remotePreviewGeneration(), folder.path)
+        if (remotePreviewCache.containsKey(key)) return
+        if (requestedPreviewKeys.add(key)) {
             onRemotePreviewNeeded?.invoke(folder)
         }
+    }
+
+    private fun needsRemotePreviewRefresh(folder: Folder): Boolean {
+        return !folder.isLocal && !folder.path.startsWith("virtual://")
     }
 
     inner class FolderViewHolder(private val binding: ItemFolderBinding) : RecyclerView.ViewHolder(binding.root) {

@@ -17,6 +17,8 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
 
     private data class LocalPreviewCandidate(
         val uri: Uri,
+        val title: String,
+        val dateModified: Long,
         val mediaType: MediaType,
         val sizeBytes: Long
     )
@@ -27,6 +29,17 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
             1 -> "${MediaStore.Files.FileColumns.DISPLAY_NAME} DESC"
             2 -> "${MediaStore.Files.FileColumns.DATE_MODIFIED} DESC"
             3 -> "${MediaStore.Files.FileColumns.DATE_MODIFIED} ASC"
+            else -> "${MediaStore.Files.FileColumns.DATE_MODIFIED} DESC"
+        }
+    }
+
+    private fun buildFolderPreviewSortOrder(): String {
+        return when (SettingsManager(context).getSortOrder()) {
+            SettingsManager.SORT_NAME_ASC -> "${MediaStore.Files.FileColumns.DISPLAY_NAME} ASC"
+            SettingsManager.SORT_NAME_DESC -> "${MediaStore.Files.FileColumns.DISPLAY_NAME} DESC"
+            SettingsManager.SORT_DATE_DESC -> "${MediaStore.Files.FileColumns.DATE_MODIFIED} DESC"
+            SettingsManager.SORT_DATE_ASC -> "${MediaStore.Files.FileColumns.DATE_MODIFIED} ASC"
+            SettingsManager.SORT_RANDOM_FOLDERS -> "${MediaStore.Files.FileColumns.DATE_MODIFIED} DESC"
             else -> "${MediaStore.Files.FileColumns.DATE_MODIFIED} DESC"
         }
     }
@@ -143,6 +156,8 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
     private fun registerPreviewCandidate(
         candidates: MutableList<LocalPreviewCandidate>,
         uri: Uri,
+        title: String,
+        dateModified: Long,
         mediaType: MediaType,
         sizeBytes: Long
     ) {
@@ -150,6 +165,8 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
             candidates.add(
                 LocalPreviewCandidate(
                     uri = uri,
+                    title = title,
+                    dateModified = dateModified,
                     mediaType = mediaType,
                     sizeBytes = sizeBytes
                 )
@@ -158,10 +175,12 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
     }
 
     private fun selectPreviewUris(candidates: List<LocalPreviewCandidate>): List<Uri> {
-        return VideoThumbnailHeuristics.selectFolderPreviewCandidates(
+        return FolderPreviewOrdering.selectPreviewValues(
             candidates.mapIndexed { index, candidate ->
-                VideoThumbnailHeuristics.FolderPreviewCandidate(
+                FolderPreviewOrdering.Candidate(
                     value = candidate.uri,
+                    title = candidate.title,
+                    dateModified = candidate.dateModified,
                     mediaType = candidate.mediaType,
                     isBlankLike = candidate.mediaType == MediaType.IMAGE && (
                         candidate.sizeBytes in 1 until tinyPreviewImageBytes ||
@@ -169,7 +188,9 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
                         ),
                     sourceOrder = index
                 )
-            }
+            },
+            sortOrder = SettingsManager(context).getSortOrder(),
+            preferUsableMedia = true
         )
     }
 
@@ -286,7 +307,7 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
             projection,
             selection,
             selectionArgs,
-            "${MediaStore.Files.FileColumns.DATE_MODIFIED} DESC"
+            buildFolderPreviewSortOrder()
         )?.use { cursor ->
             val idCol = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID)
             val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DISPLAY_NAME)
@@ -320,7 +341,7 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
 
                 if (rootPath.isNotEmpty() && parentPath == rootPath) {
                     directRootCount++
-                    registerPreviewCandidate(directRootPreviewCandidates, uri, mediaType, sizeBytes)
+                    registerPreviewCandidate(directRootPreviewCandidates, uri, name, dateModified, mediaType, sizeBytes)
                     directRootDateModified = maxOf(directRootDateModified, dateModified)
                     continue
                 }
@@ -384,7 +405,7 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
 
                 val existing = foldersMap[folderKey]
                 val previewCandidates = previewCandidatesByFolder.getOrPut(folderKey) { mutableListOf() }
-                registerPreviewCandidate(previewCandidates, uri, mediaType, sizeBytes)
+                registerPreviewCandidate(previewCandidates, uri, name, dateModified, mediaType, sizeBytes)
                 if (existing == null) {
                     foldersMap[folderKey] = Folder(
                         path = folderKey,
