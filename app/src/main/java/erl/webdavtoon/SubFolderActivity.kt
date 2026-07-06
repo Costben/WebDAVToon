@@ -125,6 +125,9 @@ class SubFolderActivity : AppCompatActivity() {
             },
             onRemotePreviewNeeded = { folder ->
                 resolveRemotePreview(folder)
+            },
+            remotePreviewGeneration = {
+                settingsManager.getSortOrder().toString()
             }
         )
 
@@ -435,13 +438,17 @@ class SubFolderActivity : AppCompatActivity() {
 
                 if (isWebDav && folders.isNotEmpty()) {
                     if (directPhotos.isNotEmpty()) {
+                        val sortedDirectPhotos = FolderPreviewOrdering.sortPhotos(
+                            directPhotos,
+                            settingsManager.getSortOrder()
+                        )
                         folders.add(
                             Folder(
                                 path = "virtual://internal_photos?path=$folderPath",
                                 name = getString(R.string.internal_photos, directPhotos.size),
                                 isLocal = false,
                                 photoCount = directPhotos.size,
-                                previewUris = directPhotos.take(4).map { it.imageUri },
+                                previewUris = sortedDirectPhotos.take(4).map { it.imageUri },
                                 hasSubFolders = false,
                                 dateModified = directPhotos.maxOfOrNull { it.dateModified } ?: 0L
                             )
@@ -545,21 +552,23 @@ class SubFolderActivity : AppCompatActivity() {
         if (folder.isLocal || folder.previewUris.isNotEmpty()) return
 
         lifecycleScope.launch {
-            val preview = RustWebDavPhotoRepository(settingsManager).inspectFolder(folder.path) ?: return@launch
+            val sortOrder = settingsManager.getSortOrder()
+            val preview = RustWebDavPhotoRepository(settingsManager).inspectFolder(folder.path, sortOrder) ?: return@launch
+            if (settingsManager.getSortOrder() != sortOrder) return@launch
             val updatedPreviewUris = if (preview.previewUris.isNotEmpty()) preview.previewUris else folder.previewUris
 
             currentAllFolders = currentAllFolders.map { current ->
                 if (current.path == folder.path) {
                     current.copy(
                         previewUris = updatedPreviewUris,
-                        hasSubFolders = preview.hasSubFolders
+                        hasSubFolders = current.hasSubFolders || preview.hasSubFolders
                     )
                 } else {
                     current
                 }
             }
 
-            adapter.updateFolderPreview(folder.path, updatedPreviewUris, preview.hasSubFolders)
+            adapter.updateFolderPreview(folder.path, updatedPreviewUris, folder.hasSubFolders || preview.hasSubFolders)
         }
     }
 
@@ -623,8 +632,12 @@ class SubFolderActivity : AppCompatActivity() {
         }
         val endpoint = settingsManager.getFullWebDavUrl().trimEnd('/')
         val aggregates = linkedMapOf<String, Aggregate>()
+        val sortedPhotos = FolderPreviewOrdering.sortPhotos(
+            photos,
+            settingsManager.getSortOrder()
+        )
 
-        photos.forEach { photo ->
+        sortedPhotos.forEach { photo ->
             val relative = photo.imageUri.toString()
                 .removePrefix(endpoint)
                 .trimStart('/')

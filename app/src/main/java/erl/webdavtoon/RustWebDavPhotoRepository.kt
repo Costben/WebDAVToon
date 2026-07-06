@@ -6,6 +6,7 @@ import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import uniffi.rust_core.MediaType as RustMediaType
+import uniffi.rust_core.Photo as RustPhoto
 import uniffi.rust_core.SortOrder
 import java.util.Locale
 
@@ -73,41 +74,16 @@ class RustWebDavPhotoRepository(
     override suspend fun getPhotos(folderPath: String, recursive: Boolean, forceRefresh: Boolean): List<Photo> = withContext(Dispatchers.IO) {
         val repo = rustRepo ?: return@withContext emptyList()
         initializeWebDavIfNeeded(repo)
-
-        // The Rust core SortOrder enum might only support NAME_ASC, NAME_DESC, DATE_DESC.
-        // We'll fetch with DATE_DESC as default and re-sort in queryMediaPage if needed.
-        val fetchSortOrder = when (settingsManager.getPhotoSortOrder()) {
-            0 -> SortOrder.NAME_ASC
-            1 -> SortOrder.NAME_DESC
-            else -> SortOrder.DATE_DESC
-        }
+        val sortOrder = settingsManager.getPhotoSortOrder()
 
         try {
-            repo.getPhotos(folderPath, fetchSortOrder, forceRefresh, recursive).map { p ->
-                val mediaUri = Uri.parse(p.uri)
-                val parentPath = if (p.uri.contains("/")) {
-                    p.uri.substringBeforeLast("/")
-                } else {
-                    ""
-                }
-                val mediaType = when (p.mediaType) {
-                    RustMediaType.VIDEO -> MediaType.VIDEO
-                    RustMediaType.IMAGE -> MediaType.IMAGE
-                }
-                Photo(
-                    id = p.id,
-                    imageUri = mediaUri,
-                    title = p.title,
-                    width = 0,
-                    height = 0,
-                    isLocal = p.isLocal,
-                    dateModified = p.dateModified.toLong() * 1000,
-                    size = p.size.toLong(),
-                    folderPath = parentPath,
-                    mediaType = mediaType,
-                    durationMs = p.durationMs?.toLong()
-                )
-            }
+            getSortedPhotosFromRepo(
+                repo = repo,
+                folderPath = folderPath,
+                sortOrder = sortOrder,
+                forceRefresh = forceRefresh,
+                recursive = recursive
+            )
         } catch (e: Exception) {
             android.util.Log.e("RustWebDavPhotoRepo", "Failed to get webdav photos", e)
             emptyList()
@@ -259,19 +235,35 @@ class RustWebDavPhotoRepository(
         repo.testWebdav(endpoint, username, password)
     }
 
-    suspend fun inspectFolder(folderPath: String): RemoteFolderPreview? = withContext(Dispatchers.IO) {
+    suspend fun inspectFolder(
+        folderPath: String,
+        sortOrder: Int = settingsManager.getSortOrder(),
+        forceRefresh: Boolean = false
+    ): RemoteFolderPreview? = withContext(Dispatchers.IO) {
         val repo = getPreviewRustRepo() ?: rustRepo ?: return@withContext null
         initializeWebDavIfNeeded(repo, isPreviewRepo = repo !== rustRepo)
 
         return@withContext try {
             val inspection = repo.inspectFolder(folderPath)
+            val sortedPreviewUris = getSortedPhotosFromRepo(
+                repo = repo,
+                folderPath = folderPath,
+                sortOrder = sortOrder,
+                forceRefresh = forceRefresh,
+                recursive = true
+            ).take(4).map { it.imageUri }
+            val previewUris = if (sortedPreviewUris.isNotEmpty()) {
+                sortedPreviewUris
+            } else {
+                inspection.previewUris.map(Uri::parse)
+            }
             Log.i(
                 "RustWebDavPhotoRepo",
-                "inspectFolder path=$folderPath previews=${inspection.previewUris.size} hasSubFolders=${inspection.hasSubFolders}"
+                "inspectFolder path=$folderPath sortOrder=$sortOrder previews=${previewUris.size} hasSubFolders=${inspection.hasSubFolders}"
             )
             RemoteFolderPreview(
                 hasSubFolders = inspection.hasSubFolders,
-                previewUris = inspection.previewUris.map(Uri::parse)
+                previewUris = previewUris
             )
         } catch (e: Exception) {
             Log.e("RustWebDavPhotoRepo", "Failed to inspect folder preview: $folderPath", e)
@@ -352,5 +344,55 @@ class RustWebDavPhotoRepository(
             android.util.Log.e("RustWebDavPhotoRepo", "Exception during folder delete", e)
             false
         }
+    }
+
+    private fun fetchSortOrderFor(sortOrder: Int): SortOrder {
+        return when (sortOrder) {
+            SettingsManager.SORT_NAME_ASC -> SortOrder.NAME_ASC
+            SettingsManager.SORT_NAME_DESC -> SortOrder.NAME_DESC
+            else -> SortOrder.DATE_DESC
+        }
+    }
+
+    private fun getSortedPhotosFromRepo(
+        repo: uniffi.rust_core.RustRepository,
+        folderPath: String,
+        sortOrder: Int,
+        forceRefresh: Boolean,
+        recursive: Boolean
+    ): List<Photo> {
+        val mappedPhotos = repo.getPhotos(
+            folderPath,
+            fetchSortOrderFor(sortOrder),
+            forceRefresh,
+            recursive
+        ).map(::toAppPhoto)
+        return FolderPreviewOrdering.sortPhotos(mappedPhotos, sortOrder)
+    }
+
+    private fun toAppPhoto(p: RustPhoto): Photo {
+        val mediaUri = Uri.parse(p.uri)
+        val parentPath = if (p.uri.contains("/")) {
+            p.uri.substringBeforeLast("/")
+        } else {
+            ""
+        }
+        val mediaType = when (p.mediaType) {
+            RustMediaType.VIDEO -> MediaType.VIDEO
+            RustMediaType.IMAGE -> MediaType.IMAGE
+        }
+        return Photo(
+            id = p.id,
+            imageUri = mediaUri,
+            title = p.title,
+            width = 0,
+            height = 0,
+            isLocal = p.isLocal,
+            dateModified = p.dateModified.toLong() * 1000,
+            size = p.size.toLong(),
+            folderPath = parentPath,
+            mediaType = mediaType,
+            durationMs = p.durationMs?.toLong()
+        )
     }
 }

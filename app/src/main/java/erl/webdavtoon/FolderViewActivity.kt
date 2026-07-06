@@ -205,6 +205,9 @@ class FolderViewActivity : AppCompatActivity() {
             },
             onRemotePreviewNeeded = { folder ->
                 resolveRemotePreview(folder)
+            },
+            remotePreviewGeneration = {
+                settingsManager.getSortOrder().toString()
             }
         )
 
@@ -490,21 +493,23 @@ class FolderViewActivity : AppCompatActivity() {
         if (folder.isLocal || folder.previewUris.isNotEmpty()) return
 
         lifecycleScope.launch {
-            val preview = RustWebDavPhotoRepository(settingsManager).inspectFolder(folder.path) ?: return@launch
+            val sortOrder = settingsManager.getSortOrder()
+            val preview = RustWebDavPhotoRepository(settingsManager).inspectFolder(folder.path, sortOrder) ?: return@launch
+            if (settingsManager.getSortOrder() != sortOrder) return@launch
             val updatedPreviewUris = if (preview.previewUris.isNotEmpty()) preview.previewUris else folder.previewUris
 
             currentAllFolders = currentAllFolders.map { current ->
                 if (current.path == folder.path) {
                     current.copy(
                         previewUris = updatedPreviewUris,
-                        hasSubFolders = preview.hasSubFolders
+                        hasSubFolders = current.hasSubFolders || preview.hasSubFolders
                     )
                 } else {
                     current
                 }
             }
 
-            adapter.updateFolderPreview(folder.path, updatedPreviewUris, preview.hasSubFolders)
+            adapter.updateFolderPreview(folder.path, updatedPreviewUris, folder.hasSubFolders || preview.hasSubFolders)
         }
     }
 
