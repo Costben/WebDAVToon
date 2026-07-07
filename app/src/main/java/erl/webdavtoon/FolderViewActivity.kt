@@ -38,6 +38,7 @@ class FolderViewActivity : AppCompatActivity() {
     private var currentSearchKeyword: String = ""
     private var folderShuffleSeed: Long = Random.nextLong()
     private var currentLoadUsesToolbarPill: Boolean = false
+    private var pendingFolderNavigationPath: String? = null
     private var toolbarRefreshHideJob: Job? = null
 
     private val requestPermissionLauncher = registerForActivityResult(
@@ -166,7 +167,7 @@ class FolderViewActivity : AppCompatActivity() {
             return
         }
 
-        openSubFolder(realPath, !folder.isLocal)
+        openFolderResolved(realPath, !folder.isLocal)
     }
 
     private fun openPhotoList(path: String, isWebDav: Boolean) {
@@ -184,6 +185,33 @@ class FolderViewActivity : AppCompatActivity() {
             putExtra("EXTRA_IS_WEBDAV", isWebDav)
         }
         startActivity(intent)
+    }
+
+    private fun openFolderResolved(path: String, isWebDav: Boolean) {
+        if (pendingFolderNavigationPath != null) return
+        pendingFolderNavigationPath = path
+        binding.swipeRefreshLayout.isEnabled = false
+        lifecycleScope.launch {
+            try {
+                val target = FolderNavigationResolver.resolve(
+                    context = this@FolderViewActivity,
+                    settingsManager = settingsManager,
+                    folderPath = path,
+                    isWebDav = isWebDav
+                )
+                android.util.Log.i(
+                    "FolderViewActivity",
+                    "resolvedFolderNavigation path=$path target=${target.javaClass.simpleName}"
+                )
+                FolderNavigationResolver.start(this@FolderViewActivity, target)
+            } catch (e: Exception) {
+                android.util.Log.e("FolderViewActivity", "Folder navigation resolve failed path=$path", e)
+                openSubFolder(path, isWebDav)
+            } finally {
+                pendingFolderNavigationPath = null
+                binding.swipeRefreshLayout.isEnabled = true
+            }
+        }
     }
 
     private fun setupUI() {
@@ -418,7 +446,7 @@ class FolderViewActivity : AppCompatActivity() {
         if (order == SettingsManager.SORT_RANDOM_FOLDERS) {
             folderShuffleSeed = Random.nextLong()
         }
-        applyFilterAndSort()
+        loadFolders(forceRefresh = false)
         return true
     }
 

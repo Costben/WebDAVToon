@@ -38,6 +38,7 @@ class SubFolderActivity : AppCompatActivity() {
     private var currentSearchKeyword: String = ""
     private var folderShuffleSeed: Long = Random.nextLong()
     private var currentLoadUsesToolbarPill: Boolean = false
+    private var pendingFolderNavigationPath: String? = null
     private var toolbarRefreshHideJob: Job? = null
 
     private val settingsLauncher = registerForActivityResult(
@@ -186,11 +187,38 @@ class SubFolderActivity : AppCompatActivity() {
             return
         }
 
-        val intent = Intent(this, SubFolderActivity::class.java).apply {
-            putExtra("EXTRA_FOLDER_PATH", realPath)
-            putExtra("EXTRA_IS_WEBDAV", !folder.isLocal)
+        openFolderResolved(realPath, !folder.isLocal)
+    }
+
+    private fun openFolderResolved(path: String, isWebDav: Boolean) {
+        if (pendingFolderNavigationPath != null) return
+        pendingFolderNavigationPath = path
+        binding.swipeRefreshLayout.isEnabled = false
+        lifecycleScope.launch {
+            try {
+                val target = FolderNavigationResolver.resolve(
+                    context = this@SubFolderActivity,
+                    settingsManager = settingsManager,
+                    folderPath = path,
+                    isWebDav = isWebDav
+                )
+                android.util.Log.i(
+                    "SubFolderActivity",
+                    "resolvedFolderNavigation path=$path target=${target.javaClass.simpleName}"
+                )
+                FolderNavigationResolver.start(this@SubFolderActivity, target)
+            } catch (e: Exception) {
+                android.util.Log.e("SubFolderActivity", "Folder navigation resolve failed path=$path", e)
+                val intent = Intent(this@SubFolderActivity, SubFolderActivity::class.java).apply {
+                    putExtra("EXTRA_FOLDER_PATH", path)
+                    putExtra("EXTRA_IS_WEBDAV", isWebDav)
+                }
+                startActivity(intent)
+            } finally {
+                pendingFolderNavigationPath = null
+                binding.swipeRefreshLayout.isEnabled = true
+            }
         }
-        startActivity(intent)
     }
 
     private fun hasStoragePermission(): Boolean {
@@ -365,7 +393,7 @@ class SubFolderActivity : AppCompatActivity() {
         if (order == SettingsManager.SORT_RANDOM_FOLDERS) {
             folderShuffleSeed = Random.nextLong()
         }
-        applyFilterAndSort()
+        loadFolders(forceRefresh = false)
         return true
     }
 
@@ -408,15 +436,11 @@ class SubFolderActivity : AppCompatActivity() {
                     !f.isLocal && (f.name.startsWith(".") || f.path.trim('/').split('/').any { it.startsWith(".") })
                 }.toMutableList()
 
-                val directPhotos = if (isWebDav) {
-                    repository.getPhotos(
-                        folderPath = folderPath,
-                        recursive = false,
-                        forceRefresh = forceRefresh
-                    )
-                } else {
-                    emptyList()
-                }
+                val directPhotos = repository.getPhotos(
+                    folderPath = folderPath,
+                    recursive = false,
+                    forceRefresh = forceRefresh
+                )
 
                 if (isWebDav && folders.isEmpty()) {
                     val recursivePhotos = repository.getPhotos(
@@ -424,11 +448,12 @@ class SubFolderActivity : AppCompatActivity() {
                         recursive = true,
                         forceRefresh = forceRefresh
                     )
-                    val synthesizedFolders =
-                        synthesizeRemoteFoldersFromPhotos(
-                            currentFolderPath = folderPath,
-                            photos = recursivePhotos
-                        )
+                    val synthesizedFolders = RemoteFolderSynthesizer.synthesizeFromRecursivePhotos(
+                        currentFolderPath = folderPath,
+                        photos = recursivePhotos,
+                        endpoint = settingsManager.getFullWebDavUrl(),
+                        sortOrder = settingsManager.getSortOrder()
+                    )
                     android.util.Log.i(
                         "SubFolderActivity",
                         "remoteFallback path=$folderPath directPhotos=${directPhotos.size} recursivePhotos=${recursivePhotos.size} synthesizedFolders=${synthesizedFolders.size}"
@@ -436,24 +461,14 @@ class SubFolderActivity : AppCompatActivity() {
                     folders.addAll(synthesizedFolders)
                 }
 
-                if (isWebDav && folders.isNotEmpty()) {
-                    if (directPhotos.isNotEmpty()) {
-                        val sortedDirectPhotos = FolderPreviewOrdering.sortPhotos(
-                            directPhotos,
-                            settingsManager.getSortOrder()
-                        )
-                        folders.add(
-                            Folder(
-                                path = "virtual://internal_photos?path=$folderPath",
-                                name = getString(R.string.internal_photos, directPhotos.size),
-                                isLocal = false,
-                                photoCount = directPhotos.size,
-                                previewUris = sortedDirectPhotos.take(4).map { it.imageUri },
-                                hasSubFolders = false,
-                                dateModified = directPhotos.maxOfOrNull { it.dateModified } ?: 0L
-                            )
-                        )
-                    }
+                val realChildFolders = folders.filterNot { it.path.startsWith("virtual://internal_photos") }
+                if (realChildFolders.isNotEmpty() && directPhotos.isNotEmpty()) {
+                    android.util.Log.i(
+                        "SubFolderActivity",
+                        "mixedFolderRedirect path=$folderPath isWebDav=$isWebDav folders=${realChildFolders.size} directPhotos=${directPhotos.size} elapsedMs=${SystemClock.elapsedRealtime() - startedAt}"
+                    )
+                    openMixedFolder()
+                    return@launch
                 }
 
                 if (folders.isEmpty()) {
@@ -572,6 +587,18 @@ class SubFolderActivity : AppCompatActivity() {
         }
     }
 
+    private fun openMixedFolder() {
+        val intent = Intent(this, MixedFolderActivity::class.java).apply {
+            putExtra("EXTRA_FOLDER_PATH", folderPath)
+            putExtra("EXTRA_IS_WEBDAV", isWebDav)
+            addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
+        }
+        startActivity(intent)
+        overridePendingTransition(0, 0)
+        finish()
+        overridePendingTransition(0, 0)
+    }
+
     private fun tintOverflowMenuIcons(menu: Menu) {
         val normalColor = if (isDarkModeEnabled()) {
             android.graphics.Color.WHITE
@@ -613,74 +640,4 @@ class SubFolderActivity : AppCompatActivity() {
         return nightModeFlags == Configuration.UI_MODE_NIGHT_YES
     }
 
-    private fun synthesizeRemoteFoldersFromPhotos(
-        currentFolderPath: String,
-        photos: List<Photo>
-    ): List<Folder> {
-        if (photos.isEmpty()) return emptyList()
-
-        data class Aggregate(
-            val childPath: String,
-            val childName: String,
-            val previewUris: MutableList<android.net.Uri> = mutableListOf(),
-            var hasSubFolders: Boolean = false,
-            var latestModified: Long = 0L
-        )
-
-        val normalizedCurrent = currentFolderPath.trim('/').let { trimmed ->
-            if (trimmed.isEmpty()) "" else "$trimmed/"
-        }
-        val endpoint = settingsManager.getFullWebDavUrl().trimEnd('/')
-        val aggregates = linkedMapOf<String, Aggregate>()
-        val sortedPhotos = FolderPreviewOrdering.sortPhotos(
-            photos,
-            settingsManager.getSortOrder()
-        )
-
-        sortedPhotos.forEach { photo ->
-            val relative = photo.imageUri.toString()
-                .removePrefix(endpoint)
-                .trimStart('/')
-                .let { path ->
-                    when {
-                        normalizedCurrent.isEmpty() -> path
-                        path.startsWith(normalizedCurrent) -> path.removePrefix(normalizedCurrent)
-                        else -> return@forEach
-                    }
-                }
-
-            val segments = relative.split('/').filter { it.isNotEmpty() }
-            if (segments.size < 2) return@forEach
-
-            val childName = segments.first()
-            val childPath = if (normalizedCurrent.isEmpty()) {
-                "$childName/"
-            } else {
-                "$normalizedCurrent$childName/"
-            }
-
-            val aggregate = aggregates.getOrPut(childPath) {
-                Aggregate(
-                    childPath = childPath,
-                    childName = childName
-                )
-            }
-            if (aggregate.previewUris.size < 4) {
-                aggregate.previewUris.add(photo.imageUri)
-            }
-            aggregate.hasSubFolders = aggregate.hasSubFolders || segments.size > 2
-            aggregate.latestModified = maxOf(aggregate.latestModified, photo.dateModified)
-        }
-
-        return aggregates.values.map { aggregate ->
-            Folder(
-                path = aggregate.childPath,
-                name = aggregate.childName,
-                isLocal = false,
-                previewUris = aggregate.previewUris,
-                hasSubFolders = aggregate.hasSubFolders,
-                dateModified = aggregate.latestModified
-            )
-        }
-    }
 }
