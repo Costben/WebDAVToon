@@ -93,6 +93,11 @@ class RustWebDavPhotoRepository(
     override suspend fun getFolders(rootPath: String, forceRefresh: Boolean): List<Folder> = withContext(Dispatchers.IO) {
         val repo = rustRepo ?: return@withContext emptyList()
         initializeWebDavIfNeeded(repo)
+        val accountKey = previewCacheAccountKey()
+        val sortOrder = settingsManager.getSortOrder()
+        if (forceRefresh) {
+            RemoteFolderPreviewMemoryCache.invalidateFolderTree(accountKey, rootPath)
+        }
         val startedAt = SystemClock.elapsedRealtime()
 
         try {
@@ -108,10 +113,23 @@ class RustWebDavPhotoRepository(
                         name = f.name,
                         isLocal = f.isLocal,
                         photoCount = 0,
-                        previewUris = f.previewUris.map { Uri.parse(it) },
+                        previewUris = emptyList(),
                         hasSubFolders = f.hasSubFolders,
                         dateModified = f.dateModified.toLong() * 1000
                     )
+                }
+                .map { folder ->
+                    val cached = RemoteFolderPreviewMemoryCache.get(accountKey, sortOrder, folder.path)
+                    when {
+                        cached != null -> {
+                            folder.copy(
+                                previewUris = cached.previewUriStrings.map(Uri::parse),
+                                hasSubFolders = folder.hasSubFolders || cached.hasSubFolders
+                            )
+                        }
+
+                        else -> folder
+                    }
                 }.toMutableList()
 
             Log.i(
@@ -242,24 +260,47 @@ class RustWebDavPhotoRepository(
     ): RemoteFolderPreview? = withContext(Dispatchers.IO) {
         val repo = getPreviewRustRepo() ?: rustRepo ?: return@withContext null
         initializeWebDavIfNeeded(repo, isPreviewRepo = repo !== rustRepo)
+        val accountKey = previewCacheAccountKey()
+        if (forceRefresh) {
+            RemoteFolderPreviewMemoryCache.invalidateFolderTree(accountKey, folderPath)
+        } else {
+            RemoteFolderPreviewMemoryCache.get(accountKey, sortOrder, folderPath)?.let { cached ->
+                Log.i(
+                    "RustWebDavPhotoRepo",
+                    "inspectFolder cacheHit path=$folderPath sortOrder=$sortOrder previews=${cached.previewUriStrings.size} hasSubFolders=${cached.hasSubFolders}"
+                )
+                return@withContext RemoteFolderPreview(
+                    hasSubFolders = cached.hasSubFolders,
+                    previewUris = cached.previewUriStrings.map(Uri::parse)
+                )
+            }
+        }
 
         return@withContext try {
             val inspection = repo.inspectFolder(folderPath)
-            val sortedPreviewUris = getSortedPhotosFromRepo(
+            val previewUris = getSortedPhotosFromRepo(
                 repo = repo,
                 folderPath = folderPath,
                 sortOrder = sortOrder,
                 forceRefresh = forceRefresh,
                 recursive = true
             ).take(4).map { it.imageUri }
-            val previewUris = if (sortedPreviewUris.isNotEmpty()) {
-                sortedPreviewUris
-            } else {
-                inspection.previewUris.map(Uri::parse)
+            if (previewUris.isEmpty() && inspection.previewUris.isNotEmpty()) {
+                Log.i(
+                    "RustWebDavPhotoRepo",
+                    "inspectFolder ignoredLegacyPreviews path=$folderPath sortOrder=$sortOrder legacyPreviews=${inspection.previewUris.size}"
+                )
             }
             Log.i(
                 "RustWebDavPhotoRepo",
                 "inspectFolder path=$folderPath sortOrder=$sortOrder previews=${previewUris.size} hasSubFolders=${inspection.hasSubFolders}"
+            )
+            RemoteFolderPreviewMemoryCache.put(
+                accountKey = accountKey,
+                sortOrder = sortOrder,
+                path = folderPath,
+                hasSubFolders = inspection.hasSubFolders,
+                previewUriStrings = previewUris.map { it.toString() }
             )
             RemoteFolderPreview(
                 hasSubFolders = inspection.hasSubFolders,
@@ -352,6 +393,10 @@ class RustWebDavPhotoRepository(
             SettingsManager.SORT_NAME_DESC -> SortOrder.NAME_DESC
             else -> SortOrder.DATE_DESC
         }
+    }
+
+    private fun previewCacheAccountKey(): String {
+        return "${settingsManager.getFullWebDavUrl().trimEnd('/')}|${settingsManager.getWebDavUsername()}"
     }
 
     private fun getSortedPhotosFromRepo(
