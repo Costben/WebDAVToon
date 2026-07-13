@@ -124,8 +124,8 @@ class SubFolderActivity : AppCompatActivity() {
                 }
                 invalidateOptionsMenu()
             },
-            onRemotePreviewNeeded = { folder ->
-                resolveRemotePreview(folder)
+            onRemotePreviewNeeded = { folder, forceRefresh ->
+                resolveRemotePreview(folder, forceRefresh)
             },
             remotePreviewGeneration = {
                 settingsManager.getSortOrder().toString()
@@ -494,6 +494,9 @@ class SubFolderActivity : AppCompatActivity() {
                     allFolders.addAll(folders)
                     currentAllFolders = allFolders.toList()
                     applyFilterAndSort()
+                    if (forceRefresh && isWebDav) {
+                        adapter.refreshVisibleRemotePreviews()
+                    }
                     android.util.Log.i(
                         "SubFolderActivity",
                         "loadFolders path=$folderPath forceRefresh=$forceRefresh count=${allFolders.size} elapsedMs=${SystemClock.elapsedRealtime() - startedAt}"
@@ -563,14 +566,22 @@ class SubFolderActivity : AppCompatActivity() {
             .start()
     }
 
-    private fun resolveRemotePreview(folder: Folder) {
-        if (folder.isLocal || folder.previewUris.isNotEmpty()) return
+    private fun resolveRemotePreview(folder: Folder, forceRefresh: Boolean = false) {
+        if (folder.isLocal || (!forceRefresh && folder.previewUris.isNotEmpty())) return
 
         lifecycleScope.launch {
             val sortOrder = settingsManager.getSortOrder()
-            val preview = RustWebDavPhotoRepository(settingsManager).inspectFolder(folder.path, sortOrder) ?: return@launch
+            val preview = RustWebDavPhotoRepository(settingsManager).inspectFolder(
+                folderPath = folder.path,
+                sortOrder = sortOrder,
+                forceRefresh = forceRefresh
+            ) ?: return@launch
             if (settingsManager.getSortOrder() != sortOrder) return@launch
-            val updatedPreviewUris = if (preview.previewUris.isNotEmpty()) preview.previewUris else folder.previewUris
+            val updatedPreviewUris = if (forceRefresh) {
+                preview.previewUris
+            } else {
+                preview.previewUris.ifEmpty { folder.previewUris }
+            }
 
             currentAllFolders = currentAllFolders.map { current ->
                 if (current.path == folder.path) {

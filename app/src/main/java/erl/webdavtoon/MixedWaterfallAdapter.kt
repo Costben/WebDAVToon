@@ -2,9 +2,7 @@ package erl.webdavtoon
 
 import android.net.Uri
 import android.view.LayoutInflater
-import android.view.View
 import android.view.ViewGroup
-import android.widget.ImageView
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.card.MaterialCardView
 import erl.webdavtoon.databinding.ItemMixedFolderBinding
@@ -15,7 +13,7 @@ class MixedWaterfallAdapter(
     private val onMediaClick: (Photo) -> Unit,
     private val shouldSuppressItemInteraction: () -> Boolean = { false },
     private val onPhotoDimensionsResolved: (photoId: String, width: Int, height: Int) -> Unit,
-    private val onRemotePreviewNeeded: (Folder) -> Unit,
+    private val onRemotePreviewNeeded: (Folder, Boolean) -> Unit,
     private val remotePreviewGeneration: () -> String
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
@@ -29,6 +27,7 @@ class MixedWaterfallAdapter(
     private val resolvedDimensions = mutableMapOf<String, Pair<Int, Int>>()
     private val requestedPreviewKeys = hashSetOf<RemotePreviewKey>()
     private val remotePreviewCache = mutableMapOf<RemotePreviewKey, List<Uri>>()
+    private val forcedPreviewRefreshPaths = hashSetOf<String>()
 
     init {
         setHasStableIds(true)
@@ -41,6 +40,7 @@ class MixedWaterfallAdapter(
         }.toSet()
         requestedPreviewKeys.retainAll { it.path in currentPaths }
         remotePreviewCache.keys.retainAll { it.path in currentPaths }
+        forcedPreviewRefreshPaths.retainAll(currentPaths)
 
         items = newItems.map { item ->
             if (item !is MixedWaterfallItem.FolderTile) {
@@ -73,13 +73,12 @@ class MixedWaterfallAdapter(
 
         val generation = remotePreviewGeneration()
         val key = RemotePreviewKey(generation, path)
-        if (previewUris.isNotEmpty()) {
-            remotePreviewCache[key] = previewUris
-        }
+        forcedPreviewRefreshPaths.remove(path)
+        remotePreviewCache[key] = previewUris
 
         val current = items[index] as? MixedWaterfallItem.FolderTile ?: return
         val updatedFolder = current.folder.copy(
-            previewUris = remotePreviewCache[key] ?: if (previewUris.isNotEmpty()) previewUris else current.folder.previewUris,
+            previewUris = previewUris,
             hasSubFolders = current.folder.hasSubFolders || hasSubFolders
         )
         if (updatedFolder == current.folder) return
@@ -88,6 +87,21 @@ class MixedWaterfallAdapter(
             mutable[index] = MixedWaterfallItem.FolderTile(updatedFolder)
         }
         notifyItemChanged(index)
+    }
+
+    fun refreshVisibleRemotePreviews() {
+        val generation = remotePreviewGeneration()
+        val remotePaths = items.asSequence()
+            .mapNotNull { (it as? MixedWaterfallItem.FolderTile)?.folder }
+            .filter { !it.isLocal && !it.path.startsWith("virtual://") }
+            .map { it.path }
+            .toSet()
+        if (remotePaths.isEmpty()) return
+
+        forcedPreviewRefreshPaths.clear()
+        forcedPreviewRefreshPaths.addAll(remotePaths)
+        requestedPreviewKeys.removeAll { it.generation == generation && it.path in remotePaths }
+        notifyItemRangeChanged(0, items.size)
     }
 
     fun getItemAspectRatio(position: Int): Float {
@@ -189,12 +203,13 @@ class MixedWaterfallAdapter(
     private fun maybeRequestRemotePreview(position: Int) {
         if (position == RecyclerView.NO_POSITION || position >= items.size) return
         val folder = (items[position] as? MixedWaterfallItem.FolderTile)?.folder ?: return
-        if (!needsRemotePreviewRefresh(folder)) return
+        val forceRefresh = folder.path in forcedPreviewRefreshPaths
+        if (!forceRefresh && !needsRemotePreviewRefresh(folder)) return
 
         val key = RemotePreviewKey(remotePreviewGeneration(), folder.path)
-        if (remotePreviewCache.containsKey(key)) return
+        if (!forceRefresh && remotePreviewCache.containsKey(key)) return
         if (requestedPreviewKeys.add(key)) {
-            onRemotePreviewNeeded(folder)
+            onRemotePreviewNeeded(folder, forceRefresh)
         }
     }
 
@@ -230,90 +245,20 @@ class MixedWaterfallAdapter(
         private val binding: ItemMixedFolderBinding
     ) : RecyclerView.ViewHolder(binding.root) {
 
-        private val previewImageViews = listOf(binding.preview1, binding.preview2, binding.preview3, binding.preview4)
+        private val previewBinder = FolderPreviewBinder(
+            previewImageViews = listOf(binding.preview1, binding.preview2, binding.preview3, binding.preview4),
+            folderIcon = binding.folderIcon,
+            logTag = "MixedWaterfallAdapter"
+        )
 
         fun bind(folder: Folder) {
             binding.folderName.text = folder.name.trimEnd('/')
             binding.root.radius = itemView.resources.getDimension(R.dimen.waterfall_card_corner_radius)
-            clearPreviews()
-
-            if (folder.previewUris.isNotEmpty()) {
-                binding.folderIcon.visibility = View.GONE
-                showPreviews(folder.previewUris)
-            } else {
-                binding.folderIcon.visibility = View.VISIBLE
-            }
+            previewBinder.bind(folder)
         }
 
         fun clear() {
-            clearPreviews()
-            binding.folderIcon.visibility = View.VISIBLE
-        }
-
-        private fun clearPreviews() {
-            previewImageViews.forEach { imageView ->
-                WebDavImageLoader.clear(imageView)
-                imageView.setImageDrawable(null)
-                imageView.scaleType = ImageView.ScaleType.CENTER_CROP
-                imageView.visibility = View.INVISIBLE
-            }
-        }
-
-        private fun showPreviews(uris: List<Uri>) {
-            uris.take(previewImageViews.size).forEachIndexed { index, uri ->
-                val imageView = previewImageViews[index]
-                imageView.visibility = View.VISIBLE
-
-                val uriString = uri.toString()
-                val mediaType = detectMediaTypeByUri(uri) ?: MediaType.IMAGE
-                val isRemote = uriString.startsWith("http", ignoreCase = true)
-                android.util.Log.d(
-                    "MixedWaterfallAdapter",
-                    "folder preview bind uri=$uriString mediaType=$mediaType isRemote=$isRemote"
-                )
-
-                if (mediaType == MediaType.VIDEO) {
-                    imageView.scaleType = ImageView.ScaleType.CENTER
-                    imageView.setImageResource(R.drawable.ic_ior_play)
-                    if (isRemote) {
-                        WebDavImageLoader.loadWebDavVideoThumbnail(
-                            imageView.context,
-                            uri,
-                            imageView,
-                            progressBar = null,
-                            isFolderPreview = true
-                        )
-                    } else {
-                        WebDavImageLoader.loadLocalVideoThumbnail(
-                            imageView.context,
-                            uri,
-                            imageView,
-                            progressBar = null,
-                            isFolderPreview = true
-                        )
-                    }
-                } else if (isRemote) {
-                    WebDavImageLoader.loadWebDavImage(
-                        imageView.context,
-                        uri,
-                        imageView,
-                        progressBar = null,
-                        limitSize = true,
-                        isWaterfall = false,
-                        isFolderPreview = true
-                    )
-                } else {
-                    WebDavImageLoader.loadLocalImage(
-                        imageView.context,
-                        uri,
-                        imageView,
-                        progressBar = null,
-                        limitSize = true,
-                        isWaterfall = false,
-                        isFolderPreview = true
-                    )
-                }
-            }
+            previewBinder.clear()
         }
     }
 

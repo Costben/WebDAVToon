@@ -29,6 +29,16 @@ class RustWebDavPhotoRepository(
         @Volatile
         private var lastPreviewWebDavParams: String? = null
 
+        private const val PREVIEW_LIMIT = 4
+
+        private val previewCacheSortOrders = listOf(
+            SettingsManager.SORT_NAME_ASC,
+            SettingsManager.SORT_NAME_DESC,
+            SettingsManager.SORT_DATE_DESC,
+            SettingsManager.SORT_DATE_ASC,
+            SettingsManager.SORT_RANDOM_FOLDERS
+        )
+
         private val previewRepoLock = Any()
     }
 
@@ -95,9 +105,6 @@ class RustWebDavPhotoRepository(
         initializeWebDavIfNeeded(repo)
         val accountKey = previewCacheAccountKey()
         val sortOrder = settingsManager.getSortOrder()
-        if (forceRefresh) {
-            RemoteFolderPreviewMemoryCache.invalidateFolderTree(accountKey, rootPath)
-        }
         val startedAt = SystemClock.elapsedRealtime()
 
         try {
@@ -261,9 +268,7 @@ class RustWebDavPhotoRepository(
         val repo = getPreviewRustRepo() ?: rustRepo ?: return@withContext null
         initializeWebDavIfNeeded(repo, isPreviewRepo = repo !== rustRepo)
         val accountKey = previewCacheAccountKey()
-        if (forceRefresh) {
-            RemoteFolderPreviewMemoryCache.invalidateFolderTree(accountKey, folderPath)
-        } else {
+        if (!forceRefresh) {
             RemoteFolderPreviewMemoryCache.get(accountKey, sortOrder, folderPath)?.let { cached ->
                 Log.i(
                     "RustWebDavPhotoRepo",
@@ -278,13 +283,15 @@ class RustWebDavPhotoRepository(
 
         return@withContext try {
             val inspection = repo.inspectFolder(folderPath)
-            val previewUris = getSortedPhotosFromRepo(
+            val previewPhotos = getPhotosFromRepo(
                 repo = repo,
                 folderPath = folderPath,
-                sortOrder = sortOrder,
+                sortOrder = SettingsManager.SORT_DATE_DESC,
                 forceRefresh = forceRefresh,
                 recursive = true
-            ).take(4).map { it.imageUri }
+            )
+            val previewsBySortOrder = buildPreviewUrisBySortOrder(previewPhotos, sortOrder)
+            val previewUris = previewsBySortOrder[sortOrder].orEmpty()
             if (previewUris.isEmpty() && inspection.previewUris.isNotEmpty()) {
                 Log.i(
                     "RustWebDavPhotoRepo",
@@ -293,14 +300,15 @@ class RustWebDavPhotoRepository(
             }
             Log.i(
                 "RustWebDavPhotoRepo",
-                "inspectFolder path=$folderPath sortOrder=$sortOrder previews=${previewUris.size} hasSubFolders=${inspection.hasSubFolders}"
+                "inspectFolder path=$folderPath sortOrder=$sortOrder forceRefresh=$forceRefresh previews=${previewUris.size} hasSubFolders=${inspection.hasSubFolders} primedSortOrders=${previewsBySortOrder.keys.sorted()} media=${previewPhotos.size}"
             )
-            RemoteFolderPreviewMemoryCache.put(
+            RemoteFolderPreviewMemoryCache.putAll(
                 accountKey = accountKey,
-                sortOrder = sortOrder,
                 path = folderPath,
                 hasSubFolders = inspection.hasSubFolders,
-                previewUriStrings = previewUris.map { it.toString() }
+                previewUriStringsBySortOrder = previewsBySortOrder.mapValues { (_, uris) ->
+                    uris.map { it.toString() }
+                }
             )
             RemoteFolderPreview(
                 hasSubFolders = inspection.hasSubFolders,
@@ -406,13 +414,47 @@ class RustWebDavPhotoRepository(
         forceRefresh: Boolean,
         recursive: Boolean
     ): List<Photo> {
-        val mappedPhotos = repo.getPhotos(
+        return FolderPreviewOrdering.sortPhotos(
+            getPhotosFromRepo(
+                repo = repo,
+                folderPath = folderPath,
+                sortOrder = sortOrder,
+                forceRefresh = forceRefresh,
+                recursive = recursive
+            ),
+            sortOrder
+        )
+    }
+
+    private fun getPhotosFromRepo(
+        repo: uniffi.rust_core.RustRepository,
+        folderPath: String,
+        sortOrder: Int,
+        forceRefresh: Boolean,
+        recursive: Boolean
+    ): List<Photo> {
+        return repo.getPhotos(
             folderPath,
             fetchSortOrderFor(sortOrder),
             forceRefresh,
             recursive
         ).map(::toAppPhoto)
-        return FolderPreviewOrdering.sortPhotos(mappedPhotos, sortOrder)
+    }
+
+    private fun buildPreviewUrisBySortOrder(
+        photos: List<Photo>,
+        requestedSortOrder: Int
+    ): Map<Int, List<Uri>> {
+        val sortOrders = if (requestedSortOrder in previewCacheSortOrders) {
+            previewCacheSortOrders
+        } else {
+            previewCacheSortOrders + requestedSortOrder
+        }
+        return sortOrders.associateWith { order ->
+            FolderPreviewOrdering.sortPhotos(photos, order)
+                .take(PREVIEW_LIMIT)
+                .map { it.imageUri }
+        }
     }
 
     private fun toAppPhoto(p: RustPhoto): Photo {

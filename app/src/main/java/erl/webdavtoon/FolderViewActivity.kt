@@ -38,6 +38,7 @@ class FolderViewActivity : AppCompatActivity() {
     private var currentSearchKeyword: String = ""
     private var folderShuffleSeed: Long = Random.nextLong()
     private var currentLoadUsesToolbarPill: Boolean = false
+    private var refreshRemotePreviewsAfterLoad: Boolean = false
     private var pendingFolderNavigationPath: String? = null
     private var toolbarRefreshHideJob: Job? = null
 
@@ -105,6 +106,8 @@ class FolderViewActivity : AppCompatActivity() {
 
                 binding.progressBar.visibility = View.GONE
                 binding.swipeRefreshLayout.isRefreshing = false
+                val shouldRefreshRemotePreviews = refreshRemotePreviewsAfterLoad && state.error == null
+                refreshRemotePreviewsAfterLoad = false
                 if (state.error != null) {
                     hideToolbarRefreshPill()
                     Toast.makeText(this@FolderViewActivity, state.error, Toast.LENGTH_SHORT).show()
@@ -115,6 +118,9 @@ class FolderViewActivity : AppCompatActivity() {
                 }
                 currentAllFolders = state.folders
                 applyFilterAndSort()
+                if (shouldRefreshRemotePreviews) {
+                    adapter.refreshVisibleRemotePreviews()
+                }
             }
         }
     }
@@ -231,8 +237,8 @@ class FolderViewActivity : AppCompatActivity() {
                 }
                 invalidateOptionsMenu()
             },
-            onRemotePreviewNeeded = { folder ->
-                resolveRemotePreview(folder)
+            onRemotePreviewNeeded = { folder, forceRefresh ->
+                resolveRemotePreview(folder, forceRefresh)
             },
             remotePreviewGeneration = {
                 settingsManager.getSortOrder().toString()
@@ -452,6 +458,9 @@ class FolderViewActivity : AppCompatActivity() {
 
     private fun loadFolders(forceRefresh: Boolean = false) {
         beginFolderLoading(forceRefresh)
+        if (forceRefresh) {
+            refreshRemotePreviewsAfterLoad = true
+        }
         FolderState.setLoading()
         val startedAt = SystemClock.elapsedRealtime()
 
@@ -517,14 +526,22 @@ class FolderViewActivity : AppCompatActivity() {
         }
     }
 
-    private fun resolveRemotePreview(folder: Folder) {
-        if (folder.isLocal || folder.previewUris.isNotEmpty()) return
+    private fun resolveRemotePreview(folder: Folder, forceRefresh: Boolean = false) {
+        if (folder.isLocal || (!forceRefresh && folder.previewUris.isNotEmpty())) return
 
         lifecycleScope.launch {
             val sortOrder = settingsManager.getSortOrder()
-            val preview = RustWebDavPhotoRepository(settingsManager).inspectFolder(folder.path, sortOrder) ?: return@launch
+            val preview = RustWebDavPhotoRepository(settingsManager).inspectFolder(
+                folderPath = folder.path,
+                sortOrder = sortOrder,
+                forceRefresh = forceRefresh
+            ) ?: return@launch
             if (settingsManager.getSortOrder() != sortOrder) return@launch
-            val updatedPreviewUris = if (preview.previewUris.isNotEmpty()) preview.previewUris else folder.previewUris
+            val updatedPreviewUris = if (forceRefresh) {
+                preview.previewUris
+            } else {
+                preview.previewUris.ifEmpty { folder.previewUris }
+            }
 
             currentAllFolders = currentAllFolders.map { current ->
                 if (current.path == folder.path) {

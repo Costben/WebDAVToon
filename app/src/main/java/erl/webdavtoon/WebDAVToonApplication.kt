@@ -22,6 +22,7 @@ class WebDAVToonApplication : Application() {
         super.onCreate()
 
         appContext = applicationContext
+        RemoteFolderPreviewMemoryCache.initialize(this)
         AppSettingsStore.prime(this)
         LogManager.initialize(this)
         AppDatabase.getInstance(this)

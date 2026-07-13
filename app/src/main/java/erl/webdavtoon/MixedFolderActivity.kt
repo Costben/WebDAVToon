@@ -232,6 +232,9 @@ class MixedFolderActivity : AppCompatActivity() {
                 }
 
                 adapter.setItems(items)
+                if (forceRefresh && isWebDav) {
+                    adapter.refreshVisibleRemotePreviews()
+                }
                 waterfallLayoutManager?.notifyAspectRatiosChanged()
                 binding.emptyView.visibility = if (items.isEmpty()) View.VISIBLE else View.GONE
                 binding.emptyView.text = getString(R.string.no_photos_found)
@@ -464,12 +467,16 @@ class MixedFolderActivity : AppCompatActivity() {
         })
     }
 
-    private fun resolveRemotePreview(folder: Folder) {
+    private fun resolveRemotePreview(folder: Folder, forceRefresh: Boolean = false) {
         if (folder.isLocal || folder.path.startsWith("virtual://")) return
 
         lifecycleScope.launch {
             val sortOrder = settingsManager.getSortOrder()
-            val preview = RustWebDavPhotoRepository(settingsManager).inspectFolder(folder.path, sortOrder) ?: return@launch
+            val preview = RustWebDavPhotoRepository(settingsManager).inspectFolder(
+                folderPath = folder.path,
+                sortOrder = sortOrder,
+                forceRefresh = forceRefresh
+            ) ?: return@launch
             if (settingsManager.getSortOrder() != sortOrder) return@launch
             adapter.updateFolderPreview(folder.path, preview.previewUris, preview.hasSubFolders)
         }
