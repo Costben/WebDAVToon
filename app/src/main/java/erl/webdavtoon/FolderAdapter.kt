@@ -4,7 +4,6 @@ import android.net.Uri
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ImageView
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import erl.webdavtoon.databinding.ItemFolderBinding
@@ -12,7 +11,7 @@ import erl.webdavtoon.databinding.ItemFolderBinding
 class FolderAdapter(
     private val onFolderClick: (Folder) -> Unit,
     private val onSelectionChanged: (Int) -> Unit,
-    private val onRemotePreviewNeeded: ((Folder) -> Unit)? = null,
+    private val onRemotePreviewNeeded: ((Folder, Boolean) -> Unit)? = null,
     private val remotePreviewGeneration: () -> String = { "" }
 ) : RecyclerView.Adapter<FolderAdapter.FolderViewHolder>() {
 
@@ -25,6 +24,7 @@ class FolderAdapter(
     private val selectedFolderPaths = linkedSetOf<String>()
     private val requestedPreviewKeys = hashSetOf<RemotePreviewKey>()
     private val remotePreviewCache = mutableMapOf<RemotePreviewKey, List<Uri>>()
+    private val forcedPreviewRefreshPaths = hashSetOf<String>()
     private var activePreviewGeneration: String? = null
     var isSelectionMode = false
         private set
@@ -69,6 +69,7 @@ class FolderAdapter(
             selectedFolderPaths.retainAll(currentPaths)
             requestedPreviewKeys.retainAll { it.path in currentPaths }
             remotePreviewCache.keys.retainAll { it.path in currentPaths }
+            forcedPreviewRefreshPaths.retainAll(currentPaths)
             requestedPreviewKeys.removeAll { it.generation == generation && it.path in previewlessPaths }
             if (folders.isNotEmpty()) {
                 notifyItemRangeChanged(0, folders.size)
@@ -96,6 +97,7 @@ class FolderAdapter(
         selectedFolderPaths.retainAll(currentPaths)
         requestedPreviewKeys.retainAll { it.path in currentPaths }
         remotePreviewCache.keys.retainAll { it.path in currentPaths }
+        forcedPreviewRefreshPaths.retainAll(currentPaths)
         requestedPreviewKeys.removeAll { it.generation == generation && it.path in previewlessPaths }
         if (selectedFolderPaths.isEmpty() && isSelectionMode) {
             isSelectionMode = false
@@ -163,19 +165,32 @@ class FolderAdapter(
 
         val generation = remotePreviewGeneration()
         val key = RemotePreviewKey(generation, path)
-        if (previewUris.isNotEmpty()) {
-            remotePreviewCache[key] = previewUris
-        }
+        forcedPreviewRefreshPaths.remove(path)
+        remotePreviewCache[key] = previewUris
 
         val current = folders[index]
         val updated = current.copy(
-            previewUris = remotePreviewCache[key] ?: if (previewUris.isNotEmpty()) previewUris else current.previewUris,
-            hasSubFolders = hasSubFolders
+            previewUris = previewUris,
+            hasSubFolders = current.hasSubFolders || hasSubFolders
         )
         if (updated == current) return
 
         folders = folders.toMutableList().also { it[index] = updated }
         notifyItemChanged(index)
+    }
+
+    fun refreshVisibleRemotePreviews() {
+        val generation = remotePreviewGeneration()
+        val remotePaths = folders.asSequence()
+            .filter { !it.isLocal && !it.path.startsWith("virtual://") }
+            .map { it.path }
+            .toSet()
+        if (remotePaths.isEmpty()) return
+
+        forcedPreviewRefreshPaths.clear()
+        forcedPreviewRefreshPaths.addAll(remotePaths)
+        requestedPreviewKeys.removeAll { it.generation == generation && it.path in remotePaths }
+        notifyItemRangeChanged(0, folders.size)
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): FolderViewHolder {
@@ -231,12 +246,13 @@ class FolderAdapter(
     private fun maybeRequestRemotePreview(position: Int) {
         if (position == RecyclerView.NO_POSITION || position >= folders.size) return
         val folder = folders[position]
-        if (!needsRemotePreviewRefresh(folder)) return
+        val forceRefresh = folder.path in forcedPreviewRefreshPaths
+        if (!forceRefresh && !needsRemotePreviewRefresh(folder)) return
 
         val key = RemotePreviewKey(remotePreviewGeneration(), folder.path)
-        if (remotePreviewCache.containsKey(key)) return
+        if (!forceRefresh && remotePreviewCache.containsKey(key)) return
         if (requestedPreviewKeys.add(key)) {
-            onRemotePreviewNeeded?.invoke(folder)
+            onRemotePreviewNeeded?.invoke(folder, forceRefresh)
         }
     }
 
@@ -246,7 +262,11 @@ class FolderAdapter(
 
     inner class FolderViewHolder(private val binding: ItemFolderBinding) : RecyclerView.ViewHolder(binding.root) {
 
-        private val previewImageViews = listOf(binding.preview1, binding.preview2, binding.preview3, binding.preview4)
+        private val previewBinder = FolderPreviewBinder(
+            previewImageViews = listOf(binding.preview1, binding.preview2, binding.preview3, binding.preview4),
+            folderIcon = binding.folderIcon,
+            logTag = "FolderAdapter"
+        )
 
         fun bind(folder: Folder, isSelected: Boolean) {
             binding.folderName.text = folder.name.trimEnd('/')
@@ -257,93 +277,12 @@ class FolderAdapter(
 
             binding.selectionOverlay.visibility = if (isSelected) View.VISIBLE else View.GONE
             binding.checkIcon.visibility = if (isSelected) View.VISIBLE else View.GONE
-            (binding.root as? com.google.android.material.card.MaterialCardView)?.strokeWidth = if (isSelected) 4 else 0
-
-            clearPreviews()
-
-            if (folder.previewUris.isNotEmpty()) {
-                showPreviews(folder.previewUris)
-            } else {
-                binding.folderIcon.visibility = View.VISIBLE
-            }
+            (binding.root as? com.google.android.material.card.MaterialCardView)?.strokeWidth = if (isSelected) 4 else 1
+            previewBinder.bind(folder)
         }
 
         fun clear() {
-            clearPreviews()
-            binding.folderIcon.visibility = View.VISIBLE
-        }
-
-        private fun clearPreviews() {
-            previewImageViews.forEach { imageView ->
-                WebDavImageLoader.clear(imageView)
-                imageView.setImageDrawable(null)
-                imageView.scaleType = ImageView.ScaleType.CENTER_CROP
-                imageView.visibility = View.INVISIBLE
-            }
-        }
-
-        private fun showPreviews(uris: List<Uri>) {
-            binding.folderIcon.visibility = View.GONE
-            uris.take(previewImageViews.size).forEachIndexed { index, uri ->
-                val imageView = previewImageViews[index]
-                imageView.visibility = View.VISIBLE
-
-                val uriString = uri.toString()
-                val mediaType = detectMediaTypeByUri(uri) ?: MediaType.IMAGE
-                val isRemote = uriString.startsWith("http", ignoreCase = true)
-                android.util.Log.d(
-                    "FolderAdapter",
-                    "preview bind uri=$uriString mediaType=$mediaType isRemote=$isRemote"
-                )
-
-                if (mediaType == MediaType.VIDEO) {
-                    showVideoPlaceholder(imageView)
-                    if (isRemote) {
-                        WebDavImageLoader.loadWebDavVideoThumbnail(
-                            imageView.context,
-                            uri,
-                            imageView,
-                            progressBar = null,
-                            isFolderPreview = true
-                        )
-                    } else {
-                        WebDavImageLoader.loadLocalVideoThumbnail(
-                            imageView.context,
-                            uri,
-                            imageView,
-                            progressBar = null,
-                            isFolderPreview = true
-                        )
-                    }
-                } else {
-                    if (isRemote) {
-                        WebDavImageLoader.loadWebDavImage(
-                            imageView.context,
-                            uri,
-                            imageView,
-                            progressBar = null,
-                            limitSize = true,
-                            isWaterfall = false,
-                            isFolderPreview = true
-                        )
-                    } else {
-                        WebDavImageLoader.loadLocalImage(
-                            imageView.context,
-                            uri,
-                            imageView,
-                            progressBar = null,
-                            limitSize = true,
-                            isWaterfall = false,
-                            isFolderPreview = true
-                        )
-                    }
-                }
-            }
-        }
-
-        private fun showVideoPlaceholder(imageView: ImageView) {
-            imageView.scaleType = ImageView.ScaleType.CENTER
-            imageView.setImageResource(R.drawable.ic_ior_play)
+            previewBinder.clear()
         }
     }
 }

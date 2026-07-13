@@ -3,8 +3,10 @@ package erl.webdavtoon
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.drawable.BitmapDrawable
 import android.util.LruCache
 import android.graphics.drawable.Drawable
+import android.graphics.drawable.TransitionDrawable
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
@@ -21,6 +23,7 @@ import com.bumptech.glide.load.engine.GlideException
 import com.bumptech.glide.load.model.GlideUrl
 import com.bumptech.glide.load.model.LazyHeaders
 import com.bumptech.glide.load.resource.bitmap.DownsampleStrategy
+import com.bumptech.glide.load.resource.drawable.DrawableTransitionOptions
 import com.bumptech.glide.request.RequestListener
 import com.bumptech.glide.request.RequestOptions
 import com.bumptech.glide.request.target.CustomTarget
@@ -70,7 +73,9 @@ object WebDavImageLoader {
         isFolderPreview: Boolean = false,
         width: Int? = null,
         height: Int? = null,
-        onDimensionsReady: ((width: Int, height: Int) -> Unit)? = null
+        onDimensionsReady: ((width: Int, height: Int) -> Unit)? = null,
+        preserveCurrentDrawable: Boolean = false,
+        crossFadeDurationMs: Int = 0
     ) {
         val requestOptions = buildRequestOptions(
             context = context,
@@ -83,7 +88,7 @@ object WebDavImageLoader {
         )
         val model = buildWebDavModel(context, imageUri)
 
-        Glide.with(context)
+        var request = Glide.with(context)
             .load(model)
             .apply(requestOptions)
             .listener(
@@ -94,7 +99,13 @@ object WebDavImageLoader {
                     onDimensionsReady = onDimensionsReady
                 )
             )
-            .into(imageView)
+        if (preserveCurrentDrawable && imageView.drawable != null) {
+            request = request.placeholder(imageView.drawable)
+        }
+        if (crossFadeDurationMs > 0) {
+            request = request.transition(DrawableTransitionOptions.withCrossFade(crossFadeDurationMs))
+        }
+        request.into(imageView)
     }
 
     fun preloadWebDavImage(
@@ -135,13 +146,18 @@ object WebDavImageLoader {
         videoUri: Uri,
         imageView: ImageView,
         progressBar: ProgressBar? = null,
-        isFolderPreview: Boolean = false
+        isFolderPreview: Boolean = false,
+        preserveCurrentDrawable: Boolean = false,
+        crossFadeDurationMs: Int = 0
     ) {
         val encodedUrl = FileUtils.encodeWebDavUrl(videoUri.toString())
         val cacheKey = buildVideoBitmapCacheKey(encodedUrl, isFolderPreview)
+        val previousDrawable = imageView.drawable.takeIf { preserveCurrentDrawable }
         imageView.tag = cacheKey
         progressBar?.visibility = View.VISIBLE
-        showVideoPlaceholder(imageView, isFolderPreview)
+        if (previousDrawable == null) {
+            showVideoPlaceholder(imageView, isFolderPreview)
+        }
 
         remoteVideoThumbCache.get(cacheKey)?.let { cached ->
             if (cached.isLikelyBlankVideoThumbnail()) {
@@ -150,7 +166,7 @@ object WebDavImageLoader {
             } else {
                 android.util.Log.d("WebDavImageLoader", "WebDAV-Video cache hit: $encodedUrl")
                 applyVideoThumbnailDisplayMode(imageView, isFolderPreview)
-                imageView.setImageBitmap(cached)
+                setBitmapWithCrossFade(imageView, cached, previousDrawable, crossFadeDurationMs)
                 progressBar?.visibility = View.GONE
                 return
             }
@@ -187,9 +203,9 @@ object WebDavImageLoader {
                         saveCachedVideoBitmap(context, cacheKey, bitmap)
                     }
                     applyVideoThumbnailDisplayMode(imageView, isFolderPreview)
-                    imageView.setImageBitmap(bitmap)
+                    setBitmapWithCrossFade(imageView, bitmap, previousDrawable, crossFadeDurationMs)
                     android.util.Log.i("WebDavImageLoader", "WebDAV-Video thumbnail success: $encodedUrl")
-                } else {
+                } else if (previousDrawable == null) {
                     showVideoPlaceholder(imageView, isFolderPreview)
                     android.util.Log.w("WebDavImageLoader", "WebDAV-Video thumbnail fallback placeholder: $encodedUrl")
                 }
@@ -209,7 +225,9 @@ object WebDavImageLoader {
         isFolderPreview: Boolean = false,
         width: Int? = null,
         height: Int? = null,
-        onDimensionsReady: ((width: Int, height: Int) -> Unit)? = null
+        onDimensionsReady: ((width: Int, height: Int) -> Unit)? = null,
+        preserveCurrentDrawable: Boolean = false,
+        crossFadeDurationMs: Int = 0
     ) {
         val requestOptions = buildRequestOptions(
             context = context,
@@ -221,7 +239,7 @@ object WebDavImageLoader {
             height = height
         )
 
-        Glide.with(context)
+        var request = Glide.with(context)
             .load(imageUri)
             .apply(requestOptions)
             .listener(
@@ -232,7 +250,13 @@ object WebDavImageLoader {
                     onDimensionsReady = onDimensionsReady
                 )
             )
-            .into(imageView)
+        if (preserveCurrentDrawable && imageView.drawable != null) {
+            request = request.placeholder(imageView.drawable)
+        }
+        if (crossFadeDurationMs > 0) {
+            request = request.transition(DrawableTransitionOptions.withCrossFade(crossFadeDurationMs))
+        }
+        request.into(imageView)
     }
 
     fun preloadLocalImage(
@@ -323,12 +347,17 @@ object WebDavImageLoader {
         videoUri: Uri,
         imageView: ImageView,
         progressBar: ProgressBar? = null,
-        isFolderPreview: Boolean = false
+        isFolderPreview: Boolean = false,
+        preserveCurrentDrawable: Boolean = false,
+        crossFadeDurationMs: Int = 0
     ) {
         val cacheKey = buildVideoBitmapCacheKey(videoUri.toString(), isFolderPreview)
+        val previousDrawable = imageView.drawable.takeIf { preserveCurrentDrawable }
         imageView.tag = cacheKey
         progressBar?.visibility = View.VISIBLE
-        showVideoPlaceholder(imageView, isFolderPreview)
+        if (previousDrawable == null) {
+            showVideoPlaceholder(imageView, isFolderPreview)
+        }
 
         localVideoThumbCache.get(cacheKey)?.let { cached ->
             if (cached.isLikelyBlankVideoThumbnail()) {
@@ -336,7 +365,7 @@ object WebDavImageLoader {
                 localVideoThumbCache.remove(cacheKey)
             } else {
                 applyVideoThumbnailDisplayMode(imageView, isFolderPreview)
-                imageView.setImageBitmap(cached)
+                setBitmapWithCrossFade(imageView, cached, previousDrawable, crossFadeDurationMs)
                 progressBar?.visibility = View.GONE
                 return
             }
@@ -358,8 +387,8 @@ object WebDavImageLoader {
                         saveCachedVideoBitmap(context, cacheKey, bitmap)
                     }
                     applyVideoThumbnailDisplayMode(imageView, isFolderPreview)
-                    imageView.setImageBitmap(bitmap)
-                } else {
+                    setBitmapWithCrossFade(imageView, bitmap, previousDrawable, crossFadeDurationMs)
+                } else if (previousDrawable == null) {
                     showVideoPlaceholder(imageView, isFolderPreview)
                     android.util.Log.w("WebDavImageLoader", "Local-Video thumbnail fallback placeholder: $videoUri")
                 }
@@ -1077,6 +1106,26 @@ object WebDavImageLoader {
         } else {
             ImageView.ScaleType.FIT_CENTER
         }
+    }
+
+    private fun setBitmapWithCrossFade(
+        imageView: ImageView,
+        bitmap: Bitmap,
+        previousDrawable: Drawable?,
+        durationMs: Int
+    ) {
+        if (previousDrawable == null || durationMs <= 0) {
+            imageView.setImageBitmap(bitmap)
+            return
+        }
+
+        val nextDrawable = BitmapDrawable(imageView.resources, bitmap)
+        imageView.setImageDrawable(
+            TransitionDrawable(arrayOf(previousDrawable, nextDrawable)).apply {
+                isCrossFadeEnabled = true
+                startTransition(durationMs)
+            }
+        )
     }
 
     private fun defaultDrawableListener(

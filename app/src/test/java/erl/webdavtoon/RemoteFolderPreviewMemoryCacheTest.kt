@@ -52,6 +52,83 @@ class RemoteFolderPreviewMemoryCacheTest {
     }
 
     @Test
+    fun putAll_storesPreviewsForEachSortOrder() {
+        RemoteFolderPreviewMemoryCache.putAll(
+            accountKey = "server|user",
+            path = "conf out/",
+            hasSubFolders = true,
+            previewUriStringsBySortOrder = mapOf(
+                SettingsManager.SORT_NAME_ASC to listOf("https://example.test/a.jpg"),
+                SettingsManager.SORT_NAME_DESC to listOf("https://example.test/z.jpg"),
+                SettingsManager.SORT_DATE_DESC to listOf("https://example.test/new.jpg"),
+                SettingsManager.SORT_DATE_ASC to listOf("https://example.test/old.jpg")
+            )
+        )
+
+        assertEquals(
+            listOf("https://example.test/a.jpg"),
+            RemoteFolderPreviewMemoryCache.get(
+                accountKey = "server|user",
+                sortOrder = SettingsManager.SORT_NAME_ASC,
+                path = "/conf out"
+            )?.previewUriStrings
+        )
+        assertEquals(
+            listOf("https://example.test/z.jpg"),
+            RemoteFolderPreviewMemoryCache.get(
+                accountKey = "server|user",
+                sortOrder = SettingsManager.SORT_NAME_DESC,
+                path = "conf out/"
+            )?.previewUriStrings
+        )
+        assertEquals(
+            listOf("https://example.test/new.jpg"),
+            RemoteFolderPreviewMemoryCache.get(
+                accountKey = "server|user",
+                sortOrder = SettingsManager.SORT_DATE_DESC,
+                path = "conf out/"
+            )?.previewUriStrings
+        )
+        assertEquals(
+            listOf("https://example.test/old.jpg"),
+            RemoteFolderPreviewMemoryCache.get(
+                accountKey = "server|user",
+                sortOrder = SettingsManager.SORT_DATE_ASC,
+                path = "conf out/"
+            )?.previewUriStrings
+        )
+    }
+
+    @Test
+    fun putAll_allowsSuccessfulRefreshToReplaceOldPreviewWithEmptyResult() {
+        RemoteFolderPreviewMemoryCache.put(
+            accountKey = "server|user",
+            sortOrder = SettingsManager.SORT_DATE_DESC,
+            path = "nested-only/",
+            hasSubFolders = true,
+            previewUriStrings = listOf("https://example.test/old.jpg")
+        )
+
+        RemoteFolderPreviewMemoryCache.putAll(
+            accountKey = "server|user",
+            path = "nested-only/",
+            hasSubFolders = true,
+            previewUriStringsBySortOrder = mapOf(
+                SettingsManager.SORT_DATE_DESC to emptyList()
+            )
+        )
+
+        assertEquals(
+            emptyList<String>(),
+            RemoteFolderPreviewMemoryCache.get(
+                accountKey = "server|user",
+                sortOrder = SettingsManager.SORT_DATE_DESC,
+                path = "nested-only/"
+            )?.previewUriStrings
+        )
+    }
+
+    @Test
     fun invalidateFolderTree_removesOnlyMatchingSubtree() {
         RemoteFolderPreviewMemoryCache.put(
             accountKey = "server|user",
