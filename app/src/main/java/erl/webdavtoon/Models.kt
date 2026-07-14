@@ -2,9 +2,7 @@ package erl.webdavtoon
 
 import android.net.Uri
 
-/**
- * 媒体数据模型（图片/视频）
- */
+/** Media model for images and videos. */
 enum class MediaType {
     IMAGE,
     VIDEO
@@ -24,9 +22,7 @@ data class Photo(
     val durationMs: Long? = null
 )
 
-/**
- * 文件夹数据模型
- */
+/** Folder data model. */
 data class Folder(
     val path: String,
     val name: String,
@@ -34,5 +30,6 @@ data class Folder(
     val photoCount: Int = 0,
     val previewUris: List<Uri> = emptyList(),
     val hasSubFolders: Boolean = false,
-    val dateModified: Long = 0
+    val dateModified: Long = 0,
+    val sourceSlot: Int = -1
 )

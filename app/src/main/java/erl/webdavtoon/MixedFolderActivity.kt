@@ -12,6 +12,7 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
+import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -23,6 +24,8 @@ import androidx.lifecycle.lifecycleScope
 import erl.webdavtoon.databinding.ActivityMainBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -35,7 +38,11 @@ class MixedFolderActivity : AppCompatActivity() {
     private lateinit var adapter: MixedWaterfallAdapter
     private var folderPath: String = ""
     private var isWebDav: Boolean = false
+    private var isFavorites: Boolean = false
     private var folderShuffleSeed: Long = Random.nextLong()
+    private var pendingDeleteRequest: PendingMixedDelete? = null
+    private var hasCompletedInitialLoad = false
+    private val webDavSlotMutex = Mutex()
     private var waterfallLayoutManager: FollowZoomWaterfallLayoutManager? = null
     private var scaleDetector: android.view.ScaleGestureDetector? = null
     private var zoomStartColumns = 2f
@@ -50,6 +57,12 @@ class MixedFolderActivity : AppCompatActivity() {
     private var pendingZoomFocusY = 0f
     private var isZoomFramePosted = false
     private var isAspectRatioRelayoutPosted = false
+
+    private data class PendingMixedDelete(
+        val localPhotos: List<Photo>,
+        val otherPhotos: List<Photo>,
+        val folders: List<Folder>
+    )
 
     private val applyPendingZoomFrame = Runnable {
         isZoomFramePosted = false
@@ -90,6 +103,22 @@ class MixedFolderActivity : AppCompatActivity() {
         }
     }
 
+    private val localMediaDeleteLauncher = registerForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        val pending = pendingDeleteRequest ?: return@registerForActivityResult
+        pendingDeleteRequest = null
+        if (result.resultCode != RESULT_OK) return@registerForActivityResult
+
+        lifecycleScope.launch {
+            val deletedLocalPhotos = LocalMediaDeleteRequest.awaitDeletedPhotos(
+                context = this@MixedFolderActivity,
+                photos = pending.localPhotos
+            )
+            executeDelete(pending, deletedLocalPhotos)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         ThemeHelper.applyTheme(this)
         settingsManager = SettingsManager(this)
@@ -106,10 +135,11 @@ class MixedFolderActivity : AppCompatActivity() {
 
         folderPath = intent.getStringExtra("EXTRA_FOLDER_PATH") ?: ""
         isWebDav = intent.getBooleanExtra("EXTRA_IS_WEBDAV", false)
+        isFavorites = intent.getBooleanExtra("EXTRA_IS_FAVORITES", false)
 
         LibraryState.update(
-            serverType = if (isWebDav) "webdav" else "local",
-            rootFolderPath = folderPath
+            serverType = if (isFavorites) "favorites" else if (isWebDav) "webdav" else "local",
+            rootFolderPath = if (isFavorites) "favorites" else folderPath
         )
 
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
@@ -128,6 +158,13 @@ class MixedFolderActivity : AppCompatActivity() {
         checkPermissionsAndLoad()
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (isFavorites && hasCompletedInitialLoad && !adapter.isSelectionMode) {
+            loadMixedContent()
+        }
+    }
+
     private fun setupUi() {
         setSupportActionBar(binding.toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
@@ -139,6 +176,7 @@ class MixedFolderActivity : AppCompatActivity() {
         adapter = MixedWaterfallAdapter(
             onFolderClick = ::openFolder,
             onMediaClick = ::openMedia,
+            onSelectionChanged = ::updateSelectionUi,
             shouldSuppressItemInteraction = ::shouldSuppressItemInteraction,
             onPhotoDimensionsResolved = ::onPhotoDimensionsResolved,
             onRemotePreviewNeeded = ::resolveRemotePreview,
@@ -148,6 +186,15 @@ class MixedFolderActivity : AppCompatActivity() {
         binding.recyclerView.adapter = adapter
         binding.recyclerView.itemAnimator = null
         installWaterfallLayout()
+
+        onBackPressedDispatcher.addCallback(this) {
+            if (adapter.isSelectionMode) {
+                adapter.exitSelectionMode()
+            } else {
+                isEnabled = false
+                onBackPressedDispatcher.onBackPressed()
+            }
+        }
 
         binding.swipeRefreshLayout.setOnRefreshListener {
             resetFolderShuffleIfRandomSort()
@@ -176,6 +223,19 @@ class MixedFolderActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 val items = withContext(Dispatchers.IO) {
+                    if (isFavorites) {
+                        val sortedMedia = FolderPreviewOrdering.sortPhotos(
+                            settingsManager.getFavoritePhotos(),
+                            settingsManager.getPhotoSortOrder()
+                        )
+                        return@withContext MixedWaterfallPlanner.buildItems(
+                            folders = settingsManager.getFavoriteFolders(),
+                            media = sortedMedia,
+                            folderSortOrder = settingsManager.getSortOrder(),
+                            folderShuffleSeed = folderShuffleSeed
+                        )
+                    }
+
                     val repository: PhotoRepository = if (isWebDav) {
                         RustWebDavPhotoRepository(settingsManager)
                     } else {
@@ -223,8 +283,14 @@ class MixedFolderActivity : AppCompatActivity() {
                         settingsManager.getPhotoSortOrder()
                     )
 
+                    val sourceSlot = if (isWebDav) settingsManager.getCurrentSlot() else -1
+                    val sourcedFolders = resolvedFolders.map { folder ->
+                        val resolvedSlot = if (folder.isLocal) -1 else sourceSlot
+                        if (folder.sourceSlot == resolvedSlot) folder else folder.copy(sourceSlot = resolvedSlot)
+                    }
+
                     MixedWaterfallPlanner.buildItems(
-                        folders = resolvedFolders,
+                        folders = sourcedFolders,
                         media = sortedMedia,
                         folderSortOrder = settingsManager.getSortOrder(),
                         folderShuffleSeed = folderShuffleSeed
@@ -232,7 +298,7 @@ class MixedFolderActivity : AppCompatActivity() {
                 }
 
                 adapter.setItems(items)
-                if (forceRefresh && isWebDav) {
+                if (forceRefresh && isWebDav && !isFavorites) {
                     adapter.refreshVisibleRemotePreviews()
                 }
                 waterfallLayoutManager?.notifyAspectRatiosChanged()
@@ -240,13 +306,14 @@ class MixedFolderActivity : AppCompatActivity() {
                 binding.emptyView.text = getString(R.string.no_photos_found)
                 android.util.Log.i(
                     "MixedFolderActivity",
-                    "loadMixedContent path=$folderPath isWebDav=$isWebDav forceRefresh=$forceRefresh items=${items.size} elapsedMs=${SystemClock.elapsedRealtime() - startedAt}"
+                    "loadMixedContent path=$folderPath isWebDav=$isWebDav isFavorites=$isFavorites forceRefresh=$forceRefresh items=${items.size} elapsedMs=${SystemClock.elapsedRealtime() - startedAt}"
                 )
             } catch (e: Exception) {
                 android.util.Log.e("MixedFolderActivity", "Mixed content load failed", e)
                 binding.emptyView.visibility = View.VISIBLE
                 binding.emptyView.text = getString(R.string.error_prefix, e.message ?: e.toString())
             } finally {
+                hasCompletedInitialLoad = true
                 binding.swipeRefreshLayout.isRefreshing = false
                 binding.progressBar.visibility = View.GONE
             }
@@ -418,7 +485,7 @@ class MixedFolderActivity : AppCompatActivity() {
         if (shouldSuppressItemInteraction()) return
         val realPath = folder.path
         val isRemoteFolder = !folder.isLocal
-        if (!folder.hasSubFolders) {
+        if (!isFavorites && !folder.hasSubFolders) {
             startActivity(Intent(this, MainActivity::class.java).apply {
                 putExtra("EXTRA_FOLDER_PATH", realPath)
                 putExtra("EXTRA_IS_WEBDAV", isRemoteFolder)
@@ -429,17 +496,19 @@ class MixedFolderActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             try {
-                val target = FolderNavigationResolver.resolve(
-                    context = this@MixedFolderActivity,
-                    settingsManager = settingsManager,
-                    folderPath = realPath,
-                    isWebDav = isRemoteFolder
-                )
-                android.util.Log.i(
-                    "MixedFolderActivity",
-                    "resolvedFolderNavigation path=$realPath target=${target.javaClass.simpleName}"
-                )
-                FolderNavigationResolver.start(this@MixedFolderActivity, target)
+                withFolderSourceSlot(folder, restoreAfter = false) {
+                    val target = FolderNavigationResolver.resolve(
+                        context = this@MixedFolderActivity,
+                        settingsManager = settingsManager,
+                        folderPath = realPath,
+                        isWebDav = isRemoteFolder
+                    )
+                    android.util.Log.i(
+                        "MixedFolderActivity",
+                        "resolvedFolderNavigation path=$realPath slot=${folder.sourceSlot} target=${target.javaClass.simpleName}"
+                    )
+                    FolderNavigationResolver.start(this@MixedFolderActivity, target)
+                }
             } catch (e: Exception) {
                 android.util.Log.e("MixedFolderActivity", "Folder navigation resolve failed path=$realPath", e)
                 startActivity(Intent(this@MixedFolderActivity, SubFolderActivity::class.java).apply {
@@ -464,6 +533,7 @@ class MixedFolderActivity : AppCompatActivity() {
         PhotoCache.setPhotos(imageOnly)
         startActivity(Intent(this, PhotoViewActivity::class.java).apply {
             putExtra("EXTRA_CURRENT_INDEX", imageIndex)
+            putExtra("EXTRA_IS_FAVORITES", isFavorites)
         })
     }
 
@@ -472,13 +542,22 @@ class MixedFolderActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             val sortOrder = settingsManager.getSortOrder()
-            val preview = RustWebDavPhotoRepository(settingsManager).inspectFolder(
-                folderPath = folder.path,
-                sortOrder = sortOrder,
-                forceRefresh = forceRefresh
-            ) ?: return@launch
+            val preview = withFolderSourceSlot(folder, restoreAfter = true) {
+                RustWebDavPhotoRepository(settingsManager).inspectFolder(
+                    folderPath = folder.path,
+                    sortOrder = sortOrder,
+                    forceRefresh = forceRefresh
+                )
+            } ?: return@launch
             if (settingsManager.getSortOrder() != sortOrder) return@launch
-            adapter.updateFolderPreview(folder.path, preview.previewUris, preview.hasSubFolders)
+            adapter.updateFolderPreview(folder, preview.previewUris, preview.hasSubFolders)
+            val updatedFolder = folder.copy(
+                previewUris = preview.previewUris,
+                hasSubFolders = folder.hasSubFolders || preview.hasSubFolders
+            )
+            if (settingsManager.isFolderFavorite(updatedFolder)) {
+                settingsManager.addFavoriteFolder(updatedFolder)
+            }
         }
     }
 
@@ -493,6 +572,7 @@ class MixedFolderActivity : AppCompatActivity() {
 
     private fun displayTitle(): String {
         return when {
+            isFavorites -> getString(R.string.favorites)
             folderPath.isEmpty() && !isWebDav -> getString(R.string.local_photos)
             folderPath.isEmpty() && isWebDav -> getString(R.string.remote)
             else -> {
@@ -519,7 +599,7 @@ class MixedFolderActivity : AppCompatActivity() {
     }
 
     private fun checkPermissionsAndLoad() {
-        if (isWebDav) {
+        if (isFavorites || isWebDav) {
             loadMixedContent()
             return
         }
@@ -542,23 +622,15 @@ class MixedFolderActivity : AppCompatActivity() {
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.main_menu, menu)
         OverflowMenuHelper.enableOptionalIcons(menu)
-
-        menu.findItem(R.id.action_share)?.isVisible = false
-        menu.findItem(R.id.action_edit)?.isVisible = false
-        menu.findItem(R.id.action_favorite)?.isVisible = false
-        menu.findItem(R.id.action_info)?.isVisible = false
-        menu.findItem(R.id.action_delete)?.isVisible = false
-        menu.findItem(R.id.action_search)?.isVisible = false
-        menu.findItem(R.id.action_select)?.isVisible = false
-        menu.findItem(R.id.action_randomize_photos)?.isVisible = false
-
         menu.findItem(R.id.action_rotation_lock)?.isChecked = settingsManager.isRotationLocked()
+        updateMenuVisibility(menu)
         tintOverflowMenuIcons(menu)
         return true
     }
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
         OverflowMenuHelper.enableOptionalIcons(menu)
+        updateMenuVisibility(menu)
         tintOverflowMenuIcons(menu)
         return super.onPrepareOptionsMenu(menu)
     }
@@ -570,6 +642,10 @@ class MixedFolderActivity : AppCompatActivity() {
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        if (item.itemId == android.R.id.home && adapter.isSelectionMode) {
+            adapter.exitSelectionMode()
+            return true
+        }
         return when (item.itemId) {
             android.R.id.home -> {
                 onBackPressedDispatcher.onBackPressed()
@@ -584,6 +660,14 @@ class MixedFolderActivity : AppCompatActivity() {
             }
             R.id.action_settings -> {
                 settingsLauncher.launch(Intent(this, SettingsActivity::class.java))
+                true
+            }
+            R.id.action_delete -> {
+                confirmDeleteSelectedItems()
+                true
+            }
+            R.id.action_favorite -> {
+                updateSelectedFavorites()
                 true
             }
             R.id.action_col_1 -> updateGridColumns(1)
@@ -614,6 +698,232 @@ class MixedFolderActivity : AppCompatActivity() {
         }
         loadMixedContent()
         return true
+    }
+
+    private fun updateSelectionUi(count: Int) {
+        supportActionBar?.title = if (count > 0) {
+            getString(R.string.selected_count, count)
+        } else {
+            displayTitle()
+        }
+        invalidateOptionsMenu()
+    }
+
+    private fun updateMenuVisibility(menu: Menu) {
+        val isSelecting = ::adapter.isInitialized && adapter.isSelectionMode
+        menu.findItem(R.id.action_share)?.isVisible = false
+        menu.findItem(R.id.action_edit)?.isVisible = false
+        menu.findItem(R.id.action_info)?.isVisible = false
+        menu.findItem(R.id.action_search)?.isVisible = false
+        menu.findItem(R.id.action_select)?.isVisible = false
+        menu.findItem(R.id.action_randomize_photos)?.isVisible = false
+        menu.findItem(R.id.action_favorite)?.apply {
+            isVisible = isSelecting
+            setIcon(if (isFavorites) R.drawable.ic_ior_star_solid else R.drawable.ic_ior_star)
+        }
+        menu.findItem(R.id.action_delete)?.isVisible = isSelecting
+        menu.findItem(R.id.action_settings)?.isVisible = !isSelecting
+        menu.findItem(R.id.action_grid_columns)?.isVisible = !isSelecting
+        menu.findItem(R.id.action_sort_order)?.isVisible = !isSelecting
+        menu.findItem(R.id.action_rotation_lock)?.isVisible = !isSelecting
+    }
+
+    private fun updateSelectedFavorites() {
+        val selectedItems = adapter.getSelectedFolders().map { MixedWaterfallItem.FolderTile(it) } +
+            adapter.getSelectedPhotos().map { MixedWaterfallItem.MediaTile(it) }
+        if (selectedItems.isEmpty()) {
+            android.widget.Toast.makeText(
+                this,
+                getString(R.string.favorite_items_requires_selection),
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+
+        val favoriteKeys = selectedItems
+            .filter { item ->
+                when (item) {
+                    is MixedWaterfallItem.FolderTile -> settingsManager.isFolderFavorite(item.folder)
+                    is MixedWaterfallItem.MediaTile -> settingsManager.isPhotoFavorite(item.photo.id)
+                }
+            }
+            .mapTo(mutableSetOf(), MixedWaterfallIdentity::key)
+        val plan = FavoriteSelectionPlanner.buildPlan(
+            selectedItems = selectedItems,
+            favoriteIds = favoriteKeys,
+            isFavoritesView = isFavorites,
+            idSelector = MixedWaterfallIdentity::key
+        )
+
+        plan.toAdd.forEach { item ->
+            when (item) {
+                is MixedWaterfallItem.FolderTile -> settingsManager.addFavoriteFolder(item.folder)
+                is MixedWaterfallItem.MediaTile -> settingsManager.addFavoritePhoto(item.photo)
+            }
+        }
+        plan.toRemove.forEach { item ->
+            when (item) {
+                is MixedWaterfallItem.FolderTile -> settingsManager.removeFavoriteFolder(item.folder)
+                is MixedWaterfallItem.MediaTile -> settingsManager.removeFavoritePhoto(item.photo.id)
+            }
+        }
+
+        val changedCount = plan.toAdd.size + plan.toRemove.size
+        val message = when {
+            plan.toAdd.isNotEmpty() -> resources.getQuantityString(
+                R.plurals.favorite_items_added_count,
+                changedCount,
+                changedCount
+            )
+            plan.toRemove.isNotEmpty() -> resources.getQuantityString(
+                R.plurals.favorite_items_removed_count,
+                changedCount,
+                changedCount
+            )
+            else -> getString(R.string.favorite_no_changes)
+        }
+        android.widget.Toast.makeText(this, message, android.widget.Toast.LENGTH_SHORT).show()
+
+        adapter.exitSelectionMode()
+        if (isFavorites && changedCount > 0) {
+            loadMixedContent()
+        }
+    }
+
+    private fun confirmDeleteSelectedItems() {
+        val selectedPhotos = adapter.getSelectedPhotos()
+        val selectedFolders = adapter.getSelectedFolders()
+        val selectedCount = selectedPhotos.size + selectedFolders.size
+        if (selectedCount == 0) return
+
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle(R.string.confirm_delete)
+            .setMessage(getString(R.string.delete_items_message, selectedCount))
+            .setPositiveButton(R.string.delete) { _, _ ->
+                beginDelete(selectedPhotos, selectedFolders)
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun beginDelete(selectedPhotos: List<Photo>, selectedFolders: List<Folder>) {
+        val localPhotos = selectedPhotos.filter { it.isLocal }
+        if (localPhotos.isNotEmpty() && LocalMediaDeleteRequest.requiresSystemRequest()) {
+            val request = runCatching {
+                LocalMediaDeleteRequest.create(this, localPhotos)
+            }.getOrNull()
+            if (request == null) {
+                android.widget.Toast.makeText(
+                    this,
+                    getString(R.string.delete_failed),
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+                return
+            }
+
+            pendingDeleteRequest = PendingMixedDelete(
+                localPhotos = localPhotos,
+                otherPhotos = selectedPhotos.filterNot { it.isLocal },
+                folders = selectedFolders
+            )
+            localMediaDeleteLauncher.launch(request)
+            return
+        }
+
+        lifecycleScope.launch {
+            executeDelete(
+                PendingMixedDelete(
+                    localPhotos = emptyList(),
+                    otherPhotos = selectedPhotos,
+                    folders = selectedFolders
+                )
+            )
+        }
+    }
+
+    private suspend fun executeDelete(
+        pending: PendingMixedDelete,
+        alreadyDeletedLocalPhotos: List<Photo> = emptyList()
+    ) {
+        val deletedPhotos = alreadyDeletedLocalPhotos.toMutableList()
+        val deletedFolders = mutableListOf<Folder>()
+
+        pending.otherPhotos.forEach { photo ->
+            val repository: PhotoRepository = if (photo.isLocal) {
+                LocalPhotoRepository(this@MixedFolderActivity)
+            } else {
+                RustWebDavPhotoRepository(settingsManager)
+            }
+            if (repository.deletePhoto(photo)) {
+                deletedPhotos.add(photo)
+            }
+        }
+
+        pending.folders.forEach { folder ->
+            val deleted = if (folder.isLocal) {
+                LocalPhotoRepository(this@MixedFolderActivity).deleteFolder(folder)
+            } else {
+                withFolderSourceSlot(folder, restoreAfter = true) {
+                    RustWebDavPhotoRepository(settingsManager).deleteFolder(folder)
+                }
+            }
+            if (deleted) {
+                deletedFolders.add(folder)
+            }
+        }
+
+        deletedPhotos.forEach { settingsManager.removeFavoritePhoto(it.id) }
+        deletedFolders.forEach(settingsManager::removeFavoriteFolder)
+
+        val requestedCount = pending.localPhotos.size + pending.otherPhotos.size + pending.folders.size
+        val deletedCount = deletedPhotos.size + deletedFolders.size
+        if (deletedCount == 0) {
+            android.widget.Toast.makeText(
+                this,
+                getString(R.string.delete_failed),
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+
+        if (deletedPhotos.any { !it.isLocal } || deletedFolders.any { !it.isLocal }) {
+            WebDavImageLoader.clearCache(this)
+        } else {
+            com.bumptech.glide.Glide.get(this).clearMemory()
+        }
+
+        val message = if (deletedCount == requestedCount) {
+            getString(R.string.deleted_items_count, deletedCount)
+        } else {
+            getString(R.string.deleted_items_partial, deletedCount, requestedCount)
+        }
+        android.widget.Toast.makeText(this, message, android.widget.Toast.LENGTH_SHORT).show()
+        adapter.exitSelectionMode()
+        loadMixedContent(forceRefresh = !isFavorites)
+    }
+
+    private suspend fun <T> withFolderSourceSlot(
+        folder: Folder,
+        restoreAfter: Boolean,
+        block: suspend () -> T
+    ): T {
+        if (folder.isLocal || folder.sourceSlot < 0) {
+            return block()
+        }
+
+        return webDavSlotMutex.withLock {
+            val originalSlot = settingsManager.getCurrentSlot()
+            if (originalSlot != folder.sourceSlot) {
+                settingsManager.setCurrentSlot(folder.sourceSlot)
+            }
+            try {
+                block()
+            } finally {
+                if (restoreAfter && originalSlot != folder.sourceSlot) {
+                    settingsManager.setCurrentSlot(originalSlot)
+                }
+            }
+        }
     }
 
     private fun applyRotationLock() {
@@ -657,6 +967,14 @@ class MixedFolderActivity : AppCompatActivity() {
         }
         submenuItems.forEach { id ->
             menu.findItem(id)?.icon?.mutate()?.let { DrawableCompat.setTint(it, normalColor) }
+        }
+        if (::adapter.isInitialized && adapter.isSelectionMode) {
+            menu.findItem(R.id.action_delete)?.icon?.mutate()?.let { icon ->
+                DrawableCompat.setTint(icon, ContextCompat.getColor(this, R.color.primary_red))
+            }
+            menu.findItem(R.id.action_favorite)?.icon?.mutate()?.let { icon ->
+                DrawableCompat.setTint(icon, ContextCompat.getColor(this, R.color.primary))
+            }
         }
     }
 

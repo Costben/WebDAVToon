@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="favorite_items_requires_selection">请先选择图片或文件夹</string>
+    <plurals name="favorite_items_added_count">
+        <item quantity="other">已收藏 %1$d 个项目</item>
+    </plurals>
+    <plurals name="favorite_items_removed_count">
+        <item quantity="other">已取消收藏 %1$d 个项目</item>
+    </plurals>
+    <string name="delete_items_message">确定要删除选中的 %1$d 个项目吗？此操作无法撤销。</string>
+    <string name="deleted_items_count">已删除 %1$d 个项目</string>
+    <string name="deleted_items_partial">已删除 %1$d/%2$d 个项目</string>
+</resources>

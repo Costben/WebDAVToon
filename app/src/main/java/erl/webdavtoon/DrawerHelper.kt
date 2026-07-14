@@ -145,7 +145,7 @@ object DrawerHelper {
         }
 
         favoritesBtn.setOnClickListener {
-            val intent = Intent(activity, MainActivity::class.java).apply {
+            val intent = Intent(activity, MixedFolderActivity::class.java).apply {
                 putExtra("EXTRA_IS_FAVORITES", true)
             }
             activity.startActivity(intent)
