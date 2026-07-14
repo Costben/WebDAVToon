@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="favorite_items_requires_selection">Select photos or folders first</string>
+    <plurals name="favorite_items_added_count">
+        <item quantity="one">Added %1$d item to favorites</item>
+        <item quantity="other">Added %1$d items to favorites</item>
+    </plurals>
+    <plurals name="favorite_items_removed_count">
+        <item quantity="one">Removed %1$d item from favorites</item>
+        <item quantity="other">Removed %1$d items from favorites</item>
+    </plurals>
+    <string name="delete_items_message">Are you sure you want to delete %1$d selected item(s)? This action cannot be undone.</string>
+    <string name="deleted_items_count">Deleted %1$d item(s)</string>
+    <string name="deleted_items_partial">Deleted %1$d of %2$d selected item(s)</string>
+</resources>

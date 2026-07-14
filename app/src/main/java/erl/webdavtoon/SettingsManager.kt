@@ -14,6 +14,7 @@ class SettingsManager(context: Context) {
         sessionStore = WebDavSessionPasswordStore
     )
     private val favoritePhotoStore = FavoritePhotoStore.getInstance(appContext)
+    private val favoriteFolderStore = FavoriteFolderStore.getInstance(appContext)
 
     companion object {
         const val KEY_GRID_COLUMNS = "grid_columns"
@@ -381,6 +382,23 @@ class SettingsManager(context: Context) {
     }
 
     fun getFavoritePhotos(): List<Photo> = favoritePhotoStore.getAll()
+
+    fun isFolderFavorite(folder: Folder): Boolean = favoriteFolderStore.isFavorite(folder.withResolvedSourceSlot())
+
+    fun addFavoriteFolder(folder: Folder) {
+        favoriteFolderStore.add(folder.withResolvedSourceSlot())
+    }
+
+    fun removeFavoriteFolder(folder: Folder) {
+        favoriteFolderStore.remove(folder.withResolvedSourceSlot())
+    }
+
+    fun getFavoriteFolders(): List<Folder> = favoriteFolderStore.getAll()
+
+    private fun Folder.withResolvedSourceSlot(): Folder {
+        val resolvedSlot = if (isLocal) -1 else sourceSlot.takeIf { it >= 0 } ?: getCurrentSlot()
+        return if (sourceSlot == resolvedSlot) this else copy(sourceSlot = resolvedSlot)
+    }
 
     private fun getWebDavSlots(): MutableMap<Int, WebDavSlotConfig> {
         val json = appSettings.getOrDefaultString(AppSettingsStore.WEBDAV_SLOTS_JSON, "")
