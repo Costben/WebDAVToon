@@ -142,7 +142,6 @@
             <include layout="@layout/item_setting" android:id="@+id/setting_theme" />
             <include layout="@layout/item_setting" android:id="@+id/setting_language" />
             <include layout="@layout/item_setting" android:id="@+id/setting_grid_columns" />
-            <include layout="@layout/item_setting" android:id="@+id/setting_waterfall_layout" />
             <include layout="@layout/item_setting" android:id="@+id/setting_drawer_edge_width" />
             <include layout="@layout/item_setting" android:id="@+id/setting_sort_order" />
             <include layout="@layout/item_setting" android:id="@+id/setting_waterfall_filenames" />

@@ -40,7 +40,6 @@ class SettingsManager(context: Context) {
         const val KEY_WATERFALL_QUALITY_MODE = "waterfall_quality_mode"
         const val KEY_WATERFALL_PERCENT = "waterfall_percent"
         const val KEY_WATERFALL_MAX_WIDTH = "waterfall_max_width"
-        const val KEY_WATERFALL_LAYOUT_MODE = "waterfall_layout_mode"
         const val KEY_WATERFALL_SHOW_FILENAMES = "waterfall_show_filenames"
         const val KEY_READER_MAX_ZOOM_PERCENT = "reader_max_zoom_percent"
         const val KEY_DEFAULT_READER_MODE = "default_reader_mode"
@@ -51,8 +50,6 @@ class SettingsManager(context: Context) {
 
         const val WATERFALL_MODE_PERCENT = "percent"
         const val WATERFALL_MODE_MAX_WIDTH = "max_width"
-        const val WATERFALL_LAYOUT_FOLLOW_ZOOM = "follow_zoom"
-        const val WATERFALL_LAYOUT_LEGACY = "legacy"
         const val DEFAULT_DRAWER_EDGE_WIDTH_PERCENT = 33
         const val DEFAULT_READER_MODE_WEBTOON = "webtoon"
         const val DEFAULT_READER_MODE_CARD = "card"
@@ -73,14 +70,6 @@ class SettingsManager(context: Context) {
 
         @Volatile
         private var cachedSlotsMap: MutableMap<Int, WebDavSlotConfig> = mutableMapOf()
-
-        fun normalizeWaterfallLayoutMode(mode: String?): String {
-            return when (mode) {
-                WATERFALL_LAYOUT_FOLLOW_ZOOM,
-                WATERFALL_LAYOUT_LEGACY -> mode
-                else -> WATERFALL_LAYOUT_FOLLOW_ZOOM
-            }
-        }
     }
 
     fun getGridColumns(): Int = appSettings.getOrDefaultInt(AppSettingsStore.GRID_COLUMNS, 2)
@@ -115,17 +104,6 @@ class SettingsManager(context: Context) {
 
     fun getWaterfallMaxWidth(): Int = appSettings.getOrDefaultInt(AppSettingsStore.WATERFALL_MAX_WIDTH, 600)
     fun setWaterfallMaxWidth(maxWidth: Int) = appSettings.putInt(AppSettingsStore.WATERFALL_MAX_WIDTH, maxWidth)
-
-    fun getWaterfallLayoutMode(): String =
-        normalizeWaterfallLayoutMode(
-            appSettings.getOrDefaultString(
-                AppSettingsStore.WATERFALL_LAYOUT_MODE,
-                WATERFALL_LAYOUT_FOLLOW_ZOOM
-            )
-        )
-
-    fun setWaterfallLayoutMode(mode: String) =
-        appSettings.putString(AppSettingsStore.WATERFALL_LAYOUT_MODE, normalizeWaterfallLayoutMode(mode))
 
     fun shouldShowWaterfallFilenames(): Boolean =
         appSettings.getOrDefaultBoolean(AppSettingsStore.WATERFALL_SHOW_FILENAMES, true)
