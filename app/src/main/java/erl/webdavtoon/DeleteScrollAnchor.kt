@@ -2,7 +2,6 @@ package erl.webdavtoon
 
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import androidx.recyclerview.widget.StaggeredGridLayoutManager
 
 data class DeleteScrollAnchor(
     val position: Int,
@@ -43,7 +42,6 @@ object DeleteScrollAnchorHelper {
         recyclerView.post {
             when (val layoutManager = recyclerView.layoutManager) {
                 is LinearLayoutManager -> layoutManager.scrollToPositionWithOffset(targetPosition, anchor.offset)
-                is StaggeredGridLayoutManager -> layoutManager.scrollToPositionWithOffset(targetPosition, anchor.offset)
                 is FollowZoomWaterfallLayoutManager -> layoutManager.scrollToPositionWithOffset(targetPosition, anchor.offset)
                 else -> recyclerView.scrollToPosition(targetPosition)
             }

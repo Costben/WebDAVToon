@@ -138,12 +138,6 @@ class SettingsActivity : AppCompatActivity() {
             root.setOnClickListener { showGridColumnsDialog() }
         }
 
-        binding.settingWaterfallLayout.apply {
-            icon.setImageResource(R.drawable.ic_ior_album_list)
-            title.text = getString(R.string.waterfall_layout_mode)
-            root.setOnClickListener { showWaterfallLayoutModeDialog() }
-        }
-
         binding.settingDrawerEdgeWidth.apply {
             icon.setImageResource(R.drawable.ic_ior_open_select_hand_gesture)
             title.text = getString(R.string.drawer_edge_width)
@@ -247,10 +241,6 @@ class SettingsActivity : AppCompatActivity() {
 
         binding.settingGridColumns.title.text = getString(R.string.grid_columns)
         binding.settingGridColumns.summary.text = getString(R.string.columns_suffix, settingsManager.getGridColumns())
-
-        binding.settingWaterfallLayout.title.text = getString(R.string.waterfall_layout_mode)
-        binding.settingWaterfallLayout.summary.text =
-            waterfallLayoutModeLabel(settingsManager.getWaterfallLayoutMode())
 
         binding.settingDrawerEdgeWidth.title.text = getString(R.string.drawer_edge_width)
         val edgePercent = settingsManager.getDrawerEdgeWidthPercent()
@@ -556,36 +546,6 @@ class SettingsActivity : AppCompatActivity() {
             .setNegativeButton(R.string.cancel, null)
             .show()
     }
-
-    private fun showWaterfallLayoutModeDialog() {
-        val modeCodes = arrayOf(
-            SettingsManager.WATERFALL_LAYOUT_FOLLOW_ZOOM,
-            SettingsManager.WATERFALL_LAYOUT_LEGACY,
-        )
-        val options = arrayOf(
-            waterfallLayoutModeLabel(SettingsManager.WATERFALL_LAYOUT_FOLLOW_ZOOM),
-            waterfallLayoutModeLabel(SettingsManager.WATERFALL_LAYOUT_LEGACY),
-        )
-        val currentMode = settingsManager.getWaterfallLayoutMode()
-        val currentIndex = modeCodes.indexOf(currentMode).coerceAtLeast(0)
-
-        MaterialAlertDialogBuilder(this)
-            .setTitle(getString(R.string.waterfall_layout_mode))
-            .setSingleChoiceItems(options, currentIndex) { dialog, which ->
-                settingsManager.setWaterfallLayoutMode(modeCodes[which])
-                refreshUi()
-                setResult(RESULT_OK)
-                dialog.dismiss()
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
-    }
-
-    private fun waterfallLayoutModeLabel(mode: String): String =
-        when (mode) {
-            SettingsManager.WATERFALL_LAYOUT_LEGACY -> getString(R.string.waterfall_layout_legacy)
-            else -> getString(R.string.waterfall_layout_follow_zoom)
-        }
 
     private fun showThumbnailQualityDialog() {
         val modes = arrayOf(

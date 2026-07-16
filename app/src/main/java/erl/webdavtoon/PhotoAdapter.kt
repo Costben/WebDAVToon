@@ -4,7 +4,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
-import androidx.recyclerview.widget.StaggeredGridLayoutManager
 import com.google.android.material.card.MaterialCardView
 import erl.webdavtoon.databinding.ItemPhotoBinding
 
@@ -14,18 +13,10 @@ class PhotoAdapter(
     private val onPhotoDimensionsResolved: (photoId: String, width: Int, height: Int) -> Unit = { _, _, _ -> }
 ) : RecyclerView.Adapter<PhotoAdapter.PhotoViewHolder>() {
 
-    enum class LayoutMode {
-        FOLLOW_ZOOM,
-        LEGACY
-    }
-
     private var photos: List<Photo> = emptyList()
     private var isImmersiveMode = false
     private var isSingleColumn = false
-    private var layoutMode = LayoutMode.FOLLOW_ZOOM
-    private var legacyColumnCount = 2
     private var showFilenames = true
-    private var attachedRecyclerView: RecyclerView? = null
     private var isSelectionMode = false
     private val selectedPositions = mutableSetOf<Int>()
     private val resolvedDimensions = mutableMapOf<String, Pair<Int, Int>>()
@@ -60,21 +51,6 @@ class PhotoAdapter(
         notifyDataSetChanged()
     }
 
-    fun setLayoutMode(mode: LayoutMode) {
-        if (layoutMode == mode) return
-        layoutMode = mode
-        notifyDataSetChanged()
-    }
-
-    fun setLegacyColumnCount(columns: Int) {
-        val clamped = columns.coerceIn(1, 4)
-        if (legacyColumnCount == clamped) return
-        legacyColumnCount = clamped
-        if (layoutMode == LayoutMode.LEGACY) {
-            notifyDataSetChanged()
-        }
-    }
-
     fun setSelectionMode(enabled: Boolean) {
         if (isSelectionMode != enabled) {
             isSelectionMode = enabled
@@ -101,12 +77,6 @@ class PhotoAdapter(
         val current = resolvedDimensions[photoId]
         if (current?.first == width && current.second == height) return false
         resolvedDimensions[photoId] = width to height
-        if (layoutMode == LayoutMode.LEGACY) {
-            val position = photos.indexOfFirst { it.id == photoId }
-            if (position != -1) {
-                notifyItemChanged(position)
-            }
-        }
         return true
     }
 
@@ -131,31 +101,17 @@ class PhotoAdapter(
         return PhotoViewHolder(binding, onPhotoDimensionsResolved)
     }
 
-    override fun onAttachedToRecyclerView(recyclerView: RecyclerView) {
-        super.onAttachedToRecyclerView(recyclerView)
-        attachedRecyclerView = recyclerView
-    }
-
-    override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
-        if (attachedRecyclerView === recyclerView) {
-            attachedRecyclerView = null
-        }
-        super.onDetachedFromRecyclerView(recyclerView)
-    }
-
     override fun onBindViewHolder(holder: PhotoViewHolder, position: Int) {
         val photo = photos[position]
         val isSelected = selectedPositions.contains(position)
 
-        val displaySize = resolveDisplaySize(holder.itemView, position)
         holder.bind(
             photo = photo,
             isImmersiveMode = isImmersiveMode,
             isSingleColumn = isSingleColumn,
             showFilenames = showFilenames,
             isSelectionMode = isSelectionMode,
-            isSelected = isSelected,
-            displaySize = displaySize
+            isSelected = isSelected
         )
 
         holder.itemView.setOnClickListener {
@@ -186,13 +142,6 @@ class PhotoAdapter(
         val cardView = holder.itemView as MaterialCardView
         cardView.strokeWidth = if (isSelectionMode && isSelected) 4 else 0
 
-        if (layoutMode == LayoutMode.LEGACY && displaySize != null) {
-            cardView.layoutParams = cardView.layoutParams.apply {
-                width = ViewGroup.LayoutParams.MATCH_PARENT
-                height = displaySize.height
-            }
-        }
-
         if (isImmersiveMode && isSingleColumn) {
             cardView.radius = 0f
             cardView.setCardBackgroundColor(android.graphics.Color.TRANSPARENT)
@@ -204,23 +153,6 @@ class PhotoAdapter(
             cardView.elevation = 0f
             (cardView.layoutParams as RecyclerView.LayoutParams).setMargins(0, 0, 0, 0)
         }
-    }
-
-    private fun resolveDisplaySize(itemView: View, position: Int): WaterfallDisplaySize? {
-        if (layoutMode != LayoutMode.LEGACY) return null
-        val recyclerView = attachedRecyclerView ?: itemView.parent as? RecyclerView
-        val layoutManager = recyclerView?.layoutManager as? StaggeredGridLayoutManager
-        val columns = (layoutManager?.spanCount ?: legacyColumnCount).coerceIn(1, 4)
-        val horizontalMargins = (itemView.layoutParams as? ViewGroup.MarginLayoutParams)
-            ?.let { it.leftMargin + it.rightMargin }
-            ?: 0
-        val availableWidth = recyclerView
-            ?.let { it.width - it.paddingLeft - it.paddingRight }
-            ?.takeIf { it > 0 }
-            ?: itemView.resources.displayMetrics.widthPixels
-        val columnWidth = (availableWidth / columns - horizontalMargins).coerceAtLeast(1)
-        val height = (columnWidth / getPhotoAspectRatio(position)).toInt().coerceAtLeast(1)
-        return WaterfallDisplaySize(columnWidth, height)
     }
 
     override fun getItemCount(): Int = photos.size
@@ -239,21 +171,13 @@ class PhotoAdapter(
             isSingleColumn: Boolean,
             showFilenames: Boolean,
             isSelectionMode: Boolean,
-            isSelected: Boolean,
-            displaySize: WaterfallDisplaySize?
+            isSelected: Boolean
         ) {
             binding.titleTextView.text = photo.title
             binding.titleTextView.visibility = if (!showFilenames || isImmersiveMode) View.GONE else View.VISIBLE
-            displaySize?.let { size ->
-                binding.imageView.layoutParams = binding.imageView.layoutParams.apply {
-                    width = ViewGroup.LayoutParams.MATCH_PARENT
-                    height = size.height
-                }
-            } ?: run {
-                binding.imageView.layoutParams = binding.imageView.layoutParams.apply {
-                    width = ViewGroup.LayoutParams.MATCH_PARENT
-                    height = ViewGroup.LayoutParams.MATCH_PARENT
-                }
+            binding.imageView.layoutParams = binding.imageView.layoutParams.apply {
+                width = ViewGroup.LayoutParams.MATCH_PARENT
+                height = ViewGroup.LayoutParams.MATCH_PARENT
             }
 
             if (isSelectionMode) {
@@ -378,9 +302,4 @@ class PhotoAdapter(
     companion object {
         private const val DEFAULT_ASPECT_RATIO = 1f
     }
-
-    data class WaterfallDisplaySize(
-        val width: Int,
-        val height: Int
-    )
 }

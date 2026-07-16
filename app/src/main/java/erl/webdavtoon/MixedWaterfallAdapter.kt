@@ -332,8 +332,7 @@ class MixedWaterfallAdapter(
                 isSingleColumn = false,
                 showFilenames = showFilenames,
                 isSelectionMode = isSelectionMode,
-                isSelected = isSelected,
-                displaySize = null
+                isSelected = isSelected
             )
             (itemView as? MaterialCardView)?.apply {
                 radius = resources.getDimension(R.dimen.waterfall_card_corner_radius)
