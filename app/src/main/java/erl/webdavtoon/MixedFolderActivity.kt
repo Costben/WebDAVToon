@@ -691,8 +691,10 @@ class MixedFolderActivity : AppCompatActivity() {
     }
 
     private fun updateSortOrder(order: Int): Boolean {
+        val previousOrder = settingsManager.getSortOrder()
         settingsManager.setSortOrder(order)
         settingsManager.setPhotoSortOrder(order)
+        SmbSortHint.maybeShowPreviewHint(this, settingsManager, previousOrder, order)
         if (order == SettingsManager.SORT_RANDOM_FOLDERS) {
             folderShuffleSeed = Random.nextLong()
         }

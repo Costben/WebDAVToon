@@ -510,6 +510,7 @@ class SettingsActivity : AppCompatActivity() {
         MaterialAlertDialogBuilder(this)
             .setTitle(getString(R.string.sort_order))
             .setSingleChoiceItems(options, current) { dialog, which ->
+                SmbSortHint.maybeShowPreviewHint(this, settingsManager, current, which)
                 settingsManager.setSortOrder(which)
                 refreshUi()
                 dialog.dismiss()
