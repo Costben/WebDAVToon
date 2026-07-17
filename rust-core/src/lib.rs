@@ -4,10 +4,12 @@ mod database;
 mod models;
 mod remote_fs;
 mod repository;
+mod smb_fs;
 
-pub use models::{Folder, FolderInspection, MediaType, Photo, SortOrder};
+pub use models::{Folder, FolderInspection, MediaType, Photo, SmbShare, SortOrder};
 use repository::{RepoError, Repository};
-use std::sync::Mutex;
+use std::sync::{Mutex, OnceLock};
+use tokio::runtime::Runtime;
 
 #[derive(Debug, thiserror::Error, uniffi::Error)]
 pub enum WebDavToonError {
@@ -122,4 +124,33 @@ pub fn init_logger() {
 #[uniffi::export]
 pub fn hello_from_rust(name: String) -> String {
     format!("Hello, {}! This is from Rust Core.", name)
+}
+
+fn ffi_runtime() -> &'static Runtime {
+    static RUNTIME: OnceLock<Runtime> = OnceLock::new();
+    RUNTIME.get_or_init(|| {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("Failed to create FFI Tokio runtime")
+    })
+}
+
+#[uniffi::export]
+pub fn list_smb_shares(
+    host: String,
+    port: u16,
+    username: String,
+    password: String,
+    domain: Option<String>,
+) -> Result<Vec<SmbShare>, WebDavToonError> {
+    ffi_runtime()
+        .block_on(smb_fs::enumerate_shares(
+            host,
+            port,
+            username,
+            password,
+            domain,
+        ))
+        .map_err(WebDavToonError::ConfigError)
 }

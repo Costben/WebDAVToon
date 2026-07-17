@@ -729,6 +729,13 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 
 
 
+
+
+
+
+
+
+
 // A JNA Library to expose the extern-C FFI definitions.
 // This is an implementation detail which will be called internally by the public API.
 
@@ -772,6 +779,8 @@ internal interface UniffiLib : Library {
     ): RustBuffer.ByValue
     fun uniffi_rust_core_fn_func_init_logger(uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
+    fun uniffi_rust_core_fn_func_list_smb_shares(`host`: RustBuffer.ByValue,`port`: Short,`username`: RustBuffer.ByValue,`password`: RustBuffer.ByValue,`domain`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     fun ffi_rust_core_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun ffi_rust_core_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -888,6 +897,8 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_rust_core_checksum_func_init_logger(
     ): Short
+    fun uniffi_rust_core_checksum_func_list_smb_shares(
+    ): Short
     fun uniffi_rust_core_checksum_method_rustrepository_delete_photo(
     ): Short
     fun uniffi_rust_core_checksum_method_rustrepository_get_folders(
@@ -925,6 +936,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_rust_core_checksum_func_init_logger() != 19108.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_rust_core_checksum_func_list_smb_shares() != 20106.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_rust_core_checksum_method_rustrepository_delete_photo() != 34856.toShort()) {
@@ -997,6 +1011,29 @@ inline fun <T : Disposable?, R> T.use(block: (T) -> R) =
  * @suppress
  * */
 object NoPointer
+
+/**
+ * @suppress
+ */
+public object FfiConverterUShort: FfiConverter<UShort, Short> {
+    override fun lift(value: Short): UShort {
+        return value.toUShort()
+    }
+
+    override fun read(buf: ByteBuffer): UShort {
+        return lift(buf.getShort())
+    }
+
+    override fun lower(value: UShort): Short {
+        return value.toShort()
+    }
+
+    override fun allocationSize(value: UShort) = 2UL
+
+    override fun write(value: UShort, buf: ByteBuffer) {
+        buf.putShort(value.toShort())
+    }
+}
 
 /**
  * @suppress
@@ -1261,34 +1298,26 @@ private fun UniffiCleaner.Companion.create(): UniffiCleaner =
     try {
         // For safety's sake: if the library hasn't been run in android_cleaner = true
         // mode, but is being run on Android, then we still need to think about
-        // Android API versions. So we check if java.lang.ref.Cleaner is there,
-        // and use that via reflection to avoid API 33 compile-time lint failures.
+        // Android API versions.
+        // So we check if java.lang.ref.Cleaner is there, and use that…
         java.lang.Class.forName("java.lang.ref.Cleaner")
         JavaLangRefCleaner()
     } catch (e: ClassNotFoundException) {
-        // Otherwise, fallback to the JNA cleaner.
+        // … otherwise, fallback to the JNA cleaner.
         UniffiJnaCleaner()
     }
 
 private class JavaLangRefCleaner : UniffiCleaner {
-    private val cleanerClass = java.lang.Class.forName("java.lang.ref.Cleaner")
-    private val cleaner = cleanerClass.getMethod("create").invoke(null)
-    private val registerMethod = cleanerClass.getMethod(
-        "register",
-        Any::class.java,
-        Runnable::class.java
-    )
+    val cleaner = java.lang.ref.Cleaner.create()
 
     override fun register(value: Any, cleanUpTask: Runnable): UniffiCleaner.Cleanable =
-        JavaLangRefCleanable(requireNotNull(registerMethod.invoke(cleaner, value, cleanUpTask)))
+        JavaLangRefCleanable(cleaner.register(value, cleanUpTask))
 }
 
 private class JavaLangRefCleanable(
-    private val cleanable: Any
+    val cleanable: java.lang.ref.Cleaner.Cleanable
 ) : UniffiCleaner.Cleanable {
-    override fun clean() {
-        cleanable.javaClass.getMethod("clean").invoke(cleanable)
-    }
+    override fun clean() = cleanable.clean()
 }
 public interface RustRepositoryInterface {
     
@@ -1522,6 +1551,8 @@ public object FfiConverterTypeRustRepository: FfiConverter<RustRepository, Point
     }
 }
 
+
+
 data class Folder (
     var `path`: kotlin.String, 
     var `name`: kotlin.String, 
@@ -1653,6 +1684,38 @@ public object FfiConverterTypePhoto: FfiConverterRustBuffer<Photo> {
             FfiConverterULong.write(value.`dateModified`, buf)
             FfiConverterTypeMediaType.write(value.`mediaType`, buf)
             FfiConverterOptionalULong.write(value.`durationMs`, buf)
+    }
+}
+
+
+
+data class SmbShare (
+    var `name`: kotlin.String, 
+    var `remark`: kotlin.String
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeSmbShare: FfiConverterRustBuffer<SmbShare> {
+    override fun read(buf: ByteBuffer): SmbShare {
+        return SmbShare(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: SmbShare) = (
+            FfiConverterString.allocationSize(value.`name`) +
+            FfiConverterString.allocationSize(value.`remark`)
+    )
+
+    override fun write(value: SmbShare, buf: ByteBuffer) {
+            FfiConverterString.write(value.`name`, buf)
+            FfiConverterString.write(value.`remark`, buf)
     }
 }
 
@@ -1936,6 +1999,38 @@ public object FfiConverterOptionalULong: FfiConverterRustBuffer<kotlin.ULong?> {
 /**
  * @suppress
  */
+public object FfiConverterOptionalString: FfiConverterRustBuffer<kotlin.String?> {
+    override fun read(buf: ByteBuffer): kotlin.String? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterString.read(buf)
+    }
+
+    override fun allocationSize(value: kotlin.String?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterString.allocationSize(value)
+        }
+    }
+
+    override fun write(value: kotlin.String?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterString.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceString: FfiConverterRustBuffer<List<kotlin.String>> {
     override fun read(buf: ByteBuffer): List<kotlin.String> {
         val len = buf.getInt()
@@ -2012,6 +2107,34 @@ public object FfiConverterSequenceTypePhoto: FfiConverterRustBuffer<List<Photo>>
             FfiConverterTypePhoto.write(it, buf)
         }
     }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeSmbShare: FfiConverterRustBuffer<List<SmbShare>> {
+    override fun read(buf: ByteBuffer): List<SmbShare> {
+        val len = buf.getInt()
+        return List<SmbShare>(len) {
+            FfiConverterTypeSmbShare.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<SmbShare>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeSmbShare.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<SmbShare>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeSmbShare.write(it, buf)
+        }
+    }
 } fun `helloFromRust`(`name`: kotlin.String): kotlin.String {
             return FfiConverterString.lift(
     uniffiRustCall() { _status ->
@@ -2030,5 +2153,14 @@ public object FfiConverterSequenceTypePhoto: FfiConverterRustBuffer<List<Photo>>
     
     
 
+    @Throws(WebDavToonException::class) fun `listSmbShares`(`host`: kotlin.String, `port`: kotlin.UShort, `username`: kotlin.String, `password`: kotlin.String, `domain`: kotlin.String?): List<SmbShare> {
+            return FfiConverterSequenceTypeSmbShare.lift(
+    uniffiRustCallWithError(WebDavToonException) { _status ->
+    UniffiLib.INSTANCE.uniffi_rust_core_fn_func_list_smb_shares(
+        FfiConverterString.lower(`host`),FfiConverterUShort.lower(`port`),FfiConverterString.lower(`username`),FfiConverterString.lower(`password`),FfiConverterOptionalString.lower(`domain`),_status)
+}
+    )
+    }
+    
 
 
