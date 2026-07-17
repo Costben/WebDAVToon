@@ -285,6 +285,18 @@ const ON_DEMAND_SCAN: ScanLimits = ScanLimits {
     cap_previews: false,
 };
 
+/// SMB variant of `ON_DEMAND_SCAN`: directory listings cost several protocol
+/// round-trips each, so previews stop at 4 instead of collecting every media
+/// file of the first yielding folder (the Kotlin side does not sort SMB
+/// previews, see RustWebDavPhotoRepository.inspectFolder).
+const ON_DEMAND_SCAN_CAPPED: ScanLimits = ScanLimits {
+    max_entries: MAX_ON_DEMAND_PREVIEW_SCAN_ENTRIES,
+    max_root_children: MAX_ON_DEMAND_ROOT_CHILDREN_TO_QUEUE,
+    count_all_entries: false,
+    truncate_on_root_cap: false,
+    cap_previews: true,
+};
+
 pub struct RemoteService {
     backend: Backend,
     base_url: String,
@@ -593,9 +605,12 @@ impl RemoteService {
 
     pub async fn inspect_folder(&self, folder_path: &str) -> Result<FolderInspection, String> {
         let started = Instant::now();
-        let scan = self
-            .scan_folder_preview(folder_path, &ON_DEMAND_SCAN)
-            .await?;
+        let limits = if self.protocol == RemoteProtocol::Smb {
+            &ON_DEMAND_SCAN_CAPPED
+        } else {
+            &ON_DEMAND_SCAN
+        };
+        let scan = self.scan_folder_preview(folder_path, limits).await?;
         log::info!(
             "inspect_folder protocol={} path={} previews={} has_sub_folders={} scanned_entries={} media_entries={} truncated={} elapsed_ms={}",
             self.proto_label(),
