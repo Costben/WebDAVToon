@@ -18,6 +18,9 @@ android_logger = "0.14"
 tokio = { version = "1.36", features = ["macros", "rt"] }
 futures = "0.3"
 opendal = { version = "0.50", features = ["services-webdav", "services-fs"] }
+smb = { version = "=0.11.2", default-features = false, features = ["async", "sign", "encrypt", "compress"] }
+smb-msg = "=0.11.2"
+smb-rpc = "=0.11.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 rusqlite = { version = "0.31", features = ["bundled"] }

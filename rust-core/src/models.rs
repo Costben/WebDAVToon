@@ -42,6 +42,12 @@ pub struct Folder {
     pub date_modified: u64,
 }
 
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct SmbShare {
+    pub name: String,
+    pub remark: String,
+}
+
 #[derive(Debug, Clone, uniffi::Enum)]
 pub enum SortOrder {
     NameAsc,
