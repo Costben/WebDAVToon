@@ -61,8 +61,22 @@ object ExternalVideoOpener {
         isRemote: Boolean,
         settingsManager: SettingsManager
     ): Uri {
-        if (!isRemote || !mediaUri.startsWith("http", ignoreCase = true)) {
+        if (!isRemote || !RemoteMediaUrlResolver.isRemoteMediaUri(mediaUri)) {
             return buildSharableLocalUri(context, mediaUri)
+        }
+
+        if (RemoteMediaUrlResolver.isProxyScheme(mediaUri)) {
+            // smb/ftp: hand the player a loopback proxy URL. The token in the
+            // path is the auth; never embed user:pass.
+            val proxyUrl = RemoteMediaUrlResolver.resolveForHttp(settingsManager, mediaUri)
+            if (proxyUrl != null) {
+                return Uri.parse(proxyUrl)
+            }
+            android.util.Log.w(
+                "ExternalVideoOpener",
+                "Unable to resolve proxy URL for $mediaUri; falling back to raw uri"
+            )
+            return Uri.parse(mediaUri)
         }
 
         return Uri.parse(

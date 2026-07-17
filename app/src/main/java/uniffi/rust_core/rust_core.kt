@@ -736,6 +736,10 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 
 
 
+
+
+
+
 // A JNA Library to expose the extern-C FFI definitions.
 // This is an implementation detail which will be called internally by the public API.
 
@@ -761,25 +765,29 @@ internal interface UniffiLib : Library {
     ): Unit
     fun uniffi_rust_core_fn_constructor_rustrepository_new(`dbPath`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Pointer
+    fun uniffi_rust_core_fn_method_rustrepository_delete_folder(`ptr`: Pointer,`path`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
     fun uniffi_rust_core_fn_method_rustrepository_delete_photo(`ptr`: Pointer,`path`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     fun uniffi_rust_core_fn_method_rustrepository_get_folders(`ptr`: Pointer,`path`: RustBuffer.ByValue,`forceRefresh`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_rust_core_fn_method_rustrepository_get_photos(`ptr`: Pointer,`path`: RustBuffer.ByValue,`sortOrder`: RustBuffer.ByValue,`forceRefresh`: Byte,`recursive`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
-    fun uniffi_rust_core_fn_method_rustrepository_init_webdav(`ptr`: Pointer,`endpoint`: RustBuffer.ByValue,`username`: RustBuffer.ByValue,`password`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_rust_core_fn_method_rustrepository_init_remote(`ptr`: Pointer,`config`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     fun uniffi_rust_core_fn_method_rustrepository_inspect_folder(`ptr`: Pointer,`path`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_rust_core_fn_method_rustrepository_read_file(`ptr`: Pointer,`path`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
-    fun uniffi_rust_core_fn_method_rustrepository_test_webdav(`ptr`: Pointer,`endpoint`: RustBuffer.ByValue,`username`: RustBuffer.ByValue,`password`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_rust_core_fn_method_rustrepository_test_remote(`ptr`: Pointer,`config`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    fun uniffi_rust_core_fn_func_ensure_media_proxy(uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_rust_core_fn_func_hello_from_rust(`name`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun uniffi_rust_core_fn_func_init_logger(uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
-    fun uniffi_rust_core_fn_func_list_smb_shares(`host`: RustBuffer.ByValue,`port`: Short,`username`: RustBuffer.ByValue,`password`: RustBuffer.ByValue,`domain`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    fun uniffi_rust_core_fn_func_list_smb_shares(`host`: RustBuffer.ByValue,`port`: Short,`username`: RustBuffer.ByValue,`password`: RustBuffer.ByValue,`domain`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
     fun ffi_rust_core_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -893,11 +901,15 @@ internal interface UniffiLib : Library {
     ): Unit
     fun ffi_rust_core_rust_future_complete_void(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
+    fun uniffi_rust_core_checksum_func_ensure_media_proxy(
+    ): Short
     fun uniffi_rust_core_checksum_func_hello_from_rust(
     ): Short
     fun uniffi_rust_core_checksum_func_init_logger(
     ): Short
     fun uniffi_rust_core_checksum_func_list_smb_shares(
+    ): Short
+    fun uniffi_rust_core_checksum_method_rustrepository_delete_folder(
     ): Short
     fun uniffi_rust_core_checksum_method_rustrepository_delete_photo(
     ): Short
@@ -905,13 +917,13 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_rust_core_checksum_method_rustrepository_get_photos(
     ): Short
-    fun uniffi_rust_core_checksum_method_rustrepository_init_webdav(
+    fun uniffi_rust_core_checksum_method_rustrepository_init_remote(
     ): Short
     fun uniffi_rust_core_checksum_method_rustrepository_inspect_folder(
     ): Short
     fun uniffi_rust_core_checksum_method_rustrepository_read_file(
     ): Short
-    fun uniffi_rust_core_checksum_method_rustrepository_test_webdav(
+    fun uniffi_rust_core_checksum_method_rustrepository_test_remote(
     ): Short
     fun uniffi_rust_core_checksum_constructor_rustrepository_new(
     ): Short
@@ -932,6 +944,9 @@ private fun uniffiCheckContractApiVersion(lib: UniffiLib) {
 
 @Suppress("UNUSED_PARAMETER")
 private fun uniffiCheckApiChecksums(lib: UniffiLib) {
+    if (lib.uniffi_rust_core_checksum_func_ensure_media_proxy() != 12398.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_rust_core_checksum_func_hello_from_rust() != 27971.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -939,6 +954,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_rust_core_checksum_func_list_smb_shares() != 20106.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_rust_core_checksum_method_rustrepository_delete_folder() != 12705.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_rust_core_checksum_method_rustrepository_delete_photo() != 34856.toShort()) {
@@ -950,7 +968,7 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_rust_core_checksum_method_rustrepository_get_photos() != 46141.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_rust_core_checksum_method_rustrepository_init_webdav() != 1199.toShort()) {
+    if (lib.uniffi_rust_core_checksum_method_rustrepository_init_remote() != 15448.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_rust_core_checksum_method_rustrepository_inspect_folder() != 60900.toShort()) {
@@ -959,7 +977,7 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
     if (lib.uniffi_rust_core_checksum_method_rustrepository_read_file() != 43160.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_rust_core_checksum_method_rustrepository_test_webdav() != 55003.toShort()) {
+    if (lib.uniffi_rust_core_checksum_method_rustrepository_test_remote() != 48723.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_rust_core_checksum_constructor_rustrepository_new() != 2962.toShort()) {
@@ -1321,19 +1339,21 @@ private class JavaLangRefCleanable(
 }
 public interface RustRepositoryInterface {
     
+    fun `deleteFolder`(`path`: kotlin.String)
+    
     fun `deletePhoto`(`path`: kotlin.String)
     
     fun `getFolders`(`path`: kotlin.String, `forceRefresh`: kotlin.Boolean): List<Folder>
     
     fun `getPhotos`(`path`: kotlin.String, `sortOrder`: SortOrder, `forceRefresh`: kotlin.Boolean, `recursive`: kotlin.Boolean): List<Photo>
     
-    fun `initWebdav`(`endpoint`: kotlin.String, `username`: kotlin.String, `password`: kotlin.String)
+    fun `initRemote`(`config`: RemoteConfig)
     
     fun `inspectFolder`(`path`: kotlin.String): FolderInspection
     
     fun `readFile`(`path`: kotlin.String): kotlin.ByteArray
     
-    fun `testWebdav`(`endpoint`: kotlin.String, `username`: kotlin.String, `password`: kotlin.String): kotlin.String
+    fun `testRemote`(`config`: RemoteConfig): kotlin.String
     
     companion object
 }
@@ -1427,6 +1447,18 @@ open class RustRepository: Disposable, AutoCloseable, RustRepositoryInterface {
     }
 
     
+    @Throws(WebDavToonException::class)override fun `deleteFolder`(`path`: kotlin.String)
+        = 
+    callWithPointer {
+    uniffiRustCallWithError(WebDavToonException) { _status ->
+    UniffiLib.INSTANCE.uniffi_rust_core_fn_method_rustrepository_delete_folder(
+        it, FfiConverterString.lower(`path`),_status)
+}
+    }
+    
+    
+
+    
     @Throws(WebDavToonException::class)override fun `deletePhoto`(`path`: kotlin.String)
         = 
     callWithPointer {
@@ -1465,12 +1497,12 @@ open class RustRepository: Disposable, AutoCloseable, RustRepositoryInterface {
     
 
     
-    @Throws(WebDavToonException::class)override fun `initWebdav`(`endpoint`: kotlin.String, `username`: kotlin.String, `password`: kotlin.String)
+    @Throws(WebDavToonException::class)override fun `initRemote`(`config`: RemoteConfig)
         = 
     callWithPointer {
     uniffiRustCallWithError(WebDavToonException) { _status ->
-    UniffiLib.INSTANCE.uniffi_rust_core_fn_method_rustrepository_init_webdav(
-        it, FfiConverterString.lower(`endpoint`),FfiConverterString.lower(`username`),FfiConverterString.lower(`password`),_status)
+    UniffiLib.INSTANCE.uniffi_rust_core_fn_method_rustrepository_init_remote(
+        it, FfiConverterTypeRemoteConfig.lower(`config`),_status)
 }
     }
     
@@ -1503,12 +1535,12 @@ open class RustRepository: Disposable, AutoCloseable, RustRepositoryInterface {
     
 
     
-    @Throws(WebDavToonException::class)override fun `testWebdav`(`endpoint`: kotlin.String, `username`: kotlin.String, `password`: kotlin.String): kotlin.String {
+    @Throws(WebDavToonException::class)override fun `testRemote`(`config`: RemoteConfig): kotlin.String {
             return FfiConverterString.lift(
     callWithPointer {
     uniffiRustCallWithError(WebDavToonException) { _status ->
-    UniffiLib.INSTANCE.uniffi_rust_core_fn_method_rustrepository_test_webdav(
-        it, FfiConverterString.lower(`endpoint`),FfiConverterString.lower(`username`),FfiConverterString.lower(`password`),_status)
+    UniffiLib.INSTANCE.uniffi_rust_core_fn_method_rustrepository_test_remote(
+        it, FfiConverterTypeRemoteConfig.lower(`config`),_status)
 }
     }
     )
@@ -1633,6 +1665,38 @@ public object FfiConverterTypeFolderInspection: FfiConverterRustBuffer<FolderIns
 
 
 
+data class MediaProxyInfo (
+    var `port`: kotlin.UShort, 
+    var `token`: kotlin.String
+) {
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeMediaProxyInfo: FfiConverterRustBuffer<MediaProxyInfo> {
+    override fun read(buf: ByteBuffer): MediaProxyInfo {
+        return MediaProxyInfo(
+            FfiConverterUShort.read(buf),
+            FfiConverterString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: MediaProxyInfo) = (
+            FfiConverterUShort.allocationSize(value.`port`) +
+            FfiConverterString.allocationSize(value.`token`)
+    )
+
+    override fun write(value: MediaProxyInfo, buf: ByteBuffer) {
+            FfiConverterUShort.write(value.`port`, buf)
+            FfiConverterString.write(value.`token`, buf)
+    }
+}
+
+
+
 data class Photo (
     var `id`: kotlin.String, 
     var `title`: kotlin.String, 
@@ -1689,11 +1753,63 @@ public object FfiConverterTypePhoto: FfiConverterRustBuffer<Photo> {
 
 
 
-data class SmbShare (
-    var `name`: kotlin.String, 
-    var `remark`: kotlin.String
+data class RemoteConfig (
+    var `protocol`: RemoteProtocol, 
+    /**
+     * Canonical endpoint string produced by the Kotlin normalizer, e.g.
+     * `https://host/dav`, `smb://host/share/sub`, `ftp://host:2121/pub`.
+     * Stored verbatim as the base for minted photo URIs.
+     */
+    var `endpoint`: kotlin.String, 
+    var `username`: kotlin.String, 
+    var `password`: kotlin.String, 
+    /**
+     * SMB domain / workgroup; ignored by other protocols.
+     */
+    var `domain`: kotlin.String?
 ) {
     
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeRemoteConfig: FfiConverterRustBuffer<RemoteConfig> {
+    override fun read(buf: ByteBuffer): RemoteConfig {
+        return RemoteConfig(
+            FfiConverterTypeRemoteProtocol.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: RemoteConfig) = (
+            FfiConverterTypeRemoteProtocol.allocationSize(value.`protocol`) +
+            FfiConverterString.allocationSize(value.`endpoint`) +
+            FfiConverterString.allocationSize(value.`username`) +
+            FfiConverterString.allocationSize(value.`password`) +
+            FfiConverterOptionalString.allocationSize(value.`domain`)
+    )
+
+    override fun write(value: RemoteConfig, buf: ByteBuffer) {
+            FfiConverterTypeRemoteProtocol.write(value.`protocol`, buf)
+            FfiConverterString.write(value.`endpoint`, buf)
+            FfiConverterString.write(value.`username`, buf)
+            FfiConverterString.write(value.`password`, buf)
+            FfiConverterOptionalString.write(value.`domain`, buf)
+    }
+}
+
+
+
+data class SmbShare (
+    var `name`: kotlin.String,
+    var `remark`: kotlin.String
+) {
+
     companion object
 }
 
@@ -1743,6 +1859,37 @@ public object FfiConverterTypeMediaType: FfiConverterRustBuffer<MediaType> {
     override fun allocationSize(value: MediaType) = 4UL
 
     override fun write(value: MediaType, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+
+enum class RemoteProtocol {
+    
+    WEB_DAV,
+    SMB,
+    FTP;
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeRemoteProtocol: FfiConverterRustBuffer<RemoteProtocol> {
+    override fun read(buf: ByteBuffer) = try {
+        RemoteProtocol.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: RemoteProtocol) = 4UL
+
+    override fun write(value: RemoteProtocol, buf: ByteBuffer) {
         buf.putInt(value.ordinal + 1)
     }
 }
@@ -2135,7 +2282,22 @@ public object FfiConverterSequenceTypeSmbShare: FfiConverterRustBuffer<List<SmbS
             FfiConverterTypeSmbShare.write(it, buf)
         }
     }
-} fun `helloFromRust`(`name`: kotlin.String): kotlin.String {
+}
+        /**
+         * Starts the loopback media proxy on first call and returns its port and
+         * auth token. Kotlin converts smb:// and ftp:// virtual URIs into
+         * `http://127.0.0.1:{port}/{token}/{path}` requests against it.
+         */
+    @Throws(WebDavToonException::class) fun `ensureMediaProxy`(): MediaProxyInfo {
+            return FfiConverterTypeMediaProxyInfo.lift(
+    uniffiRustCallWithError(WebDavToonException) { _status ->
+    UniffiLib.INSTANCE.uniffi_rust_core_fn_func_ensure_media_proxy(
+        _status)
+}
+    )
+    }
+    
+ fun `helloFromRust`(`name`: kotlin.String): kotlin.String {
             return FfiConverterString.lift(
     uniffiRustCall() { _status ->
     UniffiLib.INSTANCE.uniffi_rust_core_fn_func_hello_from_rust(
@@ -2161,6 +2323,5 @@ public object FfiConverterSequenceTypeSmbShare: FfiConverterRustBuffer<List<SmbS
 }
     )
     }
-    
 
 

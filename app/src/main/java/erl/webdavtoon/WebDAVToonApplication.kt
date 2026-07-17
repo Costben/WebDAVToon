@@ -142,6 +142,12 @@ class MyGlideModule : AppGlideModule() {
             .addInterceptor { chain ->
                 val originalRequest = chain.request()
 
+                // Loopback media-proxy requests authenticate via the URL
+                // token; never leak WebDAV Basic credentials to it.
+                if (originalRequest.url.host == "127.0.0.1") {
+                    return@addInterceptor chain.proceed(originalRequest)
+                }
+
                 if (settingsManager.isWebDavEnabled()) {
                     val username = settingsManager.getWebDavUsername()
                     val password = settingsManager.getWebDavPassword()

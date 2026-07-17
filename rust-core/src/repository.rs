@@ -1,5 +1,5 @@
 use crate::database::Database;
-use crate::models::{Folder, FolderInspection, Photo, SortOrder};
+use crate::models::{Folder, FolderInspection, Photo, RemoteConfig, SortOrder};
 use crate::remote_fs::RemoteService;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
@@ -16,19 +16,17 @@ pub enum RepoError {
 }
 
 pub struct Repository {
-    remote: Option<RemoteService>,
+    remote: Option<Arc<RemoteService>>,
     db: Option<Arc<Mutex<Database>>>,
-    rt: Arc<Runtime>,
     current_endpoint: Option<String>,
+}
+
+fn runtime() -> &'static Runtime {
+    crate::runtime::global()
 }
 
 impl Repository {
     pub fn new(db_path: String) -> Self {
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("Failed to create Tokio runtime");
-
         let db = Database::open(&db_path)
             .ok()
             .map(|d| Arc::new(Mutex::new(d)));
@@ -42,23 +40,28 @@ impl Repository {
         Self {
             remote: None,
             db,
-            rt: Arc::new(rt),
             current_endpoint: None,
         }
     }
 
-    pub fn init_webdav(
-        &mut self,
-        endpoint: String,
-        username: String,
-        password: String,
-    ) -> Result<(), RepoError> {
-        let identity = format!("{}|{}", endpoint, username);
+    /// Initializes (or re-initializes) the remote service from a protocol
+    /// config. The listing cache is cleared whenever the account identity
+    /// (protocol, endpoint, username, domain) changes. The service is also
+    /// published to the media proxy so byte requests always hit the current
+    /// slot.
+    pub fn init_remote(&mut self, config: RemoteConfig) -> Result<(), RepoError> {
+        let identity = format!(
+            "{}|{}|{}|{}",
+            config.protocol.label(),
+            config.endpoint,
+            config.username,
+            config.domain.as_deref().unwrap_or_default()
+        );
         let changed = self.current_endpoint.as_deref() != Some(identity.as_str());
 
-        let service = RemoteService::new_webdav(&endpoint, &username, &password)
-            .map_err(RepoError::Remote)?;
-        self.remote = Some(service);
+        let service = Arc::new(RemoteService::new(&config).map_err(RepoError::Remote)?);
+        self.remote = Some(Arc::clone(&service));
+        crate::media_proxy::set_byte_service(service);
 
         if changed {
             if let Some(db) = &self.db {
@@ -66,7 +69,7 @@ impl Repository {
                     if let Err(e) = db.clear_all_cache() {
                         log::warn!("Failed to clear cache on endpoint switch: {:?}", e);
                     } else {
-                        log::info!("Cleared cache on endpoint switch to {}", endpoint);
+                        log::info!("Cleared cache on endpoint switch to {}", config.endpoint);
                     }
                 }
             }
@@ -77,7 +80,7 @@ impl Repository {
     }
 
     pub fn read_file(&self, path: String) -> Result<Vec<u8>, RepoError> {
-        self.rt.block_on(async {
+        runtime().block_on(async {
             if let Some(ref service) = self.remote {
                 service.read_file(&path).await.map_err(RepoError::Remote)
             } else {
@@ -89,7 +92,7 @@ impl Repository {
     }
 
     pub fn delete_photo(&self, path: String) -> Result<(), RepoError> {
-        self.rt.block_on(async {
+        runtime().block_on(async {
             if let Some(ref service) = self.remote {
                 service
                     .delete_file(&path)
@@ -134,7 +137,7 @@ impl Repository {
         }
 
         // 2. Load from Remote
-        let photos = self.rt.block_on(async {
+        let photos = runtime().block_on(async {
             if let Some(ref service) = self.remote {
                 service
                     .list_photos(&path, sort_order.clone(), recursive)
@@ -178,7 +181,7 @@ impl Repository {
         }
 
         let started = Instant::now();
-        let folders = self.rt.block_on(async {
+        let folders = runtime().block_on(async {
             if let Some(ref service) = self.remote {
                 service.list_folders(&path).await.map_err(RepoError::Remote)
             } else {
@@ -206,7 +209,7 @@ impl Repository {
     }
 
     pub fn inspect_folder(&self, path: String) -> Result<FolderInspection, RepoError> {
-        self.rt.block_on(async {
+        runtime().block_on(async {
             if let Some(ref service) = self.remote.as_ref() {
                 service
                     .inspect_folder(&path)
@@ -220,15 +223,21 @@ impl Repository {
         })
     }
 
-    pub fn test_webdav(
-        &self,
-        endpoint: String,
-        username: String,
-        password: String,
-    ) -> Result<String, RepoError> {
-        self.rt.block_on(async {
-            let service = RemoteService::new_webdav(&endpoint, &username, &password)
-                .map_err(RepoError::Remote)?;
+    pub fn delete_folder(&self, path: String) -> Result<(), RepoError> {
+        runtime().block_on(async {
+            if let Some(ref service) = self.remote {
+                service.delete_dir(&path).await.map_err(RepoError::Remote)
+            } else {
+                Err(RepoError::Config(
+                    "Remote service not initialized".to_string(),
+                ))
+            }
+        })
+    }
+
+    pub fn test_remote(&self, config: RemoteConfig) -> Result<String, RepoError> {
+        runtime().block_on(async {
+            let service = RemoteService::new(&config).map_err(RepoError::Remote)?;
 
             let names = service.list_root_names().await.map_err(RepoError::Remote)?;
 
