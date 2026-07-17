@@ -82,7 +82,17 @@ impl Repository {
     pub fn read_file(&self, path: String) -> Result<Vec<u8>, RepoError> {
         runtime().block_on(async {
             if let Some(ref service) = self.remote {
-                service.read_file(&path).await.map_err(RepoError::Remote)
+                let started = Instant::now();
+                let result = service.read_file(&path).await.map_err(RepoError::Remote);
+                if let Ok(ref data) = result {
+                    log::info!(
+                        "read_file path={} bytes={} elapsed_ms={}",
+                        path,
+                        data.len(),
+                        started.elapsed().as_millis()
+                    );
+                }
+                result
             } else {
                 Err(RepoError::Config(
                     "Remote service not initialized".to_string(),
