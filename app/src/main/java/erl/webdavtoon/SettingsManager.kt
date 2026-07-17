@@ -271,7 +271,7 @@ class SettingsManager(context: Context) {
         upsertWebDavSlot(slot) { copy(protocol = protocol) }
 
     fun getWebDavPort(slot: Int = getCurrentSlot()): Int =
-        getWebDavSlot(slot)?.port ?: if (getWebDavProtocol(slot) == "https") 443 else 80
+        getWebDavSlot(slot)?.port ?: WebDavEndpointNormalizer.defaultPortFor(getWebDavProtocol(slot))
 
     fun setWebDavPort(port: Int, slot: Int = getCurrentSlot()) = upsertWebDavSlot(slot) { copy(port = port) }
 
@@ -300,6 +300,10 @@ class SettingsManager(context: Context) {
     fun getWebDavAlias(slot: Int = getCurrentSlot()): String = getWebDavSlot(slot)?.alias ?: ""
     fun setWebDavAlias(alias: String, slot: Int = getCurrentSlot()) = upsertWebDavSlot(slot) { copy(alias = alias) }
 
+    fun getWebDavDomain(slot: Int = getCurrentSlot()): String = getWebDavSlot(slot)?.domain ?: ""
+    fun setWebDavDomain(domain: String, slot: Int = getCurrentSlot()) =
+        upsertWebDavSlot(slot) { copy(domain = domain) }
+
     fun isWebDavPrivate(slot: Int = getCurrentSlot()): Boolean = getWebDavSlot(slot)?.isPrivate ?: false
     fun setWebDavPrivate(isPrivate: Boolean, slot: Int = getCurrentSlot()) =
         upsertWebDavSlot(slot) { copy(isPrivate = isPrivate) }
@@ -319,7 +323,8 @@ class SettingsManager(context: Context) {
         rememberPassword: Boolean,
         enabled: Boolean = true,
         switchToSlotOnSave: Boolean = false,
-        isPrivate: Boolean = false
+        isPrivate: Boolean = false,
+        domain: String = ""
     ) {
         val slots = getWebDavSlots()
         val current = slots[slot] ?: WebDavSlotConfig()
@@ -331,7 +336,8 @@ class SettingsManager(context: Context) {
             username = username,
             rememberPassword = rememberPassword,
             enabled = enabled,
-            isPrivate = isPrivate
+            isPrivate = isPrivate,
+            domain = domain
         )
         saveWebDavSlots(slots, if (switchToSlotOnSave) slot else null)
         credentialPolicy.savePassword(slot, rememberPassword, password)
@@ -346,6 +352,28 @@ class SettingsManager(context: Context) {
         LogManager.log("Built URL: $fullUrl", Log.DEBUG, "SettingsManager")
         return fullUrl
     }
+
+    /** Maps the slot's protocol string onto the Rust FFI enum. */
+    fun getRemoteProtocol(slot: Int = getCurrentSlot()): uniffi.rust_core.RemoteProtocol =
+        when (getWebDavProtocol(slot).lowercase()) {
+            "smb" -> uniffi.rust_core.RemoteProtocol.SMB
+            "ftp" -> uniffi.rust_core.RemoteProtocol.FTP
+            else -> uniffi.rust_core.RemoteProtocol.WEB_DAV
+        }
+
+    /** True when the slot's bytes are served through the loopback media proxy. */
+    fun isProxyProtocol(slot: Int = getCurrentSlot()): Boolean =
+        getRemoteProtocol(slot) != uniffi.rust_core.RemoteProtocol.WEB_DAV
+
+    /** Builds the Rust-side remote config for this slot. */
+    fun buildRemoteConfig(slot: Int = getCurrentSlot()): uniffi.rust_core.RemoteConfig =
+        uniffi.rust_core.RemoteConfig(
+            protocol = getRemoteProtocol(slot),
+            endpoint = getFullWebDavUrl(slot),
+            username = getWebDavUsername(slot),
+            password = getWebDavPassword(slot),
+            domain = getWebDavDomain(slot).takeIf { it.isNotEmpty() }
+        )
 
     fun isPhotoFavorite(photoId: String): Boolean = favoritePhotoStore.isFavorite(photoId)
 

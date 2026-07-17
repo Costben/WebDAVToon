@@ -161,13 +161,18 @@ class EditService(
 
     private fun downloadRemotePhotoToCache(photo: Photo): File {
         val targetFile = createCacheFile(photo)
+        val uriString = photo.imageUri.toString()
+        val fetchUrl = RemoteMediaUrlResolver.resolveForHttp(settingsManager, uriString)
+            ?: throw IOException("Media is not reachable from the current server: $uriString")
         val requestBuilder = Request.Builder()
-            .url(FileUtils.encodeWebDavUrl(photo.imageUri.toString()))
+            .url(fetchUrl)
             .get()
-        val username = settingsManager.getWebDavUsername()
-        val password = settingsManager.getWebDavPassword()
-        if (username.isNotBlank() || password.isNotBlank()) {
-            requestBuilder.addHeader("Authorization", Credentials.basic(username, password))
+        if (RemoteMediaUrlResolver.needsBasicAuth(uriString)) {
+            val username = settingsManager.getWebDavUsername()
+            val password = settingsManager.getWebDavPassword()
+            if (username.isNotBlank() || password.isNotBlank()) {
+                requestBuilder.addHeader("Authorization", Credentials.basic(username, password))
+            }
         }
 
         client.newCall(requestBuilder.build()).execute().use { response ->

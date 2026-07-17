@@ -90,7 +90,7 @@ internal class FolderPreviewBinder(
 
         val uriString = uri.toString()
         val mediaType = detectMediaTypeByUri(uri) ?: MediaType.IMAGE
-        val isRemote = uriString.startsWith("http", ignoreCase = true)
+        val isRemote = RemoteMediaUrlResolver.isRemoteMediaUri(uriString)
         val shouldCrossFade = animate && imageView.drawable != null
         android.util.Log.d(
             logTag,

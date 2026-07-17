@@ -150,8 +150,15 @@ object WebDavImageLoader {
         preserveCurrentDrawable: Boolean = false,
         crossFadeDurationMs: Int = 0
     ) {
-        val encodedUrl = FileUtils.encodeWebDavUrl(videoUri.toString())
-        val cacheKey = buildVideoBitmapCacheKey(encodedUrl, isFolderPreview)
+        val settings = getSettingsManager(context)
+        val uriString = videoUri.toString()
+        val isProxy = RemoteMediaUrlResolver.isProxyScheme(uriString)
+        // Cache keys: WebDAV keeps the historical encoded-URL key (existing
+        // caches stay valid); smb/ftp key on the stable virtual URI because
+        // the fetch URL embeds the per-process proxy port/token.
+        val cacheKeySource = if (isProxy) uriString else FileUtils.encodeWebDavUrl(uriString)
+        val fetchUrl = RemoteMediaUrlResolver.resolveForHttp(settings, uriString)
+        val cacheKey = buildVideoBitmapCacheKey(cacheKeySource, isFolderPreview)
         val previousDrawable = imageView.drawable.takeIf { preserveCurrentDrawable }
         imageView.tag = cacheKey
         progressBar?.visibility = View.VISIBLE
@@ -161,10 +168,10 @@ object WebDavImageLoader {
 
         remoteVideoThumbCache.get(cacheKey)?.let { cached ->
             if (cached.isLikelyBlankVideoThumbnail()) {
-                android.util.Log.i("WebDavImageLoader", "Discarded blank cached WebDAV thumbnail: $encodedUrl")
+                android.util.Log.i("WebDavImageLoader", "Discarded blank cached WebDAV thumbnail: $cacheKeySource")
                 remoteVideoThumbCache.remove(cacheKey)
             } else {
-                android.util.Log.d("WebDavImageLoader", "WebDAV-Video cache hit: $encodedUrl")
+                android.util.Log.d("WebDavImageLoader", "WebDAV-Video cache hit: $cacheKeySource")
                 applyVideoThumbnailDisplayMode(imageView, isFolderPreview)
                 setBitmapWithCrossFade(imageView, cached, previousDrawable, crossFadeDurationMs)
                 progressBar?.visibility = View.GONE
@@ -172,27 +179,30 @@ object WebDavImageLoader {
             }
         }
 
-        val settings = getSettingsManager(context)
         val headers = mutableMapOf<String, String>()
-        val username = settings.getWebDavUsername()
-        val password = settings.getWebDavPassword()
-        if (username.isNotEmpty() && password.isNotEmpty()) {
-            headers["Authorization"] = getCachedAuthHeader(username, password)
+        if (RemoteMediaUrlResolver.needsBasicAuth(uriString)) {
+            val username = settings.getWebDavUsername()
+            val password = settings.getWebDavPassword()
+            if (username.isNotEmpty() && password.isNotEmpty()) {
+                headers["Authorization"] = getCachedAuthHeader(username, password)
+            }
         }
 
         android.util.Log.i(
             "WebDavImageLoader",
-            "WebDAV-Video thumbnail start uri=$encodedUrl isFolderPreview=$isFolderPreview"
+            "WebDAV-Video thumbnail start uri=$cacheKeySource isFolderPreview=$isFolderPreview proxy=$isProxy"
         )
 
         @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
         GlobalScope.launch(videoThumbnailDispatcher) {
             val diskCached = loadCachedVideoBitmap(context, cacheKey)
-            val bitmap = diskCached ?: extractRemoteVideoThumbnail(context, encodedUrl, headers, isFolderPreview)
+            val bitmap = diskCached ?: fetchUrl?.let {
+                extractRemoteVideoThumbnail(context, it, headers, isFolderPreview, cacheKeySource)
+            }
 
             withContext(Dispatchers.Main) {
                 if (imageView.tag != cacheKey) {
-                    android.util.Log.d("WebDavImageLoader", "WebDAV-Video thumbnail ignored(stale): $encodedUrl")
+                    android.util.Log.d("WebDavImageLoader", "WebDAV-Video thumbnail ignored(stale): $cacheKeySource")
                     progressBar?.visibility = View.GONE
                     return@withContext
                 }
@@ -204,10 +214,10 @@ object WebDavImageLoader {
                     }
                     applyVideoThumbnailDisplayMode(imageView, isFolderPreview)
                     setBitmapWithCrossFade(imageView, bitmap, previousDrawable, crossFadeDurationMs)
-                    android.util.Log.i("WebDavImageLoader", "WebDAV-Video thumbnail success: $encodedUrl")
+                    android.util.Log.i("WebDavImageLoader", "WebDAV-Video thumbnail success: $cacheKeySource")
                 } else if (previousDrawable == null) {
                     showVideoPlaceholder(imageView, isFolderPreview)
-                    android.util.Log.w("WebDavImageLoader", "WebDAV-Video thumbnail fallback placeholder: $encodedUrl")
+                    android.util.Log.w("WebDavImageLoader", "WebDAV-Video thumbnail fallback placeholder: $cacheKeySource")
                 }
                 progressBar?.visibility = View.GONE
             }
@@ -422,7 +432,8 @@ object WebDavImageLoader {
         context: Context,
         encodedUrl: String,
         headers: Map<String, String>,
-        isFolderPreview: Boolean
+        isFolderPreview: Boolean,
+        cacheKeySource: String = encodedUrl
     ): Bitmap? {
         val frameTimeUs = if (isFolderPreview) 0L else 1_000_000L
         val sourceExtension = normalizedVideoSourceExtension(encodedUrl)
@@ -457,7 +468,8 @@ object WebDavImageLoader {
                 headers = headers,
                 frameTimeUs = frameTimeUs,
                 sourceExtension = sourceExtension,
-                isFolderPreview = isFolderPreview
+                isFolderPreview = isFolderPreview,
+                cacheKeySource = cacheKeySource
             ) ?: tryExtractWithPlatformRetriever(
                 dataSourceLabel = encodedUrl,
                 frameTimeUs = frameTimeUs,
@@ -562,9 +574,12 @@ object WebDavImageLoader {
         headers: Map<String, String>,
         frameTimeUs: Long,
         sourceExtension: String,
-        isFolderPreview: Boolean
+        isFolderPreview: Boolean,
+        cacheKeySource: String = dataSourceLabel
     ): Bitmap? {
-        val cachedFile = cacheRemoteVideoLocally(context, dataSourceLabel, headers, sourceExtension) ?: return null
+        val cachedFile =
+            cacheRemoteVideoLocally(context, dataSourceLabel, headers, sourceExtension, cacheKeySource)
+                ?: return null
         return tryExtractWithFfmpegRetriever(
             dataSourceLabel = "${dataSourceLabel}#cached",
             frameTimeUs = frameTimeUs,
@@ -598,10 +613,14 @@ object WebDavImageLoader {
         context: Context,
         encodedUrl: String,
         headers: Map<String, String>,
-        sourceExtension: String
+        sourceExtension: String,
+        cacheKeySource: String = encodedUrl
     ): File? {
         return try {
-            val cacheFile = prepareVideoCacheFile(context, encodedUrl, sourceExtension)
+            // The cache file name must key on a URL that is stable across
+            // process restarts (proxy URLs rotate port/token), or old range
+            // downloads would be orphaned in the cache dir.
+            val cacheFile = prepareVideoCacheFile(context, cacheKeySource, sourceExtension)
             val maxBytes = videoSourceCacheBytesForExtension(sourceExtension)
             if (cacheFile.exists() && cacheFile.length() in 1..maxBytes) {
                 android.util.Log.i("WebDavImageLoader", "Reusing cached remote video source: ${cacheFile.absolutePath}")
@@ -1058,13 +1077,24 @@ object WebDavImageLoader {
 
     private fun buildWebDavModel(context: Context, mediaUri: Uri): Any {
         val settings = getSettingsManager(context)
+        val uriString = mediaUri.toString()
+
+        if (RemoteMediaUrlResolver.isProxyScheme(uriString)) {
+            // smb/ftp bytes come from the loopback proxy; the disk cache stays
+            // keyed on the stable virtual URI (proxy port/token rotate per
+            // process). The token in the URL is the auth — no headers.
+            val proxyUrl = RemoteMediaUrlResolver.resolveForHttp(settings, uriString)
+                ?: return mediaUri // unroutable (other slot / proxy down) -> load error placeholder
+            return StableKeyGlideUrl(proxyUrl, uriString)
+        }
+
         val username = settings.getWebDavUsername()
         val password = settings.getWebDavPassword()
 
         return if (username.isNotEmpty() && password.isNotEmpty()) {
             val auth = getCachedAuthHeader(username, password)
             GlideUrl(
-                FileUtils.encodeWebDavUrl(mediaUri.toString()),
+                FileUtils.encodeWebDavUrl(uriString),
                 LazyHeaders.Builder().addHeader("Authorization", auth).build()
             )
         } else {
