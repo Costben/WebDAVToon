@@ -68,6 +68,13 @@ class WebDAVToonApplication : Application() {
         val settingsManager = SettingsManager(this)
         val logLevel = settingsManager.getLogLevel()
         LogManager.setMinLogLevel(logLevel)
+        if (rustInitError == null) {
+            try {
+                uniffi.rust_core.setLogLevel(logLevel)
+            } catch (t: Throwable) {
+                LogManager.log("Failed to set Rust log level: ${t.message}", Log.WARN)
+            }
+        }
 
         LogManager.log("Application started", Log.INFO)
         LogManager.log("Log level set to: $logLevel (${getLogLevelName(logLevel)})", Log.INFO)

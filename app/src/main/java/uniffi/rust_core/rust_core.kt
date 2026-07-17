@@ -740,6 +740,8 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 
 
 
+
+
 // A JNA Library to expose the extern-C FFI definitions.
 // This is an implementation detail which will be called internally by the public API.
 
@@ -787,8 +789,10 @@ internal interface UniffiLib : Library {
     ): RustBuffer.ByValue
     fun uniffi_rust_core_fn_func_init_logger(uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
-    fun uniffi_rust_core_fn_func_list_smb_shares(`host`: RustBuffer.ByValue,`port`: Short,`username`: RustBuffer.ByValue,`password`: RustBuffer.ByValue,`domain`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus,
+    fun uniffi_rust_core_fn_func_list_smb_shares(`host`: RustBuffer.ByValue,`port`: Short,`username`: RustBuffer.ByValue,`password`: RustBuffer.ByValue,`domain`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    fun uniffi_rust_core_fn_func_set_log_level(`level`: Int,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
     fun ffi_rust_core_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     fun ffi_rust_core_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -909,6 +913,8 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_rust_core_checksum_func_list_smb_shares(
     ): Short
+    fun uniffi_rust_core_checksum_func_set_log_level(
+    ): Short
     fun uniffi_rust_core_checksum_method_rustrepository_delete_folder(
     ): Short
     fun uniffi_rust_core_checksum_method_rustrepository_delete_photo(
@@ -954,6 +960,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_rust_core_checksum_func_list_smb_shares() != 20106.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_rust_core_checksum_func_set_log_level() != 12401.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_rust_core_checksum_method_rustrepository_delete_folder() != 12705.toShort()) {
@@ -1050,6 +1059,29 @@ public object FfiConverterUShort: FfiConverter<UShort, Short> {
 
     override fun write(value: UShort, buf: ByteBuffer) {
         buf.putShort(value.toShort())
+    }
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterInt: FfiConverter<Int, Int> {
+    override fun lift(value: Int): Int {
+        return value
+    }
+
+    override fun read(buf: ByteBuffer): Int {
+        return buf.getInt()
+    }
+
+    override fun lower(value: Int): Int {
+        return value
+    }
+
+    override fun allocationSize(value: Int) = 4UL
+
+    override fun write(value: Int, buf: ByteBuffer) {
+        buf.putInt(value)
     }
 }
 
@@ -1806,10 +1838,10 @@ public object FfiConverterTypeRemoteConfig: FfiConverterRustBuffer<RemoteConfig>
 
 
 data class SmbShare (
-    var `name`: kotlin.String,
+    var `name`: kotlin.String, 
     var `remark`: kotlin.String
 ) {
-
+    
     companion object
 }
 
@@ -2323,5 +2355,19 @@ public object FfiConverterSequenceTypeSmbShare: FfiConverterRustBuffer<List<SmbS
 }
     )
     }
+    
+
+        /**
+         * Sets the Rust-side log level from an Android `android.util.Log` priority
+         * (2=VERBOSE, 3=DEBUG, 4=INFO, 5=WARN, 6+=ERROR). Debug and below are very
+         * expensive on the SMB path (the smb crate logs every signed message).
+         */ fun `setLogLevel`(`level`: kotlin.Int)
+        = 
+    uniffiRustCall() { _status ->
+    UniffiLib.INSTANCE.uniffi_rust_core_fn_func_set_log_level(
+        FfiConverterInt.lower(`level`),_status)
+}
+    
+    
 
 
