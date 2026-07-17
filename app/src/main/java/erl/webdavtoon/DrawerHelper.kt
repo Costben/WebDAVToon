@@ -299,6 +299,10 @@ object DrawerHelper {
             }
         }
 
+        dialogBinding.listSharesButton.setOnClickListener {
+            ServerConfigDialogHelper.runShareEnumeration(activity, dialogBinding)
+        }
+
         dialog.show()
     }
 
