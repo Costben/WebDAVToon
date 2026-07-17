@@ -144,10 +144,29 @@ pub fn list_smb_shares(
 pub fn init_logger() {
     android_logger::init_once(
         android_logger::Config::default()
-            .with_max_level(log::LevelFilter::Debug)
+            // Backend stays wide open; the effective level is the `log`
+            // facade's max_level, adjustable at runtime via set_log_level.
+            .with_max_level(log::LevelFilter::Trace)
             .with_tag("RustCore"),
     );
+    log::set_max_level(log::LevelFilter::Info);
     log::info!("Rust logger initialized");
+}
+
+/// Sets the Rust-side log level from an Android `android.util.Log` priority
+/// (2=VERBOSE, 3=DEBUG, 4=INFO, 5=WARN, 6+=ERROR). Debug and below are very
+/// expensive on the SMB path (the smb crate logs every signed message).
+#[uniffi::export]
+pub fn set_log_level(level: i32) {
+    let filter = match level {
+        i32::MIN..=2 => log::LevelFilter::Trace,
+        3 => log::LevelFilter::Debug,
+        4 => log::LevelFilter::Info,
+        5 => log::LevelFilter::Warn,
+        _ => log::LevelFilter::Error,
+    };
+    log::set_max_level(filter);
+    log::info!("Rust log level set to {}", filter);
 }
 
 #[uniffi::export]
