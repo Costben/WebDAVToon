@@ -167,6 +167,8 @@
     <string name="rotation_lock">旋转锁定</string>
     <string name="more">更多</string>    <string name="video_settings">视频</string>    <string name="video_external_player_mode">外部播放器模式</string>
     <string name="video_external_player_mode_system_default">默认外部播放器</string>
-    <string name="video_external_player_mode_chooser">每次询问</string></resources>
+    <string name="video_external_player_mode_chooser">每次询问</string>    <string name="discover_devices">发现设备</string>
+    <string name="discovery_searching">正在搜索局域网…</string>
+    <string name="discovery_empty">未发现设备 — 请手动输入地址</string></resources>
 
 

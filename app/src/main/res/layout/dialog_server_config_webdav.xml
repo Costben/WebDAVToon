@@ -37,6 +37,18 @@
                 android:text="https" />
         </com.google.android.material.textfield.TextInputLayout>
 
+        <!-- LAN host discovery (self-contained block) -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/discover_hosts_button"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/discover_devices"
+            app:icon="@drawable/ic_ior_search"
+            app:iconGravity="textStart"
+            xmlns:app="http://schemas.android.com/apk/res-auto" />
+
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/host_layout"
             android:layout_width="match_parent"
