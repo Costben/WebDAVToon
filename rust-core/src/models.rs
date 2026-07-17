@@ -54,3 +54,39 @@ impl Default for SortOrder {
         SortOrder::DateDesc
     }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum RemoteProtocol {
+    WebDav,
+    Smb,
+    Ftp,
+}
+
+impl RemoteProtocol {
+    pub fn label(&self) -> &'static str {
+        match self {
+            RemoteProtocol::WebDav => "webdav",
+            RemoteProtocol::Smb => "smb",
+            RemoteProtocol::Ftp => "ftp",
+        }
+    }
+}
+
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct RemoteConfig {
+    pub protocol: RemoteProtocol,
+    /// Canonical endpoint string produced by the Kotlin normalizer, e.g.
+    /// `https://host/dav`, `smb://host/share/sub`, `ftp://host:2121/pub`.
+    /// Stored verbatim as the base for minted photo URIs.
+    pub endpoint: String,
+    pub username: String,
+    pub password: String,
+    /// SMB domain / workgroup; ignored by other protocols.
+    pub domain: Option<String>,
+}
+
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct MediaProxyInfo {
+    pub port: u16,
+    pub token: String,
+}

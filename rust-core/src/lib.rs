@@ -1,11 +1,17 @@
 uniffi::setup_scaffolding!();
 
 mod database;
+mod media_proxy;
 mod models;
 mod remote_fs;
 mod repository;
+mod runtime;
+mod smb_fs;
 
-pub use models::{Folder, FolderInspection, MediaType, Photo, SortOrder};
+pub use models::{
+    Folder, FolderInspection, MediaProxyInfo, MediaType, Photo, RemoteConfig, RemoteProtocol,
+    SortOrder,
+};
 use repository::{RepoError, Repository};
 use std::sync::Mutex;
 
@@ -31,17 +37,12 @@ impl RustRepository {
         }
     }
 
-    pub fn init_webdav(
-        &self,
-        endpoint: String,
-        username: String,
-        password: String,
-    ) -> Result<(), WebDavToonError> {
+    pub fn init_remote(&self, config: RemoteConfig) -> Result<(), WebDavToonError> {
         let mut repo = self
             .inner
             .lock()
             .map_err(|_| WebDavToonError::ConfigError("Lock poisoned".into()))?;
-        repo.init_webdav(endpoint, username, password)?;
+        repo.init_remote(config)?;
         Ok(())
     }
 
@@ -59,6 +60,14 @@ impl RustRepository {
             .lock()
             .map_err(|_| WebDavToonError::ConfigError("Lock poisoned".into()))?;
         Ok(repo.delete_photo(path)?)
+    }
+
+    pub fn delete_folder(&self, path: String) -> Result<(), WebDavToonError> {
+        let repo = self
+            .inner
+            .lock()
+            .map_err(|_| WebDavToonError::ConfigError("Lock poisoned".into()))?;
+        Ok(repo.delete_folder(path)?)
     }
 
     pub fn get_photos(
@@ -95,18 +104,21 @@ impl RustRepository {
         Ok(repo.inspect_folder(path)?)
     }
 
-    pub fn test_webdav(
-        &self,
-        endpoint: String,
-        username: String,
-        password: String,
-    ) -> Result<String, WebDavToonError> {
+    pub fn test_remote(&self, config: RemoteConfig) -> Result<String, WebDavToonError> {
         let repo = self
             .inner
             .lock()
             .map_err(|_| WebDavToonError::ConfigError("Lock poisoned".into()))?;
-        Ok(repo.test_webdav(endpoint, username, password)?)
+        Ok(repo.test_remote(config)?)
     }
+}
+
+/// Starts the loopback media proxy on first call and returns its port and
+/// auth token. Kotlin converts smb:// and ftp:// virtual URIs into
+/// `http://127.0.0.1:{port}/{token}/{path}` requests against it.
+#[uniffi::export]
+pub fn ensure_media_proxy() -> Result<MediaProxyInfo, WebDavToonError> {
+    media_proxy::ensure_media_proxy().map_err(WebDavToonError::ConfigError)
 }
 
 #[uniffi::export]

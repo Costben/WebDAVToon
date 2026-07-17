@@ -60,6 +60,9 @@
     <string name="alias_hint">别名 (可选)</string>
     <string name="protocol_hint">协议</string>
     <string name="host_hint">主机 / URL</string>
+    <string name="domain_hint">域 / 工作组（可选）</string>
+    <string name="smb_share_required">SMB 需要填写 主机/共享名（如 192.168.1.5/media）</string>
+    <string name="host_hint_smb">主机 / 共享名[/路径]</string>
     <string name="port_hint">端口 (默认: 443)</string>
     <string name="username_hint">用户名</string>
     <string name="password_hint">密码</string>
