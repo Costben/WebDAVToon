@@ -231,6 +231,12 @@ object DrawerHelper {
             settingsManager.getWebDavProtocol(slot)
         )
 
+        dialogBinding.discoverHostsButton.setOnClickListener {
+            HostDiscoverySheet.show(activity) { host ->
+                ServerConfigDialogHelper.applyDiscoveredHost(activity, dialogBinding, host)
+            }
+        }
+
         // Load existing data for this slot
         dialogBinding.aliasEdit.setText(settingsManager.getWebDavAlias(slot))
         dialogBinding.hostEdit.setText(settingsManager.getWebDavUrl(slot))

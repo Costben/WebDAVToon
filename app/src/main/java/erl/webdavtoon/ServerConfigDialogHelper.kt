@@ -35,6 +35,49 @@ object ServerConfigDialogHelper {
         }
     }
 
+    /**
+     * Pure form-value mapping for a [DiscoveredHost]: protocol dropdown text,
+     * host field text (IPv6 literals bracketed for URL use), port field text.
+     * Deliberately free of Android classes so plain JUnit can cover it.
+     */
+    data class DiscoveredFormValues(
+        val protocol: String,
+        val host: String,
+        val port: String
+    )
+
+    fun formValuesFor(host: DiscoveredHost): DiscoveredFormValues = DiscoveredFormValues(
+        // The dropdown offers http/https/smb/ftp; a discovered "webdav"
+        // service is an HTTP(S) endpoint underneath.
+        protocol = when (host.protocol) {
+            "webdav" -> if (host.port == 443) "https" else "http"
+            else -> host.protocol
+        },
+        host = bracketIpv6Literal(host.host),
+        port = host.port.toString()
+    )
+
+    /** Brackets an unbracketed IPv6 literal; IPv4 and hostnames pass through. */
+    fun bracketIpv6Literal(host: String): String =
+        if (host.contains(':') && !host.startsWith("[")) "[$host]" else host
+
+    /**
+     * Applies a discovered host to the form and re-runs the protocol linkage
+     * (domain-field visibility, host hint) exactly like a dropdown selection.
+     * The port comes from discovery, so no default-port auto-fill.
+     */
+    fun applyDiscoveredHost(
+        activity: AppCompatActivity,
+        binding: DialogServerConfigWebdavBinding,
+        host: DiscoveredHost
+    ) {
+        val values = formValuesFor(host)
+        binding.protocolEdit.setText(values.protocol, false)
+        binding.hostEdit.setText(values.host)
+        binding.portEdit.setText(values.port)
+        applyProtocolToForm(activity, binding, values.protocol, autoFillPort = false)
+    }
+
     private fun applyProtocolToForm(
         activity: AppCompatActivity,
         binding: DialogServerConfigWebdavBinding,

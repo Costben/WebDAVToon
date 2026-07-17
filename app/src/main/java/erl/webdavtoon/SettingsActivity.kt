@@ -334,6 +334,12 @@ class SettingsActivity : AppCompatActivity() {
 
         ServerConfigDialogHelper.setupProtocolField(this, dialogBinding, settingsManager.getWebDavProtocol())
 
+        dialogBinding.discoverHostsButton.setOnClickListener {
+            HostDiscoverySheet.show(this) { host ->
+                ServerConfigDialogHelper.applyDiscoveredHost(this, dialogBinding, host)
+            }
+        }
+
         dialogBinding.aliasEdit.setText(settingsManager.getWebDavAlias())
         dialogBinding.hostEdit.setText(settingsManager.getWebDavUrl())
         dialogBinding.portEdit.setText(settingsManager.getWebDavPort().toString())
