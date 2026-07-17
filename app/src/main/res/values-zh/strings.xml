@@ -167,6 +167,9 @@
     <string name="rotation_lock">旋转锁定</string>
     <string name="more">更多</string>    <string name="video_settings">视频</string>    <string name="video_external_player_mode">外部播放器模式</string>
     <string name="video_external_player_mode_system_default">默认外部播放器</string>
-    <string name="video_external_player_mode_chooser">每次询问</string></resources>
-
-
+    <string name="video_external_player_mode_chooser">每次询问</string>    <string name="smb_list_shares">列出共享</string>
+    <string name="smb_choose_share">选择共享</string>
+    <string name="smb_enumerating_shares">正在列出共享…</string>
+    <string name="smb_enum_failed_hint">也可以在主机后手动输入共享名（如 192.168.1.5/media）。</string>
+    <string name="smb_enum_requires_host_user">请先填写主机和用户名</string>
+</resources>

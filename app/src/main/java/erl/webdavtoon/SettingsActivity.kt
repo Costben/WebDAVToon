@@ -380,6 +380,10 @@ class SettingsActivity : AppCompatActivity() {
             }
         }
 
+        dialogBinding.listSharesButton.setOnClickListener {
+            ServerConfigDialogHelper.runShareEnumeration(this, dialogBinding)
+        }
+
         dialog.show()
     }
 
