@@ -530,7 +530,13 @@ impl RemoteService {
         }
 
         let direct_children_count = candidates.len();
-        if direct_children_count > MAX_PREVIEW_SCAN_FOLDERS {
+        // SMB: the per-child media scans below cost several protocol round-trips
+        // per folder and dominate folder-entry latency (measured 1.7-2.9s per
+        // navigation on a real NAS). Always take the fast path there; lazy
+        // inspect_folder fills previews and the real has_sub_folders per card.
+        if direct_children_count > MAX_PREVIEW_SCAN_FOLDERS
+            || self.protocol == RemoteProtocol::Smb
+        {
             let mut folders: Vec<Folder> = candidates
                 .into_values()
                 .map(|folder| Folder {
