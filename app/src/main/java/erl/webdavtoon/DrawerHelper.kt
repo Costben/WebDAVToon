@@ -225,16 +225,18 @@ object DrawerHelper {
         val dialogBinding = DialogServerConfigWebdavBinding.inflate(activity.layoutInflater)
         val slotExisted = settingsManager.getAllSlotsUnfiltered().contains(slot)
 
-        val protocols = arrayOf("http", "https")
-        val adapter = ArrayAdapter(activity, android.R.layout.simple_dropdown_item_1line, protocols)
-        dialogBinding.protocolEdit.setAdapter(adapter)
+        ServerConfigDialogHelper.setupProtocolField(
+            activity,
+            dialogBinding,
+            settingsManager.getWebDavProtocol(slot)
+        )
 
         // Load existing data for this slot
         dialogBinding.aliasEdit.setText(settingsManager.getWebDavAlias(slot))
-        dialogBinding.protocolEdit.setText(settingsManager.getWebDavProtocol(slot), false)
         dialogBinding.hostEdit.setText(settingsManager.getWebDavUrl(slot))
         dialogBinding.portEdit.setText(settingsManager.getWebDavPort(slot).toString())
         dialogBinding.usernameEdit.setText(settingsManager.getWebDavUsername(slot))
+        dialogBinding.domainEdit.setText(settingsManager.getWebDavDomain(slot))
         dialogBinding.passwordEdit.setText(settingsManager.getWebDavPassword(slot))
         dialogBinding.rememberPasswordCheck.isChecked = settingsManager.isWebDavRememberPassword(slot)
 
@@ -253,7 +255,17 @@ object DrawerHelper {
         val dialog = MaterialAlertDialogBuilder(activity)
             .setTitle(activity.getString(R.string.webdav_config, slot))
             .setView(dialogBinding.root)
-            .setPositiveButton(R.string.save) { _, _ ->
+            .setPositiveButton(R.string.save, null)
+            .setNegativeButton(R.string.cancel, null)
+            .setNeutralButton(R.string.test_connection, null)
+            .create()
+
+        dialog.setOnShowListener {
+            dialog.getButton(android.content.DialogInterface.BUTTON_POSITIVE).setOnClickListener {
+                ServerConfigDialogHelper.validate(activity, dialogBinding)?.let { error ->
+                    Toast.makeText(activity, error, Toast.LENGTH_LONG).show()
+                    return@setOnClickListener
+                }
                 val isPrivate = if (PrivacyModeState.isPrivacyMode) {
                     dialogBinding.privateServerCheck.isChecked
                 } else if (slotExisted) {
@@ -261,76 +273,29 @@ object DrawerHelper {
                 } else {
                     false
                 }
+                val protocol = dialogBinding.protocolEdit.text.toString()
                 settingsManager.saveWebDavConfiguration(
                     slot = slot,
                     alias = dialogBinding.aliasEdit.text.toString(),
-                    protocol = dialogBinding.protocolEdit.text.toString(),
+                    protocol = protocol,
                     url = dialogBinding.hostEdit.text.toString(),
-                    port = dialogBinding.portEdit.text.toString().toIntOrNull() ?: 443,
+                    port = dialogBinding.portEdit.text.toString().toIntOrNull()
+                        ?: WebDavEndpointNormalizer.defaultPortFor(protocol),
                     username = dialogBinding.usernameEdit.text.toString(),
                     password = dialogBinding.passwordEdit.text.toString(),
                     rememberPassword = dialogBinding.rememberPasswordCheck.isChecked,
                     enabled = true,
                     switchToSlotOnSave = !slotExisted,
-                    isPrivate = isPrivate
+                    isPrivate = isPrivate,
+                    domain = dialogBinding.domainEdit.text.toString()
                 )
 
                 onSaved()
                 Toast.makeText(activity, activity.getString(R.string.server_saved), Toast.LENGTH_SHORT).show()
+                dialog.dismiss()
             }
-            .setNegativeButton(R.string.cancel, null)
-            .setNeutralButton(R.string.test_connection, null)
-            .create()
-
-        dialog.setOnShowListener {
             dialog.getButton(android.content.DialogInterface.BUTTON_NEUTRAL).setOnClickListener {
-                val protocol = dialogBinding.protocolEdit.text.toString()
-                var rawUrl = dialogBinding.hostEdit.text.toString().replace("http://", "").replace("https://", "")
-                if (rawUrl.endsWith('/')) rawUrl = rawUrl.dropLast(1)
-
-                val firstSlash = rawUrl.indexOf('/')
-                val hostPart = if (firstSlash != -1) rawUrl.substring(0, firstSlash) else rawUrl
-                val pathPart = if (firstSlash != -1) rawUrl.substring(firstSlash) else ""
-
-                var host = hostPart
-                var port = dialogBinding.portEdit.text.toString().toIntOrNull() ?: 443
-
-                if (host.contains(':')) {
-                    val parts = host.split(':')
-                    if (parts.size == 2) {
-                        host = parts[0]
-                        parts[1].toIntOrNull()?.let { port = it }
-                    }
-                }
-
-                val endpoint = WebDavEndpointNormalizer.normalize(protocol, "$host$pathPart", port)
-
-                val username = dialogBinding.usernameEdit.text.toString()
-                val password = dialogBinding.passwordEdit.text.toString()
-
-                Toast.makeText(activity, activity.getString(R.string.testing_connection), Toast.LENGTH_SHORT).show()
-
-                activity.lifecycleScope.launch {
-                    try {
-                        val result = withContext(Dispatchers.IO) {
-                            val repo = WebDAVToonApplication.rustRepository
-                                ?: throw IllegalStateException("Rust core not initialized")
-                            repo.testWebdav(endpoint, username, password)
-                        }
-
-                        MaterialAlertDialogBuilder(activity)
-                            .setTitle(activity.getString(R.string.connection_test_result))
-                            .setMessage(result)
-                            .setPositiveButton(R.string.ok, null)
-                            .show()
-                    } catch (e: Exception) {
-                        MaterialAlertDialogBuilder(activity)
-                            .setTitle(activity.getString(R.string.connection_failed))
-                            .setMessage(activity.getString(R.string.error_prefix, e.message ?: "Unknown error"))
-                            .setPositiveButton(R.string.ok, null)
-                            .show()
-                    }
-                }
+                ServerConfigDialogHelper.runConnectionTest(activity, dialogBinding)
             }
         }
 
@@ -358,7 +323,8 @@ object DrawerHelper {
             rememberPassword = settingsManager.isWebDavRememberPassword(sourceSlot),
             enabled = settingsManager.isWebDavEnabled(sourceSlot),
             switchToSlotOnSave = false,
-            isPrivate = settingsManager.isWebDavPrivate(sourceSlot)
+            isPrivate = settingsManager.isWebDavPrivate(sourceSlot),
+            domain = settingsManager.getWebDavDomain(sourceSlot)
         )
 
         Toast.makeText(activity, activity.getString(R.string.server_duplicated), Toast.LENGTH_SHORT).show()

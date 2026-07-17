@@ -66,9 +66,11 @@ object FileUtils {
                 // 本地图片：直接获取输入流
                 context.contentResolver.openInputStream(photo.imageUri) ?: throw IOException("无法打开本地图片")
             } else {
-                // WebDAV图片：通过网络请求获取
-                val encodedUrl = encodeWebDavUrl(photo.imageUri.toString())
-                val url = URL(encodedUrl)
+                // 远程图片：通过网络请求获取（smb/ftp 走本地回环代理）
+                val uriString = photo.imageUri.toString()
+                val fetchUrl = RemoteMediaUrlResolver.resolveForHttp(SettingsManager(context), uriString)
+                    ?: throw IOException("当前服务器无法访问该媒体: $uriString")
+                val url = URL(fetchUrl)
                 val connection = url.openConnection() as HttpURLConnection
                 connection.connectTimeout = 30000
                 connection.readTimeout = 30000

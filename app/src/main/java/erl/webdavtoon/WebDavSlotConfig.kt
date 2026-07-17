@@ -8,7 +8,10 @@ data class WebDavSlotConfig(
     val username: String = "",
     val rememberPassword: Boolean = true,
     val alias: String = "",
-    val isPrivate: Boolean = false
+    val isPrivate: Boolean = false,
+    // SMB domain / workgroup; unused by other protocols. Gson tolerates the
+    // field being absent in previously-saved slot JSON (defaults apply).
+    val domain: String = ""
 )
 
 data class LegacyWebDavSlotConfig(

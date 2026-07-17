@@ -959,12 +959,17 @@ class PhotoViewActivity : AppCompatActivity() {
         val shareDir = File(cacheDir, "shared_media").apply { mkdirs() }
         val safeName = photo.title.replace(Regex("[\\\\/:*?\"<>|]"), "_").ifBlank { "shared_media" }
         val targetFile = File(shareDir, safeName)
-        val credentials = okhttp3.Credentials.basic(settingsManager.getWebDavUsername(), settingsManager.getWebDavPassword())
-        val request = okhttp3.Request.Builder()
-            .url(FileUtils.encodeWebDavUrl(photo.imageUri.toString()))
-            .addHeader("Authorization", credentials)
-            .build()
-        okhttp3.OkHttpClient().newCall(request).execute().use { response ->
+        val uriString = photo.imageUri.toString()
+        val fetchUrl = RemoteMediaUrlResolver.resolveForHttp(settingsManager, uriString)
+            ?: throw java.io.IOException("Media is not reachable from the current server: $uriString")
+        val requestBuilder = okhttp3.Request.Builder().url(fetchUrl)
+        if (RemoteMediaUrlResolver.needsBasicAuth(uriString)) {
+            requestBuilder.addHeader(
+                "Authorization",
+                okhttp3.Credentials.basic(settingsManager.getWebDavUsername(), settingsManager.getWebDavPassword())
+            )
+        }
+        okhttp3.OkHttpClient().newCall(requestBuilder.build()).execute().use { response ->
             if (!response.isSuccessful) {
                 throw java.io.IOException("HTTP ${response.code}: ${response.message}")
             }

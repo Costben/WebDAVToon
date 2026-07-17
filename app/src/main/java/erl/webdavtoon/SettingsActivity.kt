@@ -332,90 +332,51 @@ class SettingsActivity : AppCompatActivity() {
     private fun showWebDavConfigDialog() {
         val dialogBinding = DialogServerConfigWebdavBinding.inflate(layoutInflater)
 
-        val protocols = arrayOf("http", "https")
-        val adapter = ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, protocols)
-        dialogBinding.protocolEdit.setAdapter(adapter)
-        dialogBinding.protocolEdit.setText(settingsManager.getWebDavProtocol(), false)
+        ServerConfigDialogHelper.setupProtocolField(this, dialogBinding, settingsManager.getWebDavProtocol())
 
         dialogBinding.aliasEdit.setText(settingsManager.getWebDavAlias())
         dialogBinding.hostEdit.setText(settingsManager.getWebDavUrl())
         dialogBinding.portEdit.setText(settingsManager.getWebDavPort().toString())
         dialogBinding.usernameEdit.setText(settingsManager.getWebDavUsername())
+        dialogBinding.domainEdit.setText(settingsManager.getWebDavDomain())
         dialogBinding.passwordEdit.setText(settingsManager.getWebDavPassword())
         dialogBinding.rememberPasswordCheck.isChecked = settingsManager.isWebDavRememberPassword()
 
         val dialog = MaterialAlertDialogBuilder(this)
             .setTitle(getString(R.string.webdav_config, settingsManager.getCurrentSlot()))
             .setView(dialogBinding.root)
-            .setPositiveButton(R.string.save) { _, _ ->
-                settingsManager.saveWebDavConfiguration(
-                    alias = dialogBinding.aliasEdit.text.toString(),
-                    protocol = dialogBinding.protocolEdit.text.toString(),
-                    url = dialogBinding.hostEdit.text.toString(),
-                    port = dialogBinding.portEdit.text.toString().toIntOrNull() ?: 443,
-                    username = dialogBinding.usernameEdit.text.toString(),
-                    password = dialogBinding.passwordEdit.text.toString(),
-                    rememberPassword = dialogBinding.rememberPasswordCheck.isChecked,
-                    enabled = true,
-                    isPrivate = settingsManager.isWebDavPrivate()
-                )
-
-                refreshUi()
-                setResult(RESULT_OK)
-            }
+            .setPositiveButton(R.string.save, null)
             .setNegativeButton(R.string.cancel, null)
             .setNeutralButton(R.string.test_connection, null)
             .create()
 
         dialog.setOnShowListener {
-            dialog.getButton(android.content.DialogInterface.BUTTON_NEUTRAL).setOnClickListener {
+            dialog.getButton(android.content.DialogInterface.BUTTON_POSITIVE).setOnClickListener {
+                ServerConfigDialogHelper.validate(this, dialogBinding)?.let { error ->
+                    Toast.makeText(this, error, Toast.LENGTH_LONG).show()
+                    return@setOnClickListener
+                }
                 val protocol = dialogBinding.protocolEdit.text.toString()
-                var rawUrl = dialogBinding.hostEdit.text.toString().replace("http://", "").replace("https://", "")
-                if (rawUrl.endsWith('/')) rawUrl = rawUrl.dropLast(1)
+                settingsManager.saveWebDavConfiguration(
+                    alias = dialogBinding.aliasEdit.text.toString(),
+                    protocol = protocol,
+                    url = dialogBinding.hostEdit.text.toString(),
+                    port = dialogBinding.portEdit.text.toString().toIntOrNull()
+                        ?: WebDavEndpointNormalizer.defaultPortFor(protocol),
+                    username = dialogBinding.usernameEdit.text.toString(),
+                    password = dialogBinding.passwordEdit.text.toString(),
+                    rememberPassword = dialogBinding.rememberPasswordCheck.isChecked,
+                    enabled = true,
+                    isPrivate = settingsManager.isWebDavPrivate(),
+                    domain = dialogBinding.domainEdit.text.toString()
+                )
 
-                val firstSlash = rawUrl.indexOf('/')
-                val hostPart = if (firstSlash != -1) rawUrl.substring(0, firstSlash) else rawUrl
-                val pathPart = if (firstSlash != -1) rawUrl.substring(firstSlash) else ""
-
-                var host = hostPart
-                var port = dialogBinding.portEdit.text.toString().toIntOrNull() ?: 443
-
-                if (host.contains(':')) {
-                    val parts = host.split(':')
-                    if (parts.size == 2) {
-                        host = parts[0]
-                        parts[1].toIntOrNull()?.let { port = it }
-                    }
-                }
-
-                val endpoint = WebDavEndpointNormalizer.normalize(protocol, "$host$pathPart", port)
-
-                val username = dialogBinding.usernameEdit.text.toString()
-                val password = dialogBinding.passwordEdit.text.toString()
-
-                Toast.makeText(this, getString(R.string.testing_connection), Toast.LENGTH_SHORT).show()
-
-                lifecycleScope.launch {
-                    try {
-                        val result = withContext(Dispatchers.IO) {
-                            val repo = WebDAVToonApplication.rustRepository
-                                ?: throw IllegalStateException("Rust repository not initialized: ${WebDAVToonApplication.rustInitError ?: "unknown"}")
-                            repo.testWebdav(endpoint, username, password)
-                        }
-
-                        MaterialAlertDialogBuilder(this@SettingsActivity)
-                            .setTitle(getString(R.string.connection_test_result))
-                            .setMessage(result)
-                            .setPositiveButton(R.string.ok, null)
-                            .show()
-                    } catch (e: Exception) {
-                        MaterialAlertDialogBuilder(this@SettingsActivity)
-                            .setTitle(getString(R.string.connection_failed))
-                            .setMessage(getString(R.string.error_prefix, e.message ?: "Unknown error"))
-                            .setPositiveButton(R.string.ok, null)
-                            .show()
-                    }
-                }
+                refreshUi()
+                setResult(RESULT_OK)
+                dialog.dismiss()
+            }
+            dialog.getButton(android.content.DialogInterface.BUTTON_NEUTRAL).setOnClickListener {
+                ServerConfigDialogHelper.runConnectionTest(this, dialogBinding)
             }
         }
 

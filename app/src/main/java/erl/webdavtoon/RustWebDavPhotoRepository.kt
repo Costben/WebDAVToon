@@ -156,11 +156,10 @@ class RustWebDavPhotoRepository(
         val repo = rustRepo ?: return@withContext null
 
         return@withContext try {
-            val endpoint = settingsManager.getFullWebDavUrl()
-            val username = settingsManager.getWebDavUsername()
-            val password = settingsManager.getWebDavPassword()
+            val config = settingsManager.buildRemoteConfig()
+            val protocolName = settingsManager.getWebDavProtocol().uppercase()
 
-            val report = repo.testWebdav(endpoint, username, password)
+            val report = repo.testRemote(config)
             val rootEntries = report.lineSequence()
                 .map { it.trim() }
                 .filter { it.startsWith("- ") }
@@ -170,21 +169,21 @@ class RustWebDavPhotoRepository(
                 rootEntries.isEmpty() -> {
                     android.util.Log.i(
                         "RustWebDavPhotoRepo",
-                        "WebDAV root is reachable but returned no entries for endpoint=$endpoint"
+                        "$protocolName root is reachable but returned no entries for endpoint=${config.endpoint}"
                     )
-                    "WebDAV 连接成功，但当前根目录下没有任何文件夹或文件。"
+                    "$protocolName 连接成功，但当前根目录下没有任何文件夹或文件。"
                 }
 
                 else -> {
                     android.util.Log.i(
                         "RustWebDavPhotoRepo",
-                        "WebDAV root has ${rootEntries.size} entries, but none matched visible image-folder rules for endpoint=$endpoint"
+                        "$protocolName root has ${rootEntries.size} entries, but none matched visible image-folder rules for endpoint=${config.endpoint}"
                     )
-                    "WebDAV 连接成功，但当前根目录下没有可显示的图片文件夹。仅显示包含受支持图片（jpg、jpeg、png、webp、gif）的非隐藏文件夹。"
+                    "$protocolName 连接成功，但当前根目录下没有可显示的图片文件夹。仅显示包含受支持图片（jpg、jpeg、png、webp、gif）的非隐藏文件夹。"
                 }
             }
         } catch (e: Exception) {
-            android.util.Log.e("RustWebDavPhotoRepo", "Failed to diagnose empty WebDAV folder result", e)
+            android.util.Log.e("RustWebDavPhotoRepo", "Failed to diagnose empty remote folder result", e)
             null
         }
     }
@@ -215,22 +214,19 @@ class RustWebDavPhotoRepository(
         isPreviewRepo: Boolean
     ) {
         try {
-            val params = "${settingsManager.getFullWebDavUrl()}|${settingsManager.getWebDavUsername()}"
+            val params =
+                "${settingsManager.getFullWebDavUrl()}|${settingsManager.getWebDavUsername()}|${settingsManager.getWebDavDomain()}"
             val cachedParams = if (isPreviewRepo) lastPreviewWebDavParams else lastWebDavParams
             if (params == cachedParams) return
 
-            repo.initWebdav(
-                settingsManager.getFullWebDavUrl(),
-                settingsManager.getWebDavUsername(),
-                settingsManager.getWebDavPassword()
-            )
+            repo.initRemote(settingsManager.buildRemoteConfig())
             if (isPreviewRepo) {
                 lastPreviewWebDavParams = params
             } else {
                 lastWebDavParams = params
             }
         } catch (e: Exception) {
-            Log.e("RustWebDavPhotoRepo", "Failed to init webdav", e)
+            Log.e("RustWebDavPhotoRepo", "Failed to init remote", e)
             if (isPreviewRepo) {
                 lastPreviewWebDavParams = null
             } else {
@@ -255,9 +251,9 @@ class RustWebDavPhotoRepository(
         }
     }
 
-    suspend fun testWebDavConnection(endpoint: String, username: String, password: String): String = withContext(Dispatchers.IO) {
+    suspend fun testRemoteConnection(config: uniffi.rust_core.RemoteConfig): String = withContext(Dispatchers.IO) {
         val repo = rustRepo ?: throw IllegalStateException("Repository not initialized")
-        repo.testWebdav(endpoint, username, password)
+        repo.testRemote(config)
     }
 
     suspend fun inspectFolder(
@@ -321,37 +317,29 @@ class RustWebDavPhotoRepository(
     }
 
     override suspend fun deletePhoto(photo: Photo): Boolean = withContext(Dispatchers.IO) {
-        // Try calling the rust repo first if we managed to update the FFI
-        // Otherwise, fallback to direct OkHttp delete request
         try {
-            // Since we can't easily update the UniFFI generated code here, 
-            // we'll implement the delete via OkHttp directly to the WebDAV server.
-            val username = settingsManager.getWebDavUsername()
-            val password = settingsManager.getWebDavPassword()
-            
-            if (username.isEmpty() || password.isEmpty()) {
-                android.util.Log.e("RustWebDavPhotoRepo", "No credentials for delete")
+            val repo = rustRepo
+            if (repo == null) {
+                android.util.Log.e("RustWebDavPhotoRepo", "Rust repo unavailable for delete")
+                return@withContext false
+            }
+            initializeWebDavIfNeeded(repo, isPreviewRepo = false)
+
+            // photo.id already carries the service-relative path minted by the
+            // Rust side; fall back to stripping the endpoint prefix for photos
+            // hydrated from older persisted data.
+            val relPath = photo.id.ifBlank {
+                val base = settingsManager.getFullWebDavUrl().trimEnd('/')
+                photo.imageUri.toString().removePrefix(base).trimStart('/')
+            }
+            if (relPath.isBlank() || RemoteMediaUrlResolver.isRemoteMediaUri(relPath)) {
+                android.util.Log.e("RustWebDavPhotoRepo", "Cannot derive relative path for delete: ${photo.imageUri}")
                 return@withContext false
             }
 
-            val credentials = okhttp3.Credentials.basic(username, password)
-            val encodedUrl = FileUtils.encodeWebDavUrl(photo.imageUri.toString())
-            val request = okhttp3.Request.Builder()
-                .url(encodedUrl)
-                .delete()
-                .addHeader("Authorization", credentials)
-                .build()
-
-            val client = okhttp3.OkHttpClient()
-            client.newCall(request).execute().use { response ->
-                if (response.isSuccessful) {
-                    android.util.Log.i("RustWebDavPhotoRepo", "Successfully deleted: ${photo.imageUri}")
-                    true
-                } else {
-                    android.util.Log.e("RustWebDavPhotoRepo", "Failed to delete: ${response.code} ${response.message}")
-                    false
-                }
-            }
+            repo.deletePhoto(relPath)
+            android.util.Log.i("RustWebDavPhotoRepo", "Successfully deleted: $relPath")
+            true
         } catch (e: Exception) {
             android.util.Log.e("RustWebDavPhotoRepo", "Exception during delete", e)
             false
@@ -360,35 +348,22 @@ class RustWebDavPhotoRepository(
 
     override suspend fun deleteFolder(folder: Folder): Boolean = withContext(Dispatchers.IO) {
         try {
-            val username = settingsManager.getWebDavUsername()
-            val password = settingsManager.getWebDavPassword()
-            val baseUrl = settingsManager.getFullWebDavUrl().trimEnd('/')
+            val repo = rustRepo
+            if (repo == null) {
+                android.util.Log.e("RustWebDavPhotoRepo", "Rust repo unavailable for folder delete")
+                return@withContext false
+            }
+            initializeWebDavIfNeeded(repo, isPreviewRepo = false)
+
             val folderPath = folder.path.trim('/')
-            val fullUrl = "$baseUrl/$folderPath/"
-            
-            if (username.isEmpty() || password.isEmpty()) {
-                android.util.Log.e("RustWebDavPhotoRepo", "No credentials for folder delete")
+            if (folderPath.isBlank()) {
+                android.util.Log.e("RustWebDavPhotoRepo", "Refusing to delete empty folder path")
                 return@withContext false
             }
 
-            val credentials = okhttp3.Credentials.basic(username, password)
-            val encodedUrl = FileUtils.encodeWebDavUrl(fullUrl)
-            val request = okhttp3.Request.Builder()
-                .url(encodedUrl)
-                .delete()
-                .addHeader("Authorization", credentials)
-                .build()
-
-            val client = okhttp3.OkHttpClient()
-            client.newCall(request).execute().use { response ->
-                if (response.isSuccessful) {
-                    android.util.Log.i("RustWebDavPhotoRepo", "Successfully deleted folder: $fullUrl")
-                    true
-                } else {
-                    android.util.Log.e("RustWebDavPhotoRepo", "Failed to delete folder: ${response.code} ${response.message}")
-                    false
-                }
-            }
+            repo.deleteFolder("$folderPath/")
+            android.util.Log.i("RustWebDavPhotoRepo", "Successfully deleted folder: $folderPath")
+            true
         } catch (e: Exception) {
             android.util.Log.e("RustWebDavPhotoRepo", "Exception during folder delete", e)
             false
