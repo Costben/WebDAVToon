@@ -279,6 +279,31 @@ class RustWebDavPhotoRepository(
 
         return@withContext try {
             val inspection = repo.inspectFolder(folderPath)
+
+            // SMB: directory listings are several protocol round-trips each, so
+            // the recursive enumeration that sort-aware previews need is far too
+            // expensive (measured 90s for a 445-dir tree). Previews are the
+            // first 4 media files the Rust scan finds, identical for every sort
+            // order.
+            if (settingsManager.getWebDavProtocol() == "smb") {
+                val previewUriStrings = inspection.previewUris.take(PREVIEW_LIMIT)
+                val sortOrders = (previewCacheSortOrders + sortOrder).distinct()
+                Log.i(
+                    "RustWebDavPhotoRepo",
+                    "inspectFolder smbLazy path=$folderPath previews=${previewUriStrings.size} hasSubFolders=${inspection.hasSubFolders}"
+                )
+                RemoteFolderPreviewMemoryCache.putAll(
+                    accountKey = accountKey,
+                    path = folderPath,
+                    hasSubFolders = inspection.hasSubFolders,
+                    previewUriStringsBySortOrder = sortOrders.associateWith { previewUriStrings }
+                )
+                return@withContext RemoteFolderPreview(
+                    hasSubFolders = inspection.hasSubFolders,
+                    previewUris = previewUriStrings.map(Uri::parse)
+                )
+            }
+
             val previewPhotos = getPhotosFromRepo(
                 repo = repo,
                 folderPath = folderPath,
