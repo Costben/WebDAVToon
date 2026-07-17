@@ -132,6 +132,12 @@ async fn handle_request(
         return write_simple_response(writer, "503 Service Unavailable", "no remote service").await;
     };
 
+    log::info!(
+        "media_proxy request path={} range={:?}",
+        rel_path,
+        request.range
+    );
+    let stat_started = std::time::Instant::now();
     let total = match service.stat_size(&rel_path).await {
         Ok(size) => size,
         Err(e) => {
@@ -139,6 +145,12 @@ async fn handle_request(
             return write_simple_response(writer, "404 Not Found", "not found").await;
         }
     };
+    log::info!(
+        "media_proxy stat path={} total={} elapsed_ms={}",
+        rel_path,
+        total,
+        stat_started.elapsed().as_millis()
+    );
 
     let content_type = content_type_for(&rel_path);
     let range_outcome = match request.range.as_deref() {
@@ -199,6 +211,7 @@ async fn handle_request(
         }
     };
 
+    let started = std::time::Instant::now();
     writer
         .write_all(head.as_bytes())
         .await
@@ -224,6 +237,14 @@ async fn handle_request(
             break;
         }
     }
+    log::info!(
+        "media_proxy served path={} status={} offset={} bytes={} elapsed_ms={}",
+        rel_path,
+        status,
+        offset,
+        sent,
+        started.elapsed().as_millis()
+    );
 
     if sent < length {
         return Err(format!(
