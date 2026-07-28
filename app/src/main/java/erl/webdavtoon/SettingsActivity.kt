@@ -150,6 +150,12 @@ class SettingsActivity : AppCompatActivity() {
             root.setOnClickListener { showSortOrderDialog() }
         }
 
+        binding.settingRecursiveImageArrangement.apply {
+            icon.setImageResource(R.drawable.ic_ior_sort)
+            title.text = getString(R.string.recursive_image_arrangement)
+            root.setOnClickListener { showRecursiveImageArrangementDialog() }
+        }
+
         binding.settingWaterfallFilenames.apply {
             icon.setImageResource(R.drawable.ic_ior_media_image)
             title.text = getString(R.string.waterfall_show_filenames)
@@ -259,6 +265,11 @@ class SettingsActivity : AppCompatActivity() {
         }
         binding.settingSortOrder.title.text = getString(R.string.sort_order)
         binding.settingSortOrder.summary.text = sortOrder
+
+        binding.settingRecursiveImageArrangement.title.text = getString(R.string.recursive_image_arrangement)
+        binding.settingRecursiveImageArrangement.summary.text = recursiveImageArrangementLabel(
+            settingsManager.getRecursiveImageArrangement()
+        )
 
         binding.settingWaterfallFilenames.title.text = getString(R.string.waterfall_show_filenames)
         binding.settingWaterfallFilenames.summary.text = if (settingsManager.shouldShowWaterfallFilenames()) {
@@ -513,6 +524,35 @@ class SettingsActivity : AppCompatActivity() {
                 SmbSortHint.maybeShowPreviewHint(this, settingsManager, current, which)
                 settingsManager.setSortOrder(which)
                 refreshUi()
+                dialog.dismiss()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun recursiveImageArrangementLabel(arrangement: Int): String = when (arrangement) {
+        SettingsManager.RECURSIVE_IMAGE_ARRANGEMENT_GLOBAL_DATE_DESC ->
+            getString(R.string.recursive_image_arrangement_global_date_desc)
+        SettingsManager.RECURSIVE_IMAGE_ARRANGEMENT_GLOBAL_DATE_ASC ->
+            getString(R.string.recursive_image_arrangement_global_date_asc)
+        else -> getString(R.string.recursive_image_arrangement_grouped)
+    }
+
+    private fun showRecursiveImageArrangementDialog() {
+        val values = intArrayOf(
+            SettingsManager.RECURSIVE_IMAGE_ARRANGEMENT_GROUPED,
+            SettingsManager.RECURSIVE_IMAGE_ARRANGEMENT_GLOBAL_DATE_DESC,
+            SettingsManager.RECURSIVE_IMAGE_ARRANGEMENT_GLOBAL_DATE_ASC
+        )
+        val options = values.map(::recursiveImageArrangementLabel).toTypedArray()
+        val current = values.indexOf(settingsManager.getRecursiveImageArrangement()).coerceAtLeast(0)
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.recursive_image_arrangement)
+            .setSingleChoiceItems(options, current) { dialog, which ->
+                settingsManager.setRecursiveImageArrangement(values[which])
+                refreshUi()
+                setResult(RESULT_OK)
                 dialog.dismiss()
             }
             .setNegativeButton(R.string.cancel, null)

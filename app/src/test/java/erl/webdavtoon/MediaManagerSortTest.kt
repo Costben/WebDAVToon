@@ -7,6 +7,46 @@ import org.junit.Test
 class MediaManagerSortTest {
 
     @Test
+    fun recursiveGlobalDateArrangement_flattensFolderPathsAndSortsNewestFirst() {
+        val items = listOf(
+            PhotoStub("/a", "a1", 100),
+            PhotoStub("/b", "b1", 300),
+            PhotoStub("/a", "a2", 250),
+            PhotoStub("/c", "c1", 200)
+        )
+
+        val sorted = MediaManager.sortRecursivelyByGlobalDate(
+            photos = items,
+            arrangement = SettingsManager.RECURSIVE_IMAGE_ARRANGEMENT_GLOBAL_DATE_DESC,
+            dateModified = { it.dateModified }
+        )
+
+        assertEquals(listOf("b1", "a2", "c1", "a1"), sorted.map { it.id })
+        assertEquals(listOf(300L, 250L, 200L, 100L), sorted.map { it.dateModified })
+    }
+
+    @Test
+    fun recursiveGroupedArrangement_preservesExistingFolderClusters() {
+        val grouped = sampleGroupedPhotos()
+        val folderOrder = MediaManager.sortFolderPaths(
+            grouped = grouped,
+            sortOrder = SettingsManager.SORT_DATE_DESC,
+            clusterShuffleSeed = 0L,
+            newestDate = { photos -> photos.maxOfOrNull { it.dateModified } ?: 0L },
+            oldestDate = { photos -> photos.minOfOrNull { it.dateModified } ?: 0L }
+        )
+        val groupedResult = folderOrder.flatMap(grouped::getValue)
+        val unchanged = MediaManager.sortRecursivelyByGlobalDate(
+            photos = groupedResult,
+            arrangement = SettingsManager.RECURSIVE_IMAGE_ARRANGEMENT_GROUPED,
+            dateModified = { it.dateModified }
+        )
+
+        assertEquals(folderOrder, unchanged.map { it.folderPath }.distinct())
+        assertEquals(groupedResult, unchanged)
+    }
+
+    @Test
     fun randomFolderSort_keepsFolderClustersTogether() {
         val sortedFolderPaths = MediaManager.sortFolderPaths(
             grouped = sampleGroupedPhotos(),

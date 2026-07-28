@@ -12,6 +12,7 @@ class FolderAdapter(
     private val onFolderClick: (Folder) -> Unit,
     private val onSelectionChanged: (Int) -> Unit,
     private val onRemotePreviewNeeded: ((Folder, Boolean) -> Unit)? = null,
+    private val onRemotePreviewVisibilityChanged: ((Folder, Boolean) -> Unit)? = null,
     private val remotePreviewGeneration: () -> String = { "" }
 ) : RecyclerView.Adapter<FolderAdapter.FolderViewHolder>() {
 
@@ -226,12 +227,27 @@ class FolderAdapter(
     override fun onBindViewHolder(holder: FolderViewHolder, position: Int) {
         val folder = folders[position]
         holder.bind(folder, selectedFolderPaths.contains(folder.path))
-        maybeRequestRemotePreview(position)
+        if (holder.itemView.isAttachedToWindow) {
+            maybeRequestRemotePreview(position)
+        }
     }
 
     override fun onViewAttachedToWindow(holder: FolderViewHolder) {
         super.onViewAttachedToWindow(holder)
-        maybeRequestRemotePreview(holder.bindingAdapterPosition)
+        val folder = holder.boundFolder ?: folderAt(holder.bindingAdapterPosition) ?: return
+        if (isRemotePreviewCandidate(folder)) {
+            onRemotePreviewVisibilityChanged?.invoke(folder, true)
+        }
+        maybeRequestRemotePreview(folder)
+    }
+
+    override fun onViewDetachedFromWindow(holder: FolderViewHolder) {
+        val folder = holder.boundFolder ?: folderAt(holder.bindingAdapterPosition)
+        if (folder != null && isRemotePreviewCandidate(folder)) {
+            onRemotePreviewVisibilityChanged?.invoke(folder, false)
+            requestedPreviewKeys.remove(RemotePreviewKey(remotePreviewGeneration(), folder.path))
+        }
+        super.onViewDetachedFromWindow(holder)
     }
 
     override fun onViewRecycled(holder: FolderViewHolder) {
@@ -244,8 +260,11 @@ class FolderAdapter(
     override fun getItemId(position: Int): Long = folders[position].path.hashCode().toLong()
 
     private fun maybeRequestRemotePreview(position: Int) {
-        if (position == RecyclerView.NO_POSITION || position >= folders.size) return
-        val folder = folders[position]
+        val folder = folderAt(position) ?: return
+        maybeRequestRemotePreview(folder)
+    }
+
+    private fun maybeRequestRemotePreview(folder: Folder) {
         val forceRefresh = folder.path in forcedPreviewRefreshPaths
         if (!forceRefresh && !needsRemotePreviewRefresh(folder)) return
 
@@ -257,10 +276,21 @@ class FolderAdapter(
     }
 
     private fun needsRemotePreviewRefresh(folder: Folder): Boolean {
-        return !folder.isLocal && !folder.path.startsWith("virtual://") && folder.previewUris.isEmpty()
+        return isRemotePreviewCandidate(folder) && folder.previewUris.isEmpty()
+    }
+
+    private fun isRemotePreviewCandidate(folder: Folder): Boolean {
+        return !folder.isLocal && !folder.path.startsWith("virtual://")
+    }
+
+    private fun folderAt(position: Int): Folder? {
+        return folders.getOrNull(position.takeIf { it != RecyclerView.NO_POSITION } ?: return null)
     }
 
     inner class FolderViewHolder(private val binding: ItemFolderBinding) : RecyclerView.ViewHolder(binding.root) {
+
+        var boundFolder: Folder? = null
+            private set
 
         private val previewBinder = FolderPreviewBinder(
             previewImageViews = listOf(binding.preview1, binding.preview2, binding.preview3, binding.preview4),
@@ -269,6 +299,7 @@ class FolderAdapter(
         )
 
         fun bind(folder: Folder, isSelected: Boolean) {
+            boundFolder = folder
             binding.folderName.text = folder.name.trimEnd('/')
             binding.folderInfo.text = when {
                 folder.isLocal -> binding.root.context.getString(R.string.photos_local_suffix, folder.photoCount)
@@ -282,6 +313,7 @@ class FolderAdapter(
         }
 
         fun clear() {
+            boundFolder = null
             previewBinder.clear()
         }
     }

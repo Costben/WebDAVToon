@@ -33,6 +33,7 @@ class SettingsManager(context: Context) {
         const val KEY_SORT_ORDER = "sort_order"
         const val KEY_PHOTO_GRID_COLUMNS = "photo_grid_columns"
         const val KEY_PHOTO_SORT_ORDER = "photo_sort_order"
+        const val KEY_RECURSIVE_IMAGE_ARRANGEMENT = "recursive_image_arrangement"
         const val KEY_FAVORITE_PHOTOS = "favorite_photos"
         const val KEY_THEME_ID = "theme_id"
         const val KEY_LANGUAGE = "language"
@@ -62,6 +63,10 @@ class SettingsManager(context: Context) {
         const val SORT_DATE_ASC = 3
         const val SORT_RANDOM_FOLDERS = 4
 
+        const val RECURSIVE_IMAGE_ARRANGEMENT_GROUPED = 0
+        const val RECURSIVE_IMAGE_ARRANGEMENT_GLOBAL_DATE_DESC = 1
+        const val RECURSIVE_IMAGE_ARRANGEMENT_GLOBAL_DATE_ASC = 2
+
         private val gson = Gson()
         private val slotCacheLock = Any()
 
@@ -83,6 +88,28 @@ class SettingsManager(context: Context) {
 
     fun getPhotoSortOrder(): Int = appSettings.getOrDefaultInt(AppSettingsStore.PHOTO_SORT_ORDER, 2)
     fun setPhotoSortOrder(order: Int) = appSettings.putInt(AppSettingsStore.PHOTO_SORT_ORDER, order)
+
+    fun getRecursiveImageArrangement(): Int = appSettings.getOrDefaultInt(
+        AppSettingsStore.RECURSIVE_IMAGE_ARRANGEMENT,
+        RECURSIVE_IMAGE_ARRANGEMENT_GROUPED
+    ).let { arrangement ->
+        when (arrangement) {
+            RECURSIVE_IMAGE_ARRANGEMENT_GROUPED,
+            RECURSIVE_IMAGE_ARRANGEMENT_GLOBAL_DATE_DESC,
+            RECURSIVE_IMAGE_ARRANGEMENT_GLOBAL_DATE_ASC -> arrangement
+            else -> RECURSIVE_IMAGE_ARRANGEMENT_GROUPED
+        }
+    }
+
+    fun setRecursiveImageArrangement(arrangement: Int) = appSettings.putInt(
+        AppSettingsStore.RECURSIVE_IMAGE_ARRANGEMENT,
+        when (arrangement) {
+            RECURSIVE_IMAGE_ARRANGEMENT_GROUPED,
+            RECURSIVE_IMAGE_ARRANGEMENT_GLOBAL_DATE_DESC,
+            RECURSIVE_IMAGE_ARRANGEMENT_GLOBAL_DATE_ASC -> arrangement
+            else -> RECURSIVE_IMAGE_ARRANGEMENT_GROUPED
+        }
+    )
 
     fun getLogLevel(): Int = appSettings.getOrDefaultInt(AppSettingsStore.LOG_LEVEL, Log.INFO)
     fun setLogLevel(level: Int) = appSettings.putInt(AppSettingsStore.LOG_LEVEL, level)

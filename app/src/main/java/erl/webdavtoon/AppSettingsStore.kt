@@ -31,6 +31,7 @@ class AppSettingsStore(context: Context) {
         val PHOTO_GRID_COLUMNS = intPreferencesKey("photo_grid_columns")
         val SORT_ORDER = intPreferencesKey("sort_order")
         val PHOTO_SORT_ORDER = intPreferencesKey("photo_sort_order")
+        val RECURSIVE_IMAGE_ARRANGEMENT = intPreferencesKey("recursive_image_arrangement")
         val LOG_LEVEL = intPreferencesKey("log_level")
         val CURRENT_SLOT = intPreferencesKey("current_slot")
         val WEBDAV_SLOTS_JSON = stringPreferencesKey("webdav_slots_json")

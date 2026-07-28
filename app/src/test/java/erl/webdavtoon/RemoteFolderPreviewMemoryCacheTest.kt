@@ -129,6 +129,31 @@ class RemoteFolderPreviewMemoryCacheTest {
     }
 
     @Test
+    fun knownEmptyDirectMedia_isReusedAndClearedWhenMediaAppears() {
+        RemoteFolderPreviewMemoryCache.recordDirectMediaResult(
+            accountKey = "server|user",
+            path = "many-folders/",
+            isEmpty = true
+        )
+
+        assertEquals(
+            true,
+            RemoteFolderPreviewMemoryCache.hasKnownEmptyDirectMedia("server|user", "/many-folders")
+        )
+
+        RemoteFolderPreviewMemoryCache.recordDirectMediaResult(
+            accountKey = "server|user",
+            path = "many-folders/",
+            isEmpty = false
+        )
+
+        assertEquals(
+            false,
+            RemoteFolderPreviewMemoryCache.hasKnownEmptyDirectMedia("server|user", "many-folders/")
+        )
+    }
+
+    @Test
     fun invalidateFolderTree_removesOnlyMatchingSubtree() {
         RemoteFolderPreviewMemoryCache.put(
             accountKey = "server|user",

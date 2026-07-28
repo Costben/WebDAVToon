@@ -19,11 +19,17 @@ object RemoteFolderPreviewMemoryCache {
         val path: String
     )
 
+    private data class DirectMediaKey(
+        val accountKey: String,
+        val path: String
+    )
+
     private data class PersistedFolderEntry(
         val accountHash: String = "",
         val path: String = "/",
         val hasSubFolders: Boolean = false,
         val previewUriStringsBySortOrder: Map<String, List<String>> = emptyMap(),
+        val emptyDirectMediaCheckedAtMs: Long = 0L,
         val updatedAtMs: Long = 0L
     )
 
@@ -39,6 +45,12 @@ object RemoteFolderPreviewMemoryCache {
 
     private val entries = object : LinkedHashMap<Key, Entry>(MAX_MEMORY_ENTRIES, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Key, Entry>?): Boolean {
+            return size > MAX_MEMORY_ENTRIES
+        }
+    }
+
+    private val emptyDirectMediaEntries = object : LinkedHashMap<DirectMediaKey, Long>(MAX_MEMORY_ENTRIES, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<DirectMediaKey, Long>?): Boolean {
             return size > MAX_MEMORY_ENTRIES
         }
     }
@@ -91,7 +103,8 @@ object RemoteFolderPreviewMemoryCache {
             accountKey = accountKey,
             normalizedPath = normalizedPath,
             hasSubFolders = hasSubFolders,
-            previewUriStringsBySortOrder = mergedPreviews
+            previewUriStringsBySortOrder = mergedPreviews,
+            emptyDirectMediaCheckedAtMs = persisted?.emptyDirectMediaCheckedAtMs ?: 0L
         )
     }
 
@@ -118,7 +131,42 @@ object RemoteFolderPreviewMemoryCache {
             hasSubFolders = hasSubFolders,
             previewUriStringsBySortOrder = normalizedPreviewsBySortOrder.mapKeys { (sortOrder, _) ->
                 sortOrder.toString()
-            }
+            },
+            emptyDirectMediaCheckedAtMs = readPersistedFolder(accountKey, normalizedPath)?.emptyDirectMediaCheckedAtMs ?: 0L
+        )
+    }
+
+    @Synchronized
+    fun hasKnownEmptyDirectMedia(accountKey: String, path: String): Boolean {
+        val normalizedPath = normalizePath(path)
+        val key = DirectMediaKey(accountKey, normalizedPath)
+        if (emptyDirectMediaEntries.containsKey(key)) return true
+
+        val persisted = readPersistedFolder(accountKey, normalizedPath) ?: return false
+        if (persisted.emptyDirectMediaCheckedAtMs <= 0L) return false
+
+        emptyDirectMediaEntries[key] = persisted.emptyDirectMediaCheckedAtMs
+        Log.i("RemoteFolderPreviewCache", "emptyDirectMediaHit path=$normalizedPath")
+        return true
+    }
+
+    @Synchronized
+    fun recordDirectMediaResult(accountKey: String, path: String, isEmpty: Boolean) {
+        val normalizedPath = normalizePath(path)
+        val key = DirectMediaKey(accountKey, normalizedPath)
+        if (isEmpty) {
+            emptyDirectMediaEntries[key] = System.currentTimeMillis()
+        } else {
+            emptyDirectMediaEntries.remove(key)
+        }
+
+        val persisted = readPersistedFolder(accountKey, normalizedPath)
+        writePersistedFolder(
+            accountKey = accountKey,
+            normalizedPath = normalizedPath,
+            hasSubFolders = persisted?.hasSubFolders ?: false,
+            previewUriStringsBySortOrder = persisted?.previewUriStringsBySortOrder.orEmpty(),
+            emptyDirectMediaCheckedAtMs = if (isEmpty) System.currentTimeMillis() else 0L
         )
     }
 
@@ -130,6 +178,12 @@ object RemoteFolderPreviewMemoryCache {
                 (normalizedRoot == "/" || key.path == normalizedRoot || key.path.startsWith(normalizedRoot))
         }
         keysToRemove.forEach(entries::remove)
+        emptyDirectMediaEntries.keys
+            .filter { key ->
+                key.accountKey == accountKey &&
+                    (normalizedRoot == "/" || key.path == normalizedRoot || key.path.startsWith(normalizedRoot))
+            }
+            .forEach(emptyDirectMediaEntries::remove)
 
         val accountHash = sha256(accountKey)
         val prefs = preferences ?: return
@@ -149,6 +203,7 @@ object RemoteFolderPreviewMemoryCache {
     @Synchronized
     fun clearForTests() {
         entries.clear()
+        emptyDirectMediaEntries.clear()
     }
 
     internal fun normalizePath(path: String): String {
@@ -170,7 +225,8 @@ object RemoteFolderPreviewMemoryCache {
         accountKey: String,
         normalizedPath: String,
         hasSubFolders: Boolean,
-        previewUriStringsBySortOrder: Map<String, List<String>>
+        previewUriStringsBySortOrder: Map<String, List<String>>,
+        emptyDirectMediaCheckedAtMs: Long = 0L
     ) {
         val prefs = preferences ?: return
         val persisted = PersistedFolderEntry(
@@ -178,6 +234,7 @@ object RemoteFolderPreviewMemoryCache {
             path = normalizedPath,
             hasSubFolders = hasSubFolders,
             previewUriStringsBySortOrder = previewUriStringsBySortOrder,
+            emptyDirectMediaCheckedAtMs = emptyDirectMediaCheckedAtMs,
             updatedAtMs = System.currentTimeMillis()
         )
         prefs.edit()

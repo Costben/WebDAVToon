@@ -35,6 +35,7 @@ object MediaManager {
         photos: List<Photo>,
         sortOrder: Int,
         isRecursive: Boolean,
+        recursiveImageArrangement: Int = SettingsManager.RECURSIVE_IMAGE_ARRANGEMENT_GROUPED,
         clusterShuffleSeed: Long = 0L,
         randomizePhotos: Boolean = false,
         photoShuffleSeed: Long = 0L
@@ -44,6 +45,14 @@ object MediaManager {
 
         if (!isRecursive) {
             return if (randomizePhotos) baseSorted.shuffled(Random(photoShuffleSeed)) else baseSorted
+        }
+
+        if (recursiveImageArrangement != SettingsManager.RECURSIVE_IMAGE_ARRANGEMENT_GROUPED) {
+            return sortRecursivelyByGlobalDate(
+                photos = photos,
+                arrangement = recursiveImageArrangement,
+                dateModified = { it.dateModified }
+            )
         }
 
         val grouped = LinkedHashMap<String, List<Photo>>()
@@ -66,6 +75,20 @@ object MediaManager {
         val result = ArrayList<Photo>(baseSorted.size)
         result.addAll(flattenFolderGroups(grouped, sortedFolderPaths, randomizePhotos, photoShuffleSeed))
         return result
+    }
+
+    internal fun <T> sortRecursivelyByGlobalDate(
+        photos: List<T>,
+        arrangement: Int,
+        dateModified: (T) -> Long
+    ): List<T> {
+        return when (arrangement) {
+            SettingsManager.RECURSIVE_IMAGE_ARRANGEMENT_GLOBAL_DATE_ASC ->
+                photos.sortedWith(compareBy<T> { dateModified(it) })
+            SettingsManager.RECURSIVE_IMAGE_ARRANGEMENT_GLOBAL_DATE_DESC ->
+                photos.sortedWith(compareByDescending<T> { dateModified(it) })
+            else -> photos
+        }
     }
 
     private fun sortMediaItems(photos: List<Photo>, sortOrder: Int): List<Photo> {
@@ -126,7 +149,7 @@ object MediaManager {
         if (state.isLoading || !state.hasMore) return
 
         viewModel.startAppend()
-        loadPageInternal(context, scope, state, append = true, forceRefresh = false)
+        loadPageInternal(context, scope, viewModel, state, append = true, forceRefresh = false)
     }
 
     fun refresh(
@@ -165,7 +188,7 @@ object MediaManager {
         orderedMediaCache = null
         val state = viewModel.state.value
 
-        loadPageInternal(context, scope, state, append = false, forceRefresh = true)
+        loadPageInternal(context, scope, viewModel, state, append = false, forceRefresh = true)
     }
 
     fun invalidateOrderedMediaCache() {
@@ -189,6 +212,7 @@ object MediaManager {
     private fun loadPageInternal(
         context: Context,
         scope: CoroutineScope,
+        viewModel: MediaViewModel,
         state: MediaUiState,
         append: Boolean,
         forceRefresh: Boolean
@@ -211,14 +235,16 @@ object MediaManager {
                     MediaPageResult(items = items, hasMore = next < ordered.size, nextOffset = next)
                 }
 
-                val viewModel = mediaViewModel ?: return@launch
+                if (viewModel.currentSessionKey() != state.sessionKey) return@launch
                 viewModel.setPage(page.items, page.hasMore, page.nextOffset, append)
                 val updatedState = viewModel.state.value
                 MediaStateCache.setState(updatedState)
                 PhotoCache.setPhotos(updatedState.photos)
             } catch (e: Exception) {
                 android.util.Log.e("MediaManager", "Load failed: ${e.message}", e)
-                mediaViewModel?.setError(e.message ?: e.toString())
+                if (viewModel.currentSessionKey() == state.sessionKey) {
+                    viewModel.setError(e.message ?: e.toString())
+                }
             }
         }
     }
@@ -238,6 +264,7 @@ object MediaManager {
         }
 
         val sortOrder = settingsManager.getPhotoSortOrder()
+        val recursiveImageArrangement = settingsManager.getRecursiveImageArrangement()
         val allMedia = if (state.isFavorites) {
             settingsManager.getFavoritePhotos()
         } else if (state.isRemote) {
@@ -260,10 +287,18 @@ object MediaManager {
             photos = allMedia.filter { matchesMediaQuery(it, state.currentQuery) },
             sortOrder = sortOrder,
             isRecursive = state.isRecursive,
+            recursiveImageArrangement = recursiveImageArrangement,
             clusterShuffleSeed = state.clusterShuffleSeed,
             randomizePhotos = state.currentQuery.randomizePhotos,
             photoShuffleSeed = state.photoShuffleSeed
         )
+        if (state.isRecursive) {
+            android.util.Log.i(
+                "MediaManager",
+                "recursiveOrder session=${state.sessionKey} arrangement=$recursiveImageArrangement sample=" +
+                    ordered.take(5).joinToString { "${it.id}:${it.dateModified}:${it.folderPath}" }
+            )
+        }
 
         orderedMediaCache = OrderedMediaCache(
             sessionKey = state.sessionKey,

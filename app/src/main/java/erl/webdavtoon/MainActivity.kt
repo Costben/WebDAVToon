@@ -214,7 +214,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.recyclerView.setItemViewCacheSize(16)
         binding.recyclerView.itemAnimator = null
-
+        binding.settingsFab.visibility = View.GONE
 
         photoAdapter = PhotoAdapter(
             onPhotoClick = onPhotoClick@{ photos, position ->
@@ -231,8 +231,16 @@ class MainActivity : AppCompatActivity() {
                     val imageIndex = imageOnly.indexOfFirst { it.id == clicked.id }
                     if (imageIndex == -1) return@onPhotoClick
 
-                    PhotoCache.setPhotos(imageOnly)
+                    val readerSession = ReaderSessions.create(
+                        source = ReaderSessionSource.MAIN_ACTIVITY,
+                        photos = imageOnly
+                    )
+                    android.util.Log.i(
+                        "ReaderSessions",
+                        "launch source=${readerSession.source} session=${readerSession.id} index=$imageIndex target=${clicked.id} images=${imageOnly.size}"
+                    )
                     val intent = Intent(this, PhotoViewActivity::class.java).apply {
+                        putExtra(ReaderSessions.EXTRA_SESSION_ID, readerSession.id)
                         putExtra("EXTRA_CURRENT_INDEX", imageIndex)
                         putExtra("EXTRA_IS_FAVORITES", isFavorites)
                     }

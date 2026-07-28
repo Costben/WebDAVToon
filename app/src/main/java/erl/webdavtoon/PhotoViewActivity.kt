@@ -74,6 +74,7 @@ class PhotoViewActivity : AppCompatActivity() {
     private var isSlideshowAdvancePending = false
     private var slideshowSessionId = 0
     private var pendingDeleteScrollAnchor: DeleteScrollAnchor? = null
+    private var readerSessionId: String? = null
 
     private data class PendingLocalMediaDelete(
         val photos: List<Photo>,
@@ -135,7 +136,6 @@ class PhotoViewActivity : AppCompatActivity() {
         ThemeHelper.applyTheme(this)
         LogManager.initialize(this)
         super.onCreate(savedInstanceState)
-        MediaManager.mediaViewModel = mediaViewModel
         // 应用旋转锁定设置
         applyRotationLock()
         
@@ -240,7 +240,7 @@ class PhotoViewActivity : AppCompatActivity() {
                 
                 // 检查是否需要加载下一�?
                 val layoutManager = recyclerView.layoutManager as? LinearLayoutManager
-                if (layoutManager != null && photos.isNotEmpty()) {
+                if (readerSessionId == null && layoutManager != null && photos.isNotEmpty()) {
                     val lastVisible = layoutManager.findLastVisibleItemPosition()
                     if (lastVisible >= photos.size - 10) { // 提前 10 张开始预加载
                         MediaManager.loadNextPage(this@PhotoViewActivity, lifecycleScope)
@@ -1071,10 +1071,13 @@ class PhotoViewActivity : AppCompatActivity() {
         val newPhotos = photos.filterNot { it.id in deletedIds }
         photos = newPhotos
 
-        PhotoCache.setPhotos(newPhotos)
+        readerSessionId?.let { ReaderSessions.replacePhotos(it, newPhotos) }
         MediaManager.removePhotosFromCaches(deletedPhotos)
-        mediaViewModel.removePhotos(deletedPhotos)
-        MediaStateCache.setState(mediaViewModel.state.value)
+        if (readerSessionId == null) {
+            PhotoCache.setPhotos(newPhotos)
+            mediaViewModel.removePhotos(deletedPhotos)
+            MediaStateCache.setState(mediaViewModel.state.value)
+        }
 
         adapter.setPhotos(newPhotos)
         webtoonAdapter?.setPhotos(newPhotos)
@@ -1582,6 +1585,7 @@ class PhotoViewActivity : AppCompatActivity() {
     private fun observeMediaState() {
         lifecycleScope.launch {
             mediaViewModel.state.collect { state: MediaUiState ->
+                if (readerSessionId != null) return@collect
                 // 仅当会话匹配且图片列表确实发生变化时才更�?
                 if (state.sessionKey.isNotEmpty()) {
                     val imageOnly = state.photos.filter { it.mediaType == MediaType.IMAGE }
@@ -1612,6 +1616,7 @@ class PhotoViewActivity : AppCompatActivity() {
     }
 
     private fun refreshCurrentMediaPage() {
+        if (readerSessionId != null) return
         val state = mediaViewModel.state.value
         if (state.sessionKey.isEmpty()) return
 
@@ -1640,18 +1645,43 @@ class PhotoViewActivity : AppCompatActivity() {
         outState.putInt("EXTRA_CURRENT_INDEX", currentIndex)
         outState.putBoolean("EXTRA_IS_CARD_MODE", isCardMode)
         outState.putBoolean("EXTRA_IS_IMMERSIVE_MODE", isImmersiveMode)
+        readerSessionId?.let { outState.putString(ReaderSessions.STATE_SESSION_ID, it) }
     }
 
     private fun loadData(savedInstanceState: Bundle?) {
-        photos = PhotoCache.getPhotos()
+        val requestedSessionId = intent.getStringExtra(ReaderSessions.EXTRA_SESSION_ID)
+        val resolvedSession = ReaderSessions.resolve(
+            requestedSessionId = requestedSessionId,
+            restoredSessionId = savedInstanceState?.getString(ReaderSessions.STATE_SESSION_ID),
+            savedIndex = savedInstanceState?.getInt("EXTRA_CURRENT_INDEX"),
+            intentIndex = intent.getIntExtra("EXTRA_CURRENT_INDEX", 0)
+        )
+        readerSessionId = resolvedSession?.snapshot?.id ?: requestedSessionId
+        photos = resolvedSession?.snapshot?.items ?: if (requestedSessionId == null) {
+            PhotoCache.getPhotos()
+        } else {
+            emptyList()
+        }
+        val shouldRestoreReaderState = resolvedSession?.restoredFromSameSession == true
+        if (resolvedSession != null) {
+            android.util.Log.i(
+                "ReaderSessions",
+                "resolve source=${resolvedSession.snapshot.source} session=${resolvedSession.snapshot.id} index=${resolvedSession.index} target=${photos.getOrNull(resolvedSession.index)?.id} restored=$shouldRestoreReaderState images=${photos.size}"
+            )
+        } else if (requestedSessionId != null) {
+            android.util.Log.e(
+                "ReaderSessions",
+                "missing session=$requestedSessionId; refusing global cache fallback"
+            )
+        }
         
         // 优先�?savedInstanceState 恢复索引和模式，如果没有则从 intent 或默认值获�?
-        if (savedInstanceState != null) {
+        if (shouldRestoreReaderState && savedInstanceState != null) {
             currentIndex = savedInstanceState.getInt("EXTRA_CURRENT_INDEX", 0)
             isCardMode = savedInstanceState.getBoolean("EXTRA_IS_CARD_MODE", false)
             isImmersiveMode = savedInstanceState.getBoolean("EXTRA_IS_IMMERSIVE_MODE", false)
         } else {
-            currentIndex = intent.getIntExtra("EXTRA_CURRENT_INDEX", 0)
+            currentIndex = resolvedSession?.index ?: intent.getIntExtra("EXTRA_CURRENT_INDEX", 0)
             when (settingsManager.getDefaultReaderMode()) {
                 SettingsManager.DEFAULT_READER_MODE_CARD -> {
                     isCardMode = true
@@ -1664,12 +1694,14 @@ class PhotoViewActivity : AppCompatActivity() {
             }
         }
 
-        MediaStateCache.getState()?.let { state ->
-            if (state.photos.isNotEmpty()) {
-                mediaViewModel.restore(state)
+        if (readerSessionId == null) {
+            MediaStateCache.getState()?.let { state ->
+                if (state.photos.isNotEmpty()) {
+                    mediaViewModel.restore(state)
+                }
             }
+            observeMediaState()
         }
-        observeMediaState()
             
         isFavorites = intent.getBooleanExtra("EXTRA_IS_FAVORITES", false)
         
@@ -1802,9 +1834,12 @@ class PhotoViewActivity : AppCompatActivity() {
             val removedIds = plan.toRemove.mapTo(mutableSetOf()) { it.id }
             val newPhotos = photos.filterNot { it.id in removedIds }
 
-            PhotoCache.setPhotos(newPhotos)
-            mediaViewModel.removePhotos(plan.toRemove)
             photos = newPhotos
+            readerSessionId?.let { ReaderSessions.replacePhotos(it, newPhotos) }
+            if (readerSessionId == null) {
+                PhotoCache.setPhotos(newPhotos)
+                mediaViewModel.removePhotos(plan.toRemove)
+            }
 
             adapter.setPhotos(photos)
             webtoonAdapter?.setPhotos(photos)

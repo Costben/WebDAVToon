@@ -144,6 +144,7 @@
             <include layout="@layout/item_setting" android:id="@+id/setting_grid_columns" />
             <include layout="@layout/item_setting" android:id="@+id/setting_drawer_edge_width" />
             <include layout="@layout/item_setting" android:id="@+id/setting_sort_order" />
+            <include layout="@layout/item_setting" android:id="@+id/setting_recursive_image_arrangement" />
             <include layout="@layout/item_setting" android:id="@+id/setting_waterfall_filenames" />
             <include layout="@layout/item_setting" android:id="@+id/setting_thumbnail_quality" />
             <include layout="@layout/item_setting" android:id="@+id/setting_reader_max_zoom" />

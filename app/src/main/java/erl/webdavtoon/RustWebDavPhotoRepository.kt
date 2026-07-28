@@ -85,15 +85,29 @@ class RustWebDavPhotoRepository(
         val repo = rustRepo ?: return@withContext emptyList()
         initializeWebDavIfNeeded(repo)
         val sortOrder = settingsManager.getPhotoSortOrder()
+        val accountKey = previewCacheAccountKey()
+
+        if (!recursive && !forceRefresh && RemoteFolderPreviewMemoryCache.hasKnownEmptyDirectMedia(accountKey, folderPath)) {
+            Log.i("RustWebDavPhotoRepo", "getPhotos emptyDirectMediaCacheHit path=$folderPath")
+            return@withContext emptyList()
+        }
 
         try {
-            getSortedPhotosFromRepo(
+            val photos = getSortedPhotosFromRepo(
                 repo = repo,
                 folderPath = folderPath,
                 sortOrder = sortOrder,
                 forceRefresh = forceRefresh,
                 recursive = recursive
             )
+            if (!recursive) {
+                RemoteFolderPreviewMemoryCache.recordDirectMediaResult(
+                    accountKey = accountKey,
+                    path = folderPath,
+                    isEmpty = photos.isEmpty()
+                )
+            }
+            photos
         } catch (e: Exception) {
             android.util.Log.e("RustWebDavPhotoRepo", "Failed to get webdav photos", e)
             emptyList()
@@ -120,7 +134,7 @@ class RustWebDavPhotoRepository(
                         name = f.name,
                         isLocal = f.isLocal,
                         photoCount = 0,
-                        previewUris = emptyList(),
+                        previewUris = f.previewUris.map(Uri::parse),
                         hasSubFolders = f.hasSubFolders,
                         dateModified = f.dateModified.toLong() * 1000
                     )

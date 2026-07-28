@@ -38,6 +38,14 @@ object FolderNavigationResolver {
             }
             .toMutableList()
 
+        val realChildFolders = folders.filterNot { it.path.startsWith("virtual://internal_photos") }
+        if (realChildFolders.isNotEmpty()) {
+            // FolderGrid performs the one direct-media probe needed for its
+            // mixed-content redirect. Avoid doing the same remote listing in
+            // both activities before that page is even shown.
+            return@withContext Target.FolderGrid(folderPath, isWebDav)
+        }
+
         val directMedia = repository.getPhotos(
             folderPath = folderPath,
             recursive = false,
@@ -60,10 +68,10 @@ object FolderNavigationResolver {
             )
         }
 
-        val realChildFolders = folders.filterNot { it.path.startsWith("virtual://internal_photos") }
+        val resolvedChildFolders = folders.filterNot { it.path.startsWith("virtual://internal_photos") }
         when {
-            realChildFolders.isNotEmpty() && directMedia.isNotEmpty() -> Target.MixedWaterfall(folderPath, isWebDav)
-            realChildFolders.isNotEmpty() -> Target.FolderGrid(folderPath, isWebDav)
+            resolvedChildFolders.isNotEmpty() && directMedia.isNotEmpty() -> Target.MixedWaterfall(folderPath, isWebDav)
+            resolvedChildFolders.isNotEmpty() -> Target.FolderGrid(folderPath, isWebDav)
             else -> Target.MediaWaterfall(folderPath, isWebDav)
         }
     }

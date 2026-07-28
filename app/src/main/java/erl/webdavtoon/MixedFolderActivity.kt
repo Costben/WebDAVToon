@@ -187,6 +187,15 @@ class MixedFolderActivity : AppCompatActivity() {
         binding.recyclerView.itemAnimator = null
         installWaterfallLayout()
 
+        binding.settingsFab.visibility = View.VISIBLE
+        binding.settingsFab.setOnClickListener {
+            startActivity(Intent(this, MainActivity::class.java).apply {
+                putExtra("EXTRA_FOLDER_PATH", folderPath)
+                putExtra("EXTRA_IS_WEBDAV", isWebDav)
+                putExtra("EXTRA_RECURSIVE", true)
+            })
+        }
+
         onBackPressedDispatcher.addCallback(this) {
             if (adapter.isSelectionMode) {
                 adapter.exitSelectionMode()
@@ -530,8 +539,16 @@ class MixedFolderActivity : AppCompatActivity() {
         val imageIndex = imageOnly.indexOfFirst { it.id == photo.id }
         if (imageIndex == -1) return
 
-        PhotoCache.setPhotos(imageOnly)
+        val readerSession = ReaderSessions.create(
+            source = ReaderSessionSource.MIXED_FOLDER,
+            photos = imageOnly
+        )
+        android.util.Log.i(
+            "ReaderSessions",
+            "launch source=${readerSession.source} session=${readerSession.id} index=$imageIndex target=${photo.id} images=${imageOnly.size} path=$folderPath"
+        )
         startActivity(Intent(this, PhotoViewActivity::class.java).apply {
+            putExtra(ReaderSessions.EXTRA_SESSION_ID, readerSession.id)
             putExtra("EXTRA_CURRENT_INDEX", imageIndex)
             putExtra("EXTRA_IS_FAVORITES", isFavorites)
         })

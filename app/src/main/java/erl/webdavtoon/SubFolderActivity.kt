@@ -32,6 +32,7 @@ class SubFolderActivity : AppCompatActivity() {
     private lateinit var binding: ActivityFolderViewBinding
     private lateinit var settingsManager: SettingsManager
     private lateinit var adapter: FolderAdapter
+    private lateinit var remotePreviewScheduler: VisibleRemotePreviewScheduler
     private var folderPath: String = ""
     private var isWebDav: Boolean = false
     private var currentAllFolders: List<Folder> = emptyList()
@@ -112,6 +113,10 @@ class SubFolderActivity : AppCompatActivity() {
             }
         }
 
+        remotePreviewScheduler = VisibleRemotePreviewScheduler(lifecycleScope) { folder, forceRefresh ->
+            resolveRemotePreviewNow(folder, forceRefresh)
+        }
+
         adapter = FolderAdapter(
             onFolderClick = { folder ->
                 onFolderClick(folder)
@@ -125,7 +130,10 @@ class SubFolderActivity : AppCompatActivity() {
                 invalidateOptionsMenu()
             },
             onRemotePreviewNeeded = { folder, forceRefresh ->
-                resolveRemotePreview(folder, forceRefresh)
+                remotePreviewScheduler.enqueue(folder, forceRefresh)
+            },
+            onRemotePreviewVisibilityChanged = { folder, visible ->
+                remotePreviewScheduler.setVisible(folder, visible)
             },
             remotePreviewGeneration = {
                 settingsManager.getSortOrder().toString()
@@ -568,36 +576,34 @@ class SubFolderActivity : AppCompatActivity() {
             .start()
     }
 
-    private fun resolveRemotePreview(folder: Folder, forceRefresh: Boolean = false) {
+    private suspend fun resolveRemotePreviewNow(folder: Folder, forceRefresh: Boolean = false) {
         if (folder.isLocal || (!forceRefresh && folder.previewUris.isNotEmpty())) return
 
-        lifecycleScope.launch {
-            val sortOrder = settingsManager.getSortOrder()
-            val preview = RustWebDavPhotoRepository(settingsManager).inspectFolder(
-                folderPath = folder.path,
-                sortOrder = sortOrder,
-                forceRefresh = forceRefresh
-            ) ?: return@launch
-            if (settingsManager.getSortOrder() != sortOrder) return@launch
-            val updatedPreviewUris = if (forceRefresh) {
-                preview.previewUris
-            } else {
-                preview.previewUris.ifEmpty { folder.previewUris }
-            }
-
-            currentAllFolders = currentAllFolders.map { current ->
-                if (current.path == folder.path) {
-                    current.copy(
-                        previewUris = updatedPreviewUris,
-                        hasSubFolders = current.hasSubFolders || preview.hasSubFolders
-                    )
-                } else {
-                    current
-                }
-            }
-
-            adapter.updateFolderPreview(folder.path, updatedPreviewUris, folder.hasSubFolders || preview.hasSubFolders)
+        val sortOrder = settingsManager.getSortOrder()
+        val preview = RustWebDavPhotoRepository(settingsManager).inspectFolder(
+            folderPath = folder.path,
+            sortOrder = sortOrder,
+            forceRefresh = forceRefresh
+        ) ?: return
+        if (settingsManager.getSortOrder() != sortOrder) return
+        val updatedPreviewUris = if (forceRefresh) {
+            preview.previewUris
+        } else {
+            preview.previewUris.ifEmpty { folder.previewUris }
         }
+
+        currentAllFolders = currentAllFolders.map { current ->
+            if (current.path == folder.path) {
+                current.copy(
+                    previewUris = updatedPreviewUris,
+                    hasSubFolders = current.hasSubFolders || preview.hasSubFolders
+                )
+            } else {
+                current
+            }
+        }
+
+        adapter.updateFolderPreview(folder.path, updatedPreviewUris, folder.hasSubFolders || preview.hasSubFolders)
     }
 
     private fun openMixedFolder() {
