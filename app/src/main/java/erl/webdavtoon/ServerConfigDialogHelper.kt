@@ -91,6 +91,8 @@ object ServerConfigDialogHelper {
         binding.hostLayout.hint = activity.getString(
             if (protocol == "smb") R.string.host_hint_smb else R.string.host_hint
         )
+        binding.usernameLayout.helperText =
+            if (protocol == "smb") activity.getString(R.string.smb_guest_hint) else null
         if (autoFillPort) {
             // Overwrite only when the field still holds another protocol's
             // default, so a user-entered custom port survives the switch.
@@ -274,7 +276,8 @@ object ServerConfigDialogHelper {
             password = binding.passwordEdit.text.toString(),
             domain = binding.domainEdit.text.toString()
         )
-        if (params.host.isBlank() || params.username.isBlank()) {
+        // An empty username is a guest attempt; only the host is required.
+        if (params.host.isBlank()) {
             Toast.makeText(
                 activity,
                 activity.getString(R.string.smb_enum_requires_host_user),

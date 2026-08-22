@@ -74,6 +74,23 @@ class WebDAVToonApplication : Application() {
             } catch (t: Throwable) {
                 LogManager.log("Failed to set Rust log level: ${t.message}", Log.WARN)
             }
+
+            // Register every stored slot with the media proxy so favorites
+            // minted by a non-current smb/ftp slot still resolve their bytes.
+            try {
+                settingsManager.allRemoteConfigs().forEach { config ->
+                    try {
+                        uniffi.rust_core.registerProxyRemote(config)
+                    } catch (t: Throwable) {
+                        LogManager.log(
+                            "registerProxyRemote failed for ${config.endpoint}: ${t.message}",
+                            Log.WARN
+                        )
+                    }
+                }
+            } catch (t: Throwable) {
+                LogManager.log("Failed to register proxy remotes: ${t.message}", Log.WARN)
+            }
         }
 
         LogManager.log("Application started", Log.INFO)

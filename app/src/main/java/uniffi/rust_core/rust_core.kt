@@ -742,6 +742,8 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
 
 
 
+
+
 // A JNA Library to expose the extern-C FFI definitions.
 // This is an implementation detail which will be called internally by the public API.
 
@@ -791,6 +793,8 @@ internal interface UniffiLib : Library {
     ): Unit
     fun uniffi_rust_core_fn_func_list_smb_shares(`host`: RustBuffer.ByValue,`port`: Short,`username`: RustBuffer.ByValue,`password`: RustBuffer.ByValue,`domain`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    fun uniffi_rust_core_fn_func_register_proxy_remote(`config`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
     fun uniffi_rust_core_fn_func_set_log_level(`level`: Int,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     fun ffi_rust_core_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus, 
@@ -913,6 +917,8 @@ internal interface UniffiLib : Library {
     ): Short
     fun uniffi_rust_core_checksum_func_list_smb_shares(
     ): Short
+    fun uniffi_rust_core_checksum_func_register_proxy_remote(
+    ): Short
     fun uniffi_rust_core_checksum_func_set_log_level(
     ): Short
     fun uniffi_rust_core_checksum_method_rustrepository_delete_folder(
@@ -950,7 +956,7 @@ private fun uniffiCheckContractApiVersion(lib: UniffiLib) {
 
 @Suppress("UNUSED_PARAMETER")
 private fun uniffiCheckApiChecksums(lib: UniffiLib) {
-    if (lib.uniffi_rust_core_checksum_func_ensure_media_proxy() != 12398.toShort()) {
+    if (lib.uniffi_rust_core_checksum_func_ensure_media_proxy() != 1621.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_rust_core_checksum_func_hello_from_rust() != 27971.toShort()) {
@@ -960,6 +966,9 @@ private fun uniffiCheckApiChecksums(lib: UniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_rust_core_checksum_func_list_smb_shares() != 20106.toShort()) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_rust_core_checksum_func_register_proxy_remote() != 797.toShort()) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_rust_core_checksum_func_set_log_level() != 12401.toShort()) {
@@ -2318,7 +2327,7 @@ public object FfiConverterSequenceTypeSmbShare: FfiConverterRustBuffer<List<SmbS
         /**
          * Starts the loopback media proxy on first call and returns its port and
          * auth token. Kotlin converts smb:// and ftp:// virtual URIs into
-         * `http://127.0.0.1:{port}/{token}/{path}` requests against it.
+         * `http://127.0.0.1:{port}/{token}/{slot}/{path}` requests against it.
          */
     @Throws(WebDavToonException::class) fun `ensureMediaProxy`(): MediaProxyInfo {
             return FfiConverterTypeMediaProxyInfo.lift(
@@ -2355,6 +2364,21 @@ public object FfiConverterSequenceTypeSmbShare: FfiConverterRustBuffer<List<SmbS
 }
     )
     }
+    
+
+        /**
+         * Registers a slot's remote config with the media proxy so byte requests
+         * carrying that slot's identity resolve even while another slot is current.
+         * Call for every stored smb/ftp slot at startup and after config changes;
+         * idempotent per endpoint+username identity.
+         */
+    @Throws(WebDavToonException::class) fun `registerProxyRemote`(`config`: RemoteConfig)
+        = 
+    uniffiRustCallWithError(WebDavToonException) { _status ->
+    UniffiLib.INSTANCE.uniffi_rust_core_fn_func_register_proxy_remote(
+        FfiConverterTypeRemoteConfig.lower(`config`),_status)
+}
+    
     
 
         /**

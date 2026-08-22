@@ -33,6 +33,40 @@ pub struct EntryMeta {
 pub type EntryResult = Result<EntryMeta, String>;
 pub type ByteStream = Pin<Box<dyn futures::Stream<Item = Result<Bytes, String>> + Send>>;
 
+/// A media file opened once, before its size is known, that can still serve
+/// byte ranges from the same backend handle. Lets the media proxy serve each
+/// request with a single open (SMB would otherwise open twice: stat + read).
+pub enum OpenedMedia {
+    Opendal {
+        op: Arc<Operator>,
+        rel_path: String,
+    },
+    Smb(crate::smb_fs::OpenedSmbFile),
+}
+
+impl OpenedMedia {
+    pub async fn read_range(
+        self,
+        offset: u64,
+        length: Option<u64>,
+    ) -> Result<ByteStream, String> {
+        match self {
+            OpenedMedia::Opendal { op, rel_path } => {
+                let reader = op.reader(&rel_path).await.map_err(|e| e.to_string())?;
+                let stream = match length {
+                    Some(len) => reader
+                        .into_bytes_stream(offset..offset.saturating_add(len))
+                        .await,
+                    None => reader.into_bytes_stream(offset..).await,
+                }
+                .map_err(|e| e.to_string())?;
+                Ok(Box::pin(stream.map(|chunk| chunk.map_err(|e| e.to_string()))))
+            }
+            OpenedMedia::Smb(file) => Ok(file.read_range(offset, length)),
+        }
+    }
+}
+
 pub struct OpendalFs {
     op: Arc<Operator>,
     flavor: RemoteProtocol,
@@ -232,6 +266,25 @@ impl Backend {
         }
     }
 
+    async fn open_ranged(&self, rel_path: &str) -> Result<(u64, OpenedMedia), String> {
+        match self {
+            Backend::Opendal(fs) => {
+                let total = fs.stat_size(rel_path).await?;
+                Ok((
+                    total,
+                    OpenedMedia::Opendal {
+                        op: Arc::clone(&fs.op),
+                        rel_path: rel_path.to_string(),
+                    },
+                ))
+            }
+            Backend::Smb(fs) => {
+                let (total, file) = fs.open_ranged(rel_path).await?;
+                Ok((total, OpenedMedia::Smb(file)))
+            }
+        }
+    }
+
     async fn delete_file(&self, rel_path: &str) -> Result<(), String> {
         match self {
             Backend::Opendal(fs) => fs.delete_file(rel_path).await,
@@ -365,6 +418,12 @@ impl RemoteService {
         length: Option<u64>,
     ) -> Result<ByteStream, String> {
         self.backend.read_stream(path, offset, length).await
+    }
+
+    /// Opens the file once and returns its total size plus a reader that
+    /// serves ranges from the same backend handle.
+    pub async fn open_ranged(&self, path: &str) -> Result<(u64, OpenedMedia), String> {
+        self.backend.open_ranged(path).await
     }
 
     pub async fn delete_file(&self, path: &str) -> Result<(), String> {

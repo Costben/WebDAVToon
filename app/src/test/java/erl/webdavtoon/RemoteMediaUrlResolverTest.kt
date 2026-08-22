@@ -72,4 +72,25 @@ class RemoteMediaUrlResolverTest {
             RemoteMediaUrlResolver.encodeRelPath("a+b/c.jpg")
         )
     }
+
+    @Test
+    fun slot_key_matches_rust_identity_and_encodes_to_one_segment() {
+        // Mirrors rust-core media_proxy::slot_key: "{endpoint}\n{username}".
+        assertEquals(
+            "smb://nas.lan/media\nuser",
+            RemoteMediaUrlResolver.slotKey("smb://nas.lan/media", "user")
+        )
+        val encoded = RemoteMediaUrlResolver.encodeSegment(
+            RemoteMediaUrlResolver.slotKey("smb://nas.lan/media", "user")
+        )
+        // No '/' or raw newline may survive: the proxy splits path segments
+        // before percent-decoding.
+        assertFalse(encoded.contains('/'))
+        assertFalse(encoded.contains('\n'))
+        // Round trip through java.net.URLDecoder matches the Rust decoder.
+        assertEquals(
+            "smb://nas.lan/media\nuser",
+            java.net.URLDecoder.decode(encoded, "UTF-8")
+        )
+    }
 }

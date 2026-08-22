@@ -115,10 +115,20 @@ impl RustRepository {
 
 /// Starts the loopback media proxy on first call and returns its port and
 /// auth token. Kotlin converts smb:// and ftp:// virtual URIs into
-/// `http://127.0.0.1:{port}/{token}/{path}` requests against it.
+/// `http://127.0.0.1:{port}/{token}/{slot}/{path}` requests against it.
 #[uniffi::export]
 pub fn ensure_media_proxy() -> Result<MediaProxyInfo, WebDavToonError> {
     media_proxy::ensure_media_proxy().map_err(WebDavToonError::ConfigError)
+}
+
+/// Registers a slot's remote config with the media proxy so byte requests
+/// carrying that slot's identity resolve even while another slot is current.
+/// Call for every stored smb/ftp slot at startup and after config changes;
+/// idempotent per endpoint+username identity.
+#[uniffi::export]
+pub fn register_proxy_remote(config: RemoteConfig) -> Result<(), WebDavToonError> {
+    media_proxy::register_remote(&config).map_err(WebDavToonError::ConfigError)?;
+    Ok(())
 }
 
 #[uniffi::export]

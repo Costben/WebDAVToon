@@ -9,31 +9,69 @@
 //! Deliberately minimal HTTP/1.1: GET/HEAD only, single `Range` support
 //! (`206`/`416`), Content-Length framing, keep-alive, binds 127.0.0.1 only.
 //! Requests must carry the per-process random token as the first path
-//! segment; anything else is a 404. Bodies stream in chunks — whole files are
-//! never buffered in memory. Only the current slot's service is registered;
-//! WebDAV bytes never go through the proxy.
+//! segment; anything else is a 404. The second segment identifies the owning
+//! slot (`{endpoint}\n{username}`, percent-encoded) so favorites minted by
+//! any registered slot resolve even while another slot is current. Bodies
+//! stream in chunks — whole files are never buffered in memory. WebDAV bytes
+//! never go through the proxy.
 
-use crate::models::MediaProxyInfo;
+use crate::models::{MediaProxyInfo, RemoteConfig};
 use crate::remote_fs::RemoteService;
 use futures::StreamExt;
 use percent_encoding::percent_decode_str;
-use std::sync::{Arc, Mutex, RwLock};
+use std::collections::HashMap;
+use std::sync::{Arc, LazyLock, Mutex, RwLock};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, TcpStream};
 
 const MAX_REQUEST_HEAD_BYTES: usize = 16 * 1024;
 
-static BYTE_SERVICE: RwLock<Option<Arc<RemoteService>>> = RwLock::new(None);
+/// Services available to the proxy, keyed by [`slot_key`]. Registration is
+/// idempotent per identity; re-registering replaces the previous entry.
+static SERVICE_REGISTRY: LazyLock<RwLock<HashMap<String, Arc<RemoteService>>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+/// Configs of registered slots, kept so a missing service can be rebuilt
+/// lazily (e.g. after the registry was populated by another process-lifetime
+/// path that dropped its service).
+static CONFIG_REGISTRY: LazyLock<Mutex<HashMap<String, RemoteConfig>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 static PROXY_INFO: Mutex<Option<MediaProxyInfo>> = Mutex::new(None);
 
-/// Publishes the service the proxy reads bytes from. Called on every remote
-/// init; the previous service (if any) is dropped once in-flight streams end.
-pub fn set_byte_service(service: Arc<RemoteService>) {
-    *BYTE_SERVICE.write().unwrap() = Some(service);
+/// Stable identity of a byte-serving slot: canonical endpoint plus username.
+/// Must match exactly what the Kotlin side encodes into proxy URLs.
+pub fn slot_key(endpoint: &str, username: &str) -> String {
+    format!("{}\n{}", endpoint, username)
 }
 
-fn current_byte_service() -> Option<Arc<RemoteService>> {
-    BYTE_SERVICE.read().unwrap().clone()
+/// Builds a service from `config` and registers it under its slot key.
+/// Returns the key. Safe to call repeatedly.
+pub fn register_remote(config: &RemoteConfig) -> Result<String, String> {
+    let service = Arc::new(RemoteService::new(config)?);
+    Ok(register_service(config, service))
+}
+
+/// Registers an already-built service plus its config. Idempotent per slot.
+pub fn register_service(config: &RemoteConfig, service: Arc<RemoteService>) -> String {
+    let key = slot_key(&config.endpoint, &config.username);
+    SERVICE_REGISTRY.write().unwrap().insert(key.clone(), service);
+    CONFIG_REGISTRY.lock().unwrap().insert(key.clone(), config.clone());
+    key
+}
+
+/// Looks up the service for a request key; rebuilds it lazily from the
+/// config registry on a cache miss.
+fn service_for_key(key: &str) -> Option<Arc<RemoteService>> {
+    if let Some(service) = SERVICE_REGISTRY.read().unwrap().get(key) {
+        return Some(Arc::clone(service));
+    }
+    let config = CONFIG_REGISTRY.lock().unwrap().get(key).cloned()?;
+    match register_remote(&config) {
+        Ok(_) => SERVICE_REGISTRY.read().unwrap().get(key).map(Arc::clone),
+        Err(e) => {
+            log::warn!("media_proxy failed to build service for slot: {}", e);
+            None
+        }
+    }
 }
 
 /// Starts the proxy on first call (bind 127.0.0.1, random port + token) and
@@ -124,32 +162,34 @@ async fn handle_request(
         }
     };
 
-    let Some(rel_path) = authorize_and_decode(&request.target, token) else {
+    let Some((slot_key, rel_path)) = authorize_and_decode(&request.target, token) else {
         return write_simple_response(writer, "404 Not Found", "not found").await;
     };
 
-    let Some(service) = current_byte_service() else {
-        return write_simple_response(writer, "503 Service Unavailable", "no remote service").await;
+    let Some(service) = service_for_key(&slot_key) else {
+        log::info!("media_proxy no service registered for slot key");
+        return write_simple_response(writer, "404 Not Found", "not found").await;
     };
 
-    log::info!(
+    log::debug!(
         "media_proxy request path={} range={:?}",
         rel_path,
         request.range
     );
-    let stat_started = std::time::Instant::now();
-    let total = match service.stat_size(&rel_path).await {
-        Ok(size) => size,
+    let open_started = std::time::Instant::now();
+    // Single backend open per request: the size and the byte reader share it.
+    let (total, media) = match service.open_ranged(&rel_path).await {
+        Ok(opened) => opened,
         Err(e) => {
             log::info!("media_proxy stat failed for {}: {}", rel_path, e);
             return write_simple_response(writer, "404 Not Found", "not found").await;
         }
     };
-    log::info!(
+    log::debug!(
         "media_proxy stat path={} total={} elapsed_ms={}",
         rel_path,
         total,
-        stat_started.elapsed().as_millis()
+        open_started.elapsed().as_millis()
     );
 
     let content_type = content_type_for(&rel_path);
@@ -203,10 +243,10 @@ async fn handle_request(
             .map_err(|e| e.to_string());
     }
 
-    let mut body = match service.read_stream(&rel_path, offset, Some(length)).await {
+    let mut body = match media.read_range(offset, Some(length)).await {
         Ok(stream) => stream,
         Err(e) => {
-            log::warn!("media_proxy read_stream failed for {}: {}", rel_path, e);
+            log::warn!("media_proxy read_range failed for {}: {}", rel_path, e);
             return write_simple_response(writer, "502 Bad Gateway", "read failed").await;
         }
     };
@@ -237,14 +277,28 @@ async fn handle_request(
             break;
         }
     }
-    log::info!(
-        "media_proxy served path={} status={} offset={} bytes={} elapsed_ms={}",
-        rel_path,
-        status,
-        offset,
-        sent,
-        started.elapsed().as_millis()
-    );
+    let elapsed_ms = started.elapsed().as_millis();
+    // Slow serves stay at info; routine ones drop to debug to keep logcat
+    // usable during bulk thumbnail loading.
+    if elapsed_ms >= 500 {
+        log::info!(
+            "media_proxy served slow path={} status={} offset={} bytes={} elapsed_ms={}",
+            rel_path,
+            status,
+            offset,
+            sent,
+            elapsed_ms
+        );
+    } else {
+        log::debug!(
+            "media_proxy served path={} status={} offset={} bytes={} elapsed_ms={}",
+            rel_path,
+            status,
+            offset,
+            sent,
+            elapsed_ms
+        );
+    }
 
     if sent < length {
         return Err(format!(
@@ -255,13 +309,22 @@ async fn handle_request(
     Ok(())
 }
 
-/// Validates `/{token}/{encoded-path}` and returns the decoded remote path.
-fn authorize_and_decode(target: &str, token: &str) -> Option<String> {
+/// Validates `/{token}/{encoded-slot-key}/{encoded-path}` and returns the
+/// decoded slot key and remote path.
+fn authorize_and_decode(target: &str, token: &str) -> Option<(String, String)> {
     let target = target.split(['?', '#']).next().unwrap_or("");
     let without_slash = target.strip_prefix('/')?;
-    let (request_token, encoded_path) = without_slash.split_once('/')?;
-    if request_token != token || encoded_path.is_empty() {
+    let (request_token, remainder) = without_slash.split_once('/')?;
+    if request_token != token {
         return None;
+    }
+    let (encoded_key, encoded_path) = remainder.split_once('/')?;
+    if encoded_path.is_empty() {
+        return None;
+    }
+    let key = percent_decode_str(encoded_key).decode_utf8().ok()?.into_owned();
+    if !key.contains('\n') {
+        return None; // not a valid slot identity
     }
     let decoded = percent_decode_str(encoded_path)
         .decode_utf8()
@@ -270,7 +333,7 @@ fn authorize_and_decode(target: &str, token: &str) -> Option<String> {
     if decoded.contains("../") {
         return None;
     }
-    Some(decoded.trim_start_matches('/').to_string())
+    Some((key, decoded.trim_start_matches('/').to_string()))
 }
 
 async fn read_request_head<R: AsyncBufReadExt + Unpin>(
@@ -471,21 +534,25 @@ mod tests {
 
     #[test]
     fn authorize_and_decode_enforces_token_and_decodes_path() {
+        let key = slot_key("smb://nas.lan/media", "user");
         assert_eq!(
-            Some("comics/ch 01/p1.jpg".to_string()),
-            authorize_and_decode("/tok123/comics/ch%2001/p1.jpg", "tok123")
+            Some((key.clone(), "comics/ch 01/p1.jpg".to_string())),
+            authorize_and_decode("/tok123/smb%3A%2F%2Fnas.lan%2Fmedia%0Auser/comics%2Fch%2001%2Fp1.jpg", "tok123")
         );
-        assert_eq!(None, authorize_and_decode("/wrong/comics/p1.jpg", "tok123"));
+        assert_eq!(None, authorize_and_decode("/wrong/smb%3A%2F%2Fhost%0Au/a.jpg", "tok123"));
         assert_eq!(None, authorize_and_decode("/tok123/", "tok123"));
         assert_eq!(None, authorize_and_decode("/tok123", "tok123"));
         assert_eq!(
             None,
-            authorize_and_decode("/tok123/a/../../etc/passwd", "tok123")
+            authorize_and_decode("/tok123/smb%3A%2F%2Fhost%0Au/a/../../etc/passwd", "tok123")
         );
+        // A path segment without a slot key is rejected.
+        assert_eq!(None, authorize_and_decode("/tok123/a.jpg", "tok123"));
         // query strings are ignored
+        let ftp_key = slot_key("ftp://host", "u");
         assert_eq!(
-            Some("a.mp4".to_string()),
-            authorize_and_decode("/tok123/a.mp4?x=1", "tok123")
+            Some((ftp_key, "a.mp4".to_string())),
+            authorize_and_decode("/tok123/ftp%3A%2F%2Fhost%0Au/a.mp4?x=1", "tok123")
         );
     }
 
@@ -584,14 +651,18 @@ mod tests {
             "smb://testhost/share",
         )
         .expect("service");
-        set_byte_service(Arc::new(service));
+        let key = slot_key("smb://testhost/share", "tester");
+        SERVICE_REGISTRY
+            .write()
+            .unwrap()
+            .insert(key.clone(), Arc::new(service));
         let info = ensure_media_proxy().expect("proxy");
         let token = info.token.as_str();
-
+        let encoded_key = "smb%3A%2F%2Ftesthost%2Fshare%0Atester";
         let mut client = TestClient::connect(info.port);
 
         // Full GET
-        let full = client.request("GET", &format!("/{}/file.bin", token), None);
+        let full = client.request("GET", &format!("/{}/{}/file.bin", token, encoded_key), None);
         assert!(full.status.contains("200"), "status: {}", full.status);
         assert_eq!(Some("bytes"), full.header("accept-ranges"));
         assert_eq!(payload, full.body);
@@ -599,7 +670,7 @@ mod tests {
         // Bounded range (keep-alive: same connection)
         let part = client.request(
             "GET",
-            &format!("/{}/file.bin", token),
+            &format!("/{}/{}/file.bin", token, encoded_key),
             Some("bytes=10-19"),
         );
         assert!(part.status.contains("206"), "status: {}", part.status);
@@ -609,43 +680,43 @@ mod tests {
         // Open-ended range
         let tail = client.request(
             "GET",
-            &format!("/{}/file.bin", token),
+            &format!("/{}/{}/file.bin", token, encoded_key),
             Some("bytes=99990-"),
         );
         assert!(tail.status.contains("206"));
         assert_eq!(&payload[99990..], &tail.body[..]);
 
         // Suffix range
-        let suffix = client.request("GET", &format!("/{}/file.bin", token), Some("bytes=-5"));
+        let suffix = client.request("GET", &format!("/{}/{}/file.bin", token, encoded_key), Some("bytes=-5"));
         assert!(suffix.status.contains("206"));
         assert_eq!(&payload[99995..], &suffix.body[..]);
 
         // Unsatisfiable range
         let bad_range = client.request(
             "GET",
-            &format!("/{}/file.bin", token),
+            &format!("/{}/{}/file.bin", token, encoded_key),
             Some("bytes=100000-"),
         );
         assert!(bad_range.status.contains("416"), "status: {}", bad_range.status);
         assert_eq!(Some("bytes */100000"), bad_range.header("content-range"));
 
         // Percent-encoded path
-        let pic = client.request("GET", &format!("/{}/sub%20dir/pic.jpg", token), None);
+        let pic = client.request("GET", &format!("/{}/{}/sub%20dir/pic.jpg", token, encoded_key), None);
         assert!(pic.status.contains("200"));
         assert_eq!(Some("image/jpeg"), pic.header("content-type"));
         assert_eq!(b"jpegdata", &pic.body[..]);
 
         // HEAD carries headers but no body
-        let head = client.request("HEAD", &format!("/{}/file.bin", token), None);
+        let head = client.request("HEAD", &format!("/{}/{}/file.bin", token, encoded_key), None);
         assert!(head.status.contains("200"));
         assert_eq!(Some("100000"), head.header("content-length"));
 
         // Missing file and wrong token both 404 (fresh connection for HEAD-after
         // framing simplicity)
         let mut client2 = TestClient::connect(info.port);
-        let missing = client2.request("GET", &format!("/{}/nope.bin", token), None);
+        let missing = client2.request("GET", &format!("/{}/{}/nope.bin", token, encoded_key), None);
         assert!(missing.status.contains("404"));
-        let wrong_token = client2.request("GET", "/deadbeef/file.bin", None);
+        let wrong_token = client2.request("GET", "/deadbeef/smb%3A%2F%2Ftesthost%2Fshare%0Atester/file.bin", None);
         assert!(wrong_token.status.contains("404"));
 
         let _ = std::fs::remove_dir_all(&dir);

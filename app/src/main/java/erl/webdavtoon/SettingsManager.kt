@@ -368,7 +368,30 @@ class SettingsManager(context: Context) {
         )
         saveWebDavSlots(slots, if (switchToSlotOnSave) slot else null)
         credentialPolicy.savePassword(slot, rememberPassword, password)
+        registerWithMediaProxy(slot)
     }
+
+    /**
+     * Registers the slot's remote config with the Rust media proxy so byte
+     * requests for URIs minted by this slot resolve even while another slot
+     * is current (cross-slot favorites). Best effort: failures are logged and
+     * never block configuration saving.
+     */
+    private fun registerWithMediaProxy(slot: Int) {
+        try {
+            uniffi.rust_core.registerProxyRemote(buildRemoteConfig(slot))
+        } catch (t: Throwable) {
+            LogManager.log(
+                "registerProxyRemote failed for slot $slot: ${t.message}",
+                Log.WARN,
+                "SettingsManager"
+            )
+        }
+    }
+
+    /** Remote configs of every stored slot, used for proxy registration. */
+    fun allRemoteConfigs(): List<uniffi.rust_core.RemoteConfig> =
+        getAllSlotsUnfiltered().map { buildRemoteConfig(it) }
 
     fun getFullWebDavUrl(slot: Int = getCurrentSlot()): String {
         val fullUrl = WebDavEndpointNormalizer.normalize(

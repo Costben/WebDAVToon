@@ -28,7 +28,9 @@ const DISK_SHARE_KIND: u8 = 0;
 ///
 /// Keep NTLM enabled, Kerberos disabled, and negotiation limited to SMB 3.0-
 /// 3.1.1. This is required for the Android SSPI configuration used by this app.
-fn smb_client_config(port: u16) -> ClientConfig {
+/// Guest attempts (`guest`) also allow unsigned access: guest/null sessions
+/// have no signing key, so servers that accept them reject signed traffic.
+fn smb_client_config(port: u16, guest: bool) -> ClientConfig {
     ClientConfig {
         // DFS namespaces are out of scope; fail with a clear error instead
         // of attempting referral resolution.
@@ -42,6 +44,7 @@ fn smb_client_config(port: u16) -> ClientConfig {
                 ntlm: true,
                 kerberos: false,
             },
+            allow_unsigned_guest_access: guest,
             ..Default::default()
         },
         ..Default::default()
@@ -53,6 +56,17 @@ fn qualify_username(username: &str, domain: Option<&str>) -> String {
         Some(domain) if !domain.is_empty() => format!("{}\\{}", domain, username),
         _ => username.to_string(),
     }
+}
+
+/// Resolves the effective NTLM account name. An empty (or whitespace-only)
+/// username means guest access: the `guest` account is presented with the
+/// (usually empty) password, and servers either map it to a guest/null
+/// session or reject it.
+fn resolve_auth_username(username: &str, domain: Option<&str>) -> (String, bool) {
+    let trimmed = username.trim();
+    let guest = trimmed.is_empty();
+    let account = if guest { "guest" } else { trimmed };
+    (qualify_username(account, domain), guest)
 }
 
 /// Keeps user-visible disk shares and excludes hidden administrative shares.
@@ -98,17 +112,25 @@ pub async fn enumerate_shares(
     password: String,
     domain: Option<&str>,
 ) -> Result<Vec<SmbShare>, String> {
-    if username.is_empty() {
-        return Err("SMB requires a username (guest access is not supported)".to_string());
+    let (auth_username, guest) = resolve_auth_username(username, domain);
+    if guest {
+        log::info!("SMB share enumeration on {host} using guest access");
     }
 
-    let auth_username = qualify_username(username, domain);
-    let client = Client::new(smb_client_config(port));
+    let client = Client::new(smb_client_config(port, guest));
 
     client
         .ipc_connect(host, &auth_username, password)
         .await
-        .map_err(|error| classify_ipc_connect_error(host, error))?;
+        .map_err(|error| {
+            if guest {
+                format!(
+                    "SMB guest connection to {host} failed (server may not allow guest access): {error}"
+                )
+            } else {
+                classify_ipc_connect_error(host, error)
+            }
+        })?;
 
     client
         .list_shares(host)
@@ -140,8 +162,11 @@ pub struct SmbFs {
     share: String,
     /// Path inside the share acting as the service root ("" or "a/b").
     root_prefix: String,
-    /// Username, possibly domain-qualified as `DOMAIN\user`.
+    /// Username, possibly domain-qualified as `DOMAIN\user`; `guest` when the
+    /// user left the username empty.
     auth_username: String,
+    /// True when the session is a guest attempt (empty configured username).
+    guest: bool,
     password: String,
     client: RwLock<Option<Arc<Client>>>,
 }
@@ -156,23 +181,24 @@ impl SmbFs {
         password: &str,
         domain: Option<&str>,
     ) -> Result<Self, String> {
-        if username.is_empty() {
-            return Err("SMB requires a username (guest access is not supported)".to_string());
+        let (auth_username, guest) = resolve_auth_username(username, domain);
+        if guest {
+            log::info!("SMB session on {host}\\{share} using guest access");
         }
-        let auth_username = qualify_username(username, domain);
         Ok(Self {
             host,
             port,
             share,
             root_prefix,
             auth_username,
+            guest,
             password: password.to_string(),
             client: RwLock::new(None),
         })
     }
 
     fn client_config(&self) -> ClientConfig {
-        smb_client_config(self.port)
+        smb_client_config(self.port, self.guest)
     }
 
     fn share_unc(&self) -> Result<UncPath, String> {
@@ -225,7 +251,19 @@ impl SmbFs {
         client
             .share_connect(&unc, &self.auth_username, self.password.clone())
             .await
-            .map_err(|e| format!("SMB connect to \\\\{}\\{} failed: {}", self.host, self.share, e))?;
+            .map_err(|e| {
+                if self.guest {
+                    format!(
+                        "SMB guest connect to \\\\{}\\{} failed (server may not allow guest access): {}",
+                        self.host, self.share, e
+                    )
+                } else {
+                    format!(
+                        "SMB connect to \\\\{}\\{} failed: {}",
+                        self.host, self.share, e
+                    )
+                }
+            })?;
         Ok(Arc::new(client))
     }
 
@@ -355,6 +393,15 @@ impl SmbFs {
         Ok(file_byte_stream(file, offset, length))
     }
 
+    /// Opens the file once and returns its size plus a ranged reader over the
+    /// same handle. The media proxy uses this to serve each byte request with
+    /// a single open instead of one open for stat and another for the read.
+    pub async fn open_ranged(&self, rel_path: &str) -> Result<(u64, OpenedSmbFile), String> {
+        let file = self.open_file(rel_path).await?;
+        let total = file.get_len().await.map_err(|e| e.to_string())?;
+        Ok((total, OpenedSmbFile { file }))
+    }
+
     pub async fn delete_file(&self, rel_path: &str) -> Result<(), String> {
         self.delete_path(rel_path).await
     }
@@ -420,6 +467,19 @@ fn is_retryable(error: &smb::Error) -> bool {
     // A server that answered with an SMB status has a live connection; anything
     // else (transport, timeout, parse) is worth one reconnect attempt.
     !matches!(error, smb::Error::ReceivedErrorMessage(..))
+}
+
+/// An open SMB file handle that can serve byte ranges. Dropping it without a
+/// close leaves the server-side handle to die with the session, matching the
+/// pre-existing behavior of abandoned streams.
+pub struct OpenedSmbFile {
+    file: smb::File,
+}
+
+impl OpenedSmbFile {
+    pub fn read_range(self, offset: u64, length: Option<u64>) -> ByteStream {
+        file_byte_stream(self.file, offset, length)
+    }
 }
 
 async fn collect_dir_entries(
@@ -575,8 +635,8 @@ mod tests {
     }
 
     #[test]
-    fn empty_username_is_rejected() {
-        assert!(SmbFs::new(
+    fn empty_username_maps_to_guest() {
+        let fs = SmbFs::new(
             "nas.lan".into(),
             445,
             "media".into(),
@@ -585,7 +645,45 @@ mod tests {
             "",
             None,
         )
-        .is_err());
+        .expect("guest smbfs");
+        assert!(fs.guest);
+        assert_eq!("guest", fs.auth_username);
+
+        let domained = SmbFs::new(
+            "nas.lan".into(),
+            445,
+            "media".into(),
+            String::new(),
+            "  ",
+            "",
+            Some("WORKGROUP"),
+        )
+        .expect("guest smbfs with domain");
+        assert!(domained.guest);
+        assert_eq!(r"WORKGROUP\guest", domained.auth_username);
+
+        let named = SmbFs::new(
+            "nas.lan".into(),
+            445,
+            "media".into(),
+            String::new(),
+            "alice",
+            "pw",
+            None,
+        )
+        .expect("named smbfs");
+        assert!(!named.guest);
+        assert_eq!("alice", named.auth_username);
+    }
+
+    #[test]
+    fn resolve_auth_username_flags_guest_only_for_empty_names() {
+        let (name, guest) = resolve_auth_username("", Some("WG"));
+        assert_eq!(r"WG\guest", name);
+        assert!(guest);
+        let (name, guest) = resolve_auth_username("bob", None);
+        assert_eq!("bob", name);
+        assert!(!guest);
     }
 
     #[test]

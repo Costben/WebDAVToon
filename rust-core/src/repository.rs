@@ -61,7 +61,7 @@ impl Repository {
 
         let service = Arc::new(RemoteService::new(&config).map_err(RepoError::Remote)?);
         self.remote = Some(Arc::clone(&service));
-        crate::media_proxy::set_byte_service(service);
+        crate::media_proxy::register_service(&config, service);
 
         if changed {
             if let Some(db) = &self.db {
