@@ -74,6 +74,9 @@ reference/
 /hotl-workflow-*.md
 .hotl/
 /docs/plans/
+/AGENTS.md
+/Agent.md
+/agent.md
 
 # Claude Code local session/skill config
 .claude/
