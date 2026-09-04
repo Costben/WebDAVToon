@@ -4,7 +4,10 @@ import android.content.Context
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.os.Build
+import android.os.ext.SdkExtensions
 import android.util.Log
+import androidx.annotation.RequiresApi
+import androidx.annotation.RequiresExtension
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -314,13 +317,23 @@ internal class AndroidNsdBackend(
         service: NsdServiceSnapshot,
         listener: NsdBackend.ServiceInfoListener,
     ): Cancellable {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        // NsdManager.ServiceInfoCallback needs Android 14 (API 34) *and*
+        // version 7 of the T extensions SDK; anything older falls back to
+        // one-shot resolveService. The SDK_INT >= R check guards the
+        // SdkExtensions call itself (added in API 30).
+        val useServiceCallback =
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+                SdkExtensions.getExtensionVersion(Build.VERSION_CODES.TIRAMISU) >= 7
+        return if (useServiceCallback) {
             registerServiceCallback(service, listener)
         } else {
             resolveOnce(service, listener)
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
+    @RequiresExtension(extension = Build.VERSION_CODES.TIRAMISU, version = 7)
     private fun registerServiceCallback(
         service: NsdServiceSnapshot,
         listener: NsdBackend.ServiceInfoListener,

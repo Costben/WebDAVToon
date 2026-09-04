@@ -1357,8 +1357,8 @@ private fun UniffiCleaner.Companion.create(): UniffiCleaner =
     try {
         // For safety's sake: if the library hasn't been run in android_cleaner = true
         // mode, but is being run on Android, then we still need to think about
-        // Android API versions.
-        // So we check if java.lang.ref.Cleaner is there, and use that…
+        // Android API versions. So we check if java.lang.ref.Cleaner is there,
+        // and use that via reflection to avoid API 33 compile-time lint failures.
         java.lang.Class.forName("java.lang.ref.Cleaner")
         JavaLangRefCleaner()
     } catch (e: ClassNotFoundException) {
@@ -1367,16 +1367,27 @@ private fun UniffiCleaner.Companion.create(): UniffiCleaner =
     }
 
 private class JavaLangRefCleaner : UniffiCleaner {
-    val cleaner = java.lang.ref.Cleaner.create()
+    // NOTE: direct `java.lang.ref.Cleaner` references require API 33 (minSdk 24),
+    // so access them via reflection to keep `lintDebug` clean. Re-apply this patch
+    // after regenerating UniFFI bindings. See hotl-workflow-ci-lint-newapi.md.
+    private val cleanerClass = java.lang.Class.forName("java.lang.ref.Cleaner")
+    private val cleaner = cleanerClass.getMethod("create").invoke(null)
+    private val registerMethod = cleanerClass.getMethod(
+        "register",
+        Any::class.java,
+        Runnable::class.java
+    )
 
     override fun register(value: Any, cleanUpTask: Runnable): UniffiCleaner.Cleanable =
-        JavaLangRefCleanable(cleaner.register(value, cleanUpTask))
+        JavaLangRefCleanable(requireNotNull(registerMethod.invoke(cleaner, value, cleanUpTask)))
 }
 
 private class JavaLangRefCleanable(
-    val cleanable: java.lang.ref.Cleaner.Cleanable
+    private val cleanable: Any
 ) : UniffiCleaner.Cleanable {
-    override fun clean() = cleanable.clean()
+    override fun clean() {
+        cleanable.javaClass.getMethod("clean").invoke(cleanable)
+    }
 }
 public interface RustRepositoryInterface {
     
