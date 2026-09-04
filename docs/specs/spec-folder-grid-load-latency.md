@@ -33,7 +33,7 @@ Reduce the delay when opening remote folders with many child folders (for exampl
 ## Verification
 
 - `./gradlew.bat :app:testDebugUnitTest :app:compileDebugKotlin`
-- Install the debug APK on `<TARGET_DEVICE_IP>:5555`, open `ComfyOUT/Douyin` twice, refresh once, and capture logcat plus UI/activity evidence under `.artifacts/adb/2026-07-27/`.
+- Install the debug APK on `<TARGET_DEVICE_IP>:5555`, open `ComfyOUT/Sample` twice, refresh once, and capture logcat plus UI/activity evidence under `.artifacts/adb/2026-07-27/`.
 
 ## Risks / open questions
 

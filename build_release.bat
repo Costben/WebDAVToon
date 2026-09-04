@@ -1,6 +1,6 @@
 @echo off
-set "JAVA_HOME=C:\Program Files\Android\Android Studio\jbr"
-set "ANDROID_HOME=%LOCALAPPDATA%\Android\Sdk"
+if not defined JAVA_HOME set "JAVA_HOME=C:\Program Files\Android\Android Studio\jbr"
+if not defined ANDROID_HOME set "ANDROID_HOME=%LOCALAPPDATA%\Android\Sdk"
 set "PATH=%JAVA_HOME%\bin;%PATH%"
 echo Building release APK...
 call gradlew.bat :app:assembleRelease --stacktrace

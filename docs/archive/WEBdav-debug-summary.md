@@ -38,12 +38,12 @@
 真机日志显示：
 
 - `test_webdav` 被调用成功
-- 当前服务器配置为：`http://192.168.1.100:5005/NSFW`
+- 当前服务器配置为：`http://192.168.1.100:5005/comics`
 - 根目录实际存在返回内容
 
 新增诊断日志中出现：
 
-> `WebDAV root has 5 entries, but none matched visible image-folder rules for endpoint=http://192.168.1.100:5005/NSFW`
+> `WebDAV root has 5 entries, but none matched visible image-folder rules for endpoint=http://192.168.1.100:5005/comics`
 
 这说明：
 

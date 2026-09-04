@@ -20,5 +20,5 @@
 ## Execution record
 
 - `:app:testDebugUnitTest :app:compileDebugKotlin` and `:app:assembleDebug` passed.
-- On `<TARGET_DEVICE_IP>:5555`, `ComfyOUT/Douyin` first entry emitted one direct-media listing; re-entry hit `emptyDirectMediaCacheHit` and loaded the 332-folder grid in `102ms` without a `list_photos` call.
+- On `<TARGET_DEVICE_IP>:5555`, `ComfyOUT/Sample` first entry emitted one direct-media listing; re-entry hit `emptyDirectMediaCacheHit` and loaded the 332-folder grid in `102ms` without a `list_photos` call.
 - A forced refresh emitted one direct-media listing as intended. During a fast scroll, pending previews for detached cards were skipped while the active scan completed.
