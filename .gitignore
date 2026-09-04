@@ -73,10 +73,17 @@ reference/
 # Local-only agent / HOTL docs
 /hotl-workflow-*.md
 .hotl/
-/docs/plans/
+/docs/
 /AGENTS.md
 /Agent.md
 /agent.md
+PROJECT_STATUS.md
+
+# Local AI tooling & scratch assets
+paseo.json
+/scripts/
+/public/
+/image-proxy-server/
 
 # Claude Code local session/skill config
 .claude/
