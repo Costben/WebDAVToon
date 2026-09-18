@@ -190,4 +190,5 @@
     <string name="ui_mode_switch_summary">即时切换界面风格</string>
 <string name="display_options">显示选项</string>
     <string name="reader_video_editing">阅读、视频与编辑</string>
-    <string name="material_settings_placeholder">Material 设置占位界面</string></resources>
+    <string name="material_settings_placeholder">Material 设置占位界面</string>
+    <string name="port_invalid">端口无效（1-65535）</string></resources>

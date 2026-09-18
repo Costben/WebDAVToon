@@ -198,4 +198,6 @@
     <string name="ui_mode_switch_summary">Switch interface style instantly</string>
 <string name="display_options">Display options</string>
     <string name="reader_video_editing">Reader, video and editing</string>
-    <string name="material_settings_placeholder">Material settings placeholder</string></resources>
+    <string name="material_settings_placeholder">Material settings placeholder</string>
+    <string name="port_invalid">Invalid port (1-65535)</string>
+</resources>
