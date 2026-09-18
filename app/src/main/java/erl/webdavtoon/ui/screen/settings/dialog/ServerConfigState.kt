@@ -178,7 +178,16 @@ object RustServerConfigBackend : ServerConfigBackend {
         NetworkDiscovery(WebDAVToonApplication.appContext).discover()
 }
 
-class ServerConfigViewModel(
+/**
+ * `@JvmOverloads` is load-bearing: a Kotlin default parameter alone generates only
+ * `(Application, ServerConfigBackend)` plus a synthetic marker overload, none of which
+ * `AndroidViewModelFactory`'s fixed-signature reflection `(Application, SavedStateHandle)`
+ * → `(SavedStateHandle)` → `(Application)` → `()` can match. Without the real
+ * `(Application)` overload `by viewModels()` throws at the moment the dialog is opened,
+ * which no compiler check would catch. The KMP/JS target is not built here, so the
+ * `@JvmOverloads` `actual`-declaration concern does not apply.
+ */
+class ServerConfigViewModel @JvmOverloads constructor(
     app: Application,
     private val backend: ServerConfigBackend = RustServerConfigBackend,
 ) : AndroidViewModel(app) {
@@ -204,9 +213,12 @@ class ServerConfigViewModel(
             url = settings.getWebDavUrl(slot),
             port = settings.getWebDavPort(slot).toString(),
             username = settings.getWebDavUsername(slot),
-            // Left blank on purpose: the form must not pull secrets out of the
-            // credential store itself. Wiring this belongs to the caller.
-            password = "",
+            // Prefilled here rather than by the UI: the Compose layer must not read
+            // SettingsManager, and this ViewModel already owns the credential-backed
+            // SettingsManager instance. Matches the legacy dialog, which seeded the field
+            // through `getWebDavPassword()`. The field stays masked because
+            // `showPassword` defaults to false.
+            password = settings.getWebDavPassword(slot),
             domain = settings.getWebDavDomain(slot),
             rememberPassword = settings.isWebDavRememberPassword(slot),
             isPrivate = settings.isWebDavPrivate(slot),

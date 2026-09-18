@@ -81,6 +81,7 @@ PROJECT_STATUS.md
 
 # Local AI tooling & scratch assets
 paseo.json
+.paseo/
 /scripts/
 /public/
 /image-proxy-server/

@@ -32,6 +32,7 @@ import top.yukonga.miuix.kmp.icon.extended.AddCircle
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.CloudFill
 import top.yukonga.miuix.kmp.icon.extended.Delete
+import top.yukonga.miuix.kmp.icon.extended.Edit
 import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlaySpinnerPreference
@@ -129,6 +130,9 @@ private fun SettingsContent(
                     startAction = { SettingsIcon(MiuixIcons.Light.CloudFill, R.string.webdav_server) },
                     endActions = {
                         if (slot.isCurrent) SettingsIcon(MiuixIcons.Light.Settings, R.string.current_server)
+                        IconButton(onClick = { actions.onEditSlot(slot.slot) }) {
+                            Icon(MiuixIcons.Light.Edit, contentDescription = stringResource(R.string.edit_server))
+                        }
                         IconButton(onClick = { actions.onDeleteSlot(slot.slot) }) {
                             Icon(MiuixIcons.Light.Delete, contentDescription = stringResource(R.string.delete))
                         }

@@ -210,6 +210,7 @@ dependencies {
     implementation("top.yukonga.miuix.kmp:miuix-squircle-android:0.9.3")
     implementation("top.yukonga.miuix.kmp:miuix-blur-android:0.9.3")
     implementation("top.yukonga.miuix.kmp:miuix-preference-android:0.9.3")
+    implementation("androidx.navigationevent:navigationevent-compose:1.1.2")
     implementation("com.materialkolor:material-kolor:2.0.2")
 
     implementation("androidx.core:core-ktx:1.12.0")
