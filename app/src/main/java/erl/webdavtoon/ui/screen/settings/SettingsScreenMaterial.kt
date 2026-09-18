@@ -17,9 +17,9 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
@@ -28,6 +28,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -59,13 +60,8 @@ fun SettingsScreenMaterial(
             TopAppBar(
                 title = { Text(stringResource(R.string.settings)) },
                 navigationIcon = {
-                    IconButton(onClick = actions.onBack) {
+                    TextButton(onClick = actions.onBack) {
                         Text(stringResource(R.string.back))
-                    }
-                },
-                actions = {
-                    IconButton(onClick = actions.onRefreshSlots) {
-                        Text(stringResource(R.string.webdav_server))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -136,7 +132,7 @@ private fun SettingsMaterialContent(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         MaterialSettingsGroup(stringResource(R.string.webdav_server)) {
-            uiState.slots.forEachIndexed { index, slot ->
+            uiState.slots.forEach { slot ->
                 MaterialListRow(
                     title = slot.alias.ifBlank { stringResource(R.string.slot_name, slot.slot) },
                     summary = if (slot.url.isBlank()) stringResource(R.string.not_configured)
@@ -151,19 +147,19 @@ private fun SettingsMaterialContent(
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.primary,
                             )
-                            IconButton(
+                            TextButton(
                                 onClick = { actions.onEditSlot(slot.slot) },
                                 modifier = Modifier.semantics { contentDescription = editDescription },
                             ) {
                                 Text(stringResource(R.string.edit_server))
                             }
-                            IconButton(onClick = { actions.onDeleteSlot(slot.slot) }) {
+                            TextButton(onClick = { actions.onDeleteSlot(slot.slot) }) {
                                 Text(stringResource(R.string.delete))
                             }
                         }
                     },
                 )
-                if (index == uiState.slots.lastIndex) HorizontalDivider()
+                if (index != uiState.slots.lastIndex) HorizontalDivider()
             }
             MaterialListRow(
                 title = stringResource(R.string.add_webdav_server),
@@ -348,7 +344,9 @@ private fun MaterialSelectionRow(
             headlineContent = { Text(title) },
             supportingContent = { Text(summary ?: labels[selectedIndex]) },
             trailingContent = { RadioButton(selected = true, onClick = { expanded = true }) },
-            modifier = Modifier.fillMaxWidth().menuAnchor(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable),
         )
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             labels.forEachIndexed { index, label ->
@@ -388,15 +386,6 @@ private fun MaterialSliderRow(
         },
     )
     if (divider) HorizontalDivider()
-}
-
-private fun materialSortValueForIndex(index: Int): Int = when (index) {
-    0 -> SettingsDefaults.SORT_NAME_ASC
-    1 -> SettingsDefaults.SORT_NAME_DESC
-    2 -> SettingsDefaults.SORT_DATE_DESC
-    3 -> SettingsDefaults.SORT_DATE_ASC
-    4 -> SettingsDefaults.SORT_RANDOM_FOLDERS
-    else -> SettingsDefaults.SORT_DATE_DESC
 }
 
 @Composable

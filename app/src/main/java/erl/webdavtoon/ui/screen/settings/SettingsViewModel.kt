@@ -151,7 +151,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setDrawerEdgeWidthPercent(p: Int) = io { settingsManager.setDrawerEdgeWidthPercent(p); _uiState.update { it.copy(drawerEdgeWidthPercent = p.coerceIn(0, 100)) } }
     fun setSortOrder(n: Int) = io { settingsManager.setSortOrder(n); _uiState.update { it.copy(sortOrder = n) } }
     fun setRecursiveImageArrangement(n: Int) = io { settingsManager.setRecursiveImageArrangement(n); _uiState.update { it.copy(recursiveImageArrangement = settingsManager.getRecursiveImageArrangement()) }; eventChannel.send(SettingsEvent.ResultChanged) }
-    fun setWaterfallShowFilenames(b: Boolean) = io { settingsManager.setShowWaterfallFilenames(b); _uiState.update { it.copy(waterfallShowFilenames = b) } }
+    fun setWaterfallShowFilenames(b: Boolean) = io { settingsManager.setShowWaterfallFilenames(b); _uiState.update { it.copy(waterfallShowFilenames = b) }; eventChannel.send(SettingsEvent.ResultChanged) }
     fun setWaterfallQualityMode(m: String) = io { settingsManager.setWaterfallQualityMode(m); _uiState.update { it.copy(waterfallQualityMode = m) } }
     fun setWaterfallPercent(p: Int) = io { settingsManager.setWaterfallPercent(p); _uiState.update { it.copy(waterfallPercent = p) } }
     fun setWaterfallMaxWidth(w: Int) = io { settingsManager.setWaterfallMaxWidth(w); _uiState.update { it.copy(waterfallMaxWidth = w) } }
