@@ -1,6 +1,8 @@
 package erl.webdavtoon.ui.component
 
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -83,7 +85,11 @@ fun DrawerContent(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier.fillMaxHeight().padding(horizontal = 12.dp, vertical = 16.dp),
+        modifier = modifier
+            .fillMaxHeight()
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(horizontal = 12.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {

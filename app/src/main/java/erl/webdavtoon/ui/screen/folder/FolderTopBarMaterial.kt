@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -24,6 +26,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import erl.webdavtoon.R
@@ -56,12 +59,14 @@ fun FolderTopBarMaterial(
         TopAppBarDefaults.topAppBarColors()
     }
 
-    Column(modifier = modifier) {
+    Column(modifier = modifier.statusBarsPadding()) {
         TopAppBar(
             title = {
                 Text(
-                    if (uiState.isSelectionMode) stringResource(R.string.selected_count, uiState.selectedCount)
+                    text = if (uiState.isSelectionMode) stringResource(R.string.selected_count, uiState.selectedCount)
                     else stringResource(R.string.app_name),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             },
             navigationIcon = {
@@ -124,8 +129,12 @@ private fun MaterialRefreshStatus(status: RefreshStatus, onRefresh: () -> Unit) 
             CircularProgressIndicator(modifier = Modifier.padding(6.dp), strokeWidth = 2.dp)
             Text(stringResource(R.string.refresh_status_refreshing), style = MaterialTheme.typography.labelSmall)
         }
-        RefreshStatus.Completed -> TextButton(onClick = onRefresh) {
-            Text("✓ ${stringResource(R.string.refresh_status_completed)}")
+        RefreshStatus.Completed -> IconButton(onClick = onRefresh) {
+            Icon(
+                painter = painterResource(R.drawable.ic_ior_check_circle),
+                contentDescription = stringResource(R.string.refresh_status_completed),
+                tint = MaterialTheme.colorScheme.primary,
+            )
         }
         RefreshStatus.Idle -> IconButton(onClick = onRefresh) {
             Icon(MiuixIcons.Light.Refresh, contentDescription = stringResource(R.string.refresh_status_refreshing))

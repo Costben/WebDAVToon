@@ -3,8 +3,11 @@
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -65,7 +68,7 @@ fun FolderTopBarMiuix(
     var searchExpanded by remember { mutableStateOf(uiState.isSearching) }
     var menuExpanded by remember { mutableStateOf(false) }
 
-    Column(modifier = modifier.background(MiuixTheme.colorScheme.background)) {
+    Column(modifier = modifier.background(MiuixTheme.colorScheme.background).statusBarsPadding()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -78,7 +81,10 @@ fun FolderTopBarMiuix(
                 Text(
                     text = stringResource(R.string.selected_count, uiState.selectedCount),
                     modifier = Modifier.weight(1f),
-                    style = MiuixTheme.textStyles.title1,
+                    style = MiuixTheme.textStyles.title2,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    softWrap = false,
                 )
                 IconButton(onClick = actions.onSelectAll) {
                     Icon(MiuixIcons.Light.SelectAll, contentDescription = "Select all")
@@ -93,7 +99,10 @@ fun FolderTopBarMiuix(
                 Text(
                     text = stringResource(R.string.app_name),
                     modifier = Modifier.weight(1f),
-                    style = MiuixTheme.textStyles.title1,
+                    style = MiuixTheme.textStyles.title3,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    softWrap = false,
                 )
                 MiuixRefreshStatus(uiState.refreshStatus, actions.onRefresh)
                 IconButton(onClick = {
@@ -143,8 +152,12 @@ private fun MiuixRefreshStatus(status: RefreshStatus, onRefresh: () -> Unit) {
                 Text(stringResource(R.string.refresh_status_refreshing), style = MiuixTheme.textStyles.body2)
             }
         }
-        RefreshStatus.Completed -> TextButton(onClick = onRefresh) {
-            Text("✓ ${stringResource(R.string.refresh_status_completed)}")
+        RefreshStatus.Completed -> IconButton(onClick = onRefresh) {
+            Icon(
+                painter = painterResource(R.drawable.ic_ior_check_circle),
+                contentDescription = stringResource(R.string.refresh_status_completed),
+                tint = MiuixTheme.colorScheme.primary,
+            )
         }
         RefreshStatus.Idle -> IconButton(onClick = onRefresh) {
             Icon(MiuixIcons.Light.Refresh, contentDescription = stringResource(R.string.refresh_status_refreshing))
