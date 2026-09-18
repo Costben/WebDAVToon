@@ -159,7 +159,6 @@ private fun SettingsMaterialContent(
                         }
                     },
                 )
-                if (index != uiState.slots.lastIndex) HorizontalDivider()
             }
             MaterialListRow(
                 title = stringResource(R.string.add_webdav_server),
