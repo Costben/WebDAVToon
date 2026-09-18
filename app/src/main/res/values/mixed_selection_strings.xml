@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="select_all">Select All</string>
+    <string name="unselect_all">Deselect All</string>
+    <string name="favorite">Favorite</string>
     <string name="favorite_items_requires_selection">Select photos or folders first</string>
     <plurals name="favorite_items_added_count">
         <item quantity="one">Added %1$d item to favorites</item>

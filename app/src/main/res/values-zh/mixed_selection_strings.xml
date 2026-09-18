@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="select_all">全选</string>
+    <string name="unselect_all">取消全选</string>
+    <string name="favorite">收藏</string>
     <string name="favorite_items_requires_selection">请先选择图片或文件夹</string>
     <plurals name="favorite_items_added_count">
         <item quantity="other">已收藏 %1$d 个项目</item>
