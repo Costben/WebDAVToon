@@ -2,62 +2,81 @@ package erl.webdavtoon
 
 import android.Manifest
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
-import android.os.SystemClock
-import android.content.res.Configuration
-import android.view.Menu
-import android.view.MenuItem
-import android.view.View
+import android.widget.Toast
+import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
-import androidx.core.graphics.drawable.DrawableCompat
-import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.lifecycleScope
-import androidx.recyclerview.widget.GridLayoutManager
-import erl.webdavtoon.databinding.ActivityFolderViewBinding
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
+import erl.webdavtoon.ui.UiMode
+import erl.webdavtoon.ui.screen.waterfall.MixedWaterfallActions
+import erl.webdavtoon.ui.screen.waterfall.MixedWaterfallItemUi
+import erl.webdavtoon.ui.screen.waterfall.MixedWaterfallScreen
+import erl.webdavtoon.ui.screen.waterfall.MixedWaterfallViewModel
+import erl.webdavtoon.ui.theme.WebDAVToonTheme
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import kotlin.random.Random
 
 class SubFolderActivity : AppCompatActivity() {
 
-    private lateinit var binding: ActivityFolderViewBinding
     private lateinit var settingsManager: SettingsManager
-    private lateinit var adapter: FolderAdapter
-    private lateinit var remotePreviewScheduler: VisibleRemotePreviewScheduler
-    private var folderPath: String = ""
-    private var isWebDav: Boolean = false
-    private var currentAllFolders: List<Folder> = emptyList()
-    private var currentSearchKeyword: String = ""
-    private var folderShuffleSeed: Long = Random.nextLong()
-    private var currentLoadUsesToolbarPill: Boolean = false
-    private var pendingFolderNavigationPath: String? = null
-    private var toolbarRefreshHideJob: Job? = null
+    private val viewModel: MixedWaterfallViewModel by viewModels()
 
-    private val settingsLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == RESULT_OK) {
-            loadFolders()
-        }
-    }
+    private var showDeleteConfirmDialog by mutableStateOf(false)
+    private var pendingDeleteRequest: PendingMixedDelete? = null
+
+    private data class PendingMixedDelete(
+        val photos: List<Photo>,
+        val folders: List<Folder>,
+        val localPhotos: List<Photo>,
+    )
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { result ->
         val allGranted = result.values.all { it }
+        viewModel.updateStoragePermission(allGranted)
         if (!allGranted) {
-            android.widget.Toast.makeText(this, getString(R.string.storage_permission_required), android.widget.Toast.LENGTH_LONG).show()
+            Toast.makeText(this, getString(R.string.storage_permission_required), Toast.LENGTH_LONG).show()
         }
-        loadFolders()
+    }
+
+    private val localMediaDeleteLauncher = registerForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        val pending = pendingDeleteRequest ?: return@registerForActivityResult
+        pendingDeleteRequest = null
+        if (result.resultCode != RESULT_OK) return@registerForActivityResult
+
+        lifecycleScope.launch {
+            val deletedLocalPhotos = LocalMediaDeleteRequest.awaitDeletedPhotos(
+                context = this@SubFolderActivity,
+                photos = pending.localPhotos
+            )
+            val deletedCount = viewModel.executeDelete(
+                selectedPhotos = pending.photos,
+                selectedFolders = pending.folders,
+                alreadyDeletedLocalPhotos = deletedLocalPhotos
+            )
+            val requestedCount = pending.photos.size + pending.folders.size
+            showDeleteToast(deletedCount, requestedCount)
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -68,165 +87,182 @@ class SubFolderActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
+        window.navigationBarColor = android.graphics.Color.TRANSPARENT
+        WindowCompat.getInsetsController(window, window.decorView).isAppearanceLightNavigationBars = !isNightModeActive()
 
-        binding = ActivityFolderViewBinding.inflate(layoutInflater)
-        setContentView(binding.root)
+        val folderPath = intent.getStringExtra("EXTRA_FOLDER_PATH") ?: ""
+        val isWebDav = intent.getBooleanExtra("EXTRA_IS_WEBDAV", false)
 
-        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            binding.appBarLayout.setPadding(0, systemBars.top, 0, 0)
-            binding.recyclerView.setPadding(
-                binding.recyclerView.paddingLeft,
-                binding.recyclerView.paddingTop,
-                binding.recyclerView.paddingRight,
-                systemBars.bottom
-            )
-            insets
-        }
-
-        folderPath = intent.getStringExtra("EXTRA_FOLDER_PATH") ?: ""
-        isWebDav = intent.getBooleanExtra("EXTRA_IS_WEBDAV", false)
-
-        setupUI()
-        checkPermissionsAndLoad()
-    }
-
-    private fun setupUI() {
-        setSupportActionBar(binding.toolbar)
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
-
-        val displayTitle = when {
-            folderPath.isEmpty() && !isWebDav -> getString(R.string.local_photos)
-            folderPath.isEmpty() && isWebDav -> getString(R.string.remote)
-            else -> {
-                val lastSegment = folderPath.trimEnd('/').split('/').lastOrNull { it.isNotEmpty() } ?: folderPath
-                android.net.Uri.decode(lastSegment)
-            }
-        }
-        val originalTitle = displayTitle
-        supportActionBar?.title = displayTitle
-        binding.toolbar.setNavigationOnClickListener { 
-            if (adapter.isSelectionMode) {
-                adapter.exitSelectionMode()
-            } else {
-                onBackPressedDispatcher.onBackPressed() 
-            }
-        }
-
-        remotePreviewScheduler = VisibleRemotePreviewScheduler(lifecycleScope) { folder, forceRefresh ->
-            resolveRemotePreviewNow(folder, forceRefresh)
-        }
-
-        adapter = FolderAdapter(
-            onFolderClick = { folder ->
-                onFolderClick(folder)
-            },
-            onSelectionChanged = { count ->
-                if (count > 0) {
-                    supportActionBar?.title = getString(R.string.selected_count, count)
-                } else {
-                    supportActionBar?.title = originalTitle
-                }
-                invalidateOptionsMenu()
-            },
-            onRemotePreviewNeeded = { folder, forceRefresh ->
-                remotePreviewScheduler.enqueue(folder, forceRefresh)
-            },
-            onRemotePreviewVisibilityChanged = { folder, visible ->
-                remotePreviewScheduler.setVisible(folder, visible)
-            },
-            remotePreviewGeneration = {
-                settingsManager.getSortOrder().toString()
-            }
+        LibraryState.update(
+            serverType = if (isWebDav) "webdav" else "local",
+            rootFolderPath = folderPath
         )
 
-        binding.recyclerView.layoutManager = GridLayoutManager(this, settingsManager.getGridColumns()).apply {
-            isItemPrefetchEnabled = false
-        }
-        binding.recyclerView.setHasFixedSize(true)
-        binding.recyclerView.itemAnimator = null
-        binding.recyclerView.adapter = adapter
+        viewModel.init(folderPath, isWebDav, isFavorites = false)
 
-        binding.swipeRefreshLayout.setOnRefreshListener {
-            resetFolderShuffleIfRandomSort()
-            loadFolders(forceRefresh = true)
-        }
+        setContent {
+            val navOwner = androidx.navigationevent.compose.rememberNavigationEventDispatcherOwner(parent = null)
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner provides navOwner,
+            ) {
+                val uiState by viewModel.uiState.collectAsState()
 
-        binding.settingsFab.visibility = View.VISIBLE
-        binding.settingsFab.setOnClickListener {
-            val intent = Intent(this, MainActivity::class.java).apply {
-                putExtra("EXTRA_FOLDER_PATH", folderPath)
-                putExtra("EXTRA_IS_WEBDAV", isWebDav)
-                putExtra("EXTRA_RECURSIVE", true)
-            }
-            startActivity(intent)
-        }
-
-        DrawerHelper.setupDrawer(
-            this,
-            binding.drawerLayout,
-            binding.toolbar,
-            binding.drawerContent.root,
-            settingsLauncher
-        )
-    }
-
-    private fun onFolderClick(folder: Folder) {
-        if (folder.path == "virtual://local_all") {
-            val intent = Intent(this, MainActivity::class.java).apply {
-                putExtra("EXTRA_FOLDER_PATH", "")
-                putExtra("EXTRA_IS_WEBDAV", false)
-                putExtra("EXTRA_RECURSIVE", true)
-            }
-            startActivity(intent)
-            return
-        }
-
-        val isInternalPhotos = folder.path.startsWith("virtual://internal_photos")
-        val realPath = if (isInternalPhotos) folder.path.substringAfter("path=") else folder.path
-
-        if (isInternalPhotos || !folder.hasSubFolders) {
-            val intent = Intent(this, MainActivity::class.java).apply {
-                putExtra("EXTRA_FOLDER_PATH", realPath)
-                putExtra("EXTRA_IS_WEBDAV", !folder.isLocal)
-                putExtra("EXTRA_RECURSIVE", false)
-            }
-            startActivity(intent)
-            return
-        }
-
-        openFolderResolved(realPath, !folder.isLocal)
-    }
-
-    private fun openFolderResolved(path: String, isWebDav: Boolean) {
-        if (pendingFolderNavigationPath != null) return
-        pendingFolderNavigationPath = path
-        binding.swipeRefreshLayout.isEnabled = false
-        lifecycleScope.launch {
-            try {
-                val target = FolderNavigationResolver.resolve(
-                    context = this@SubFolderActivity,
-                    settingsManager = settingsManager,
-                    folderPath = path,
-                    isWebDav = isWebDav
-                )
-                android.util.Log.i(
-                    "SubFolderActivity",
-                    "resolvedFolderNavigation path=$path target=${target.javaClass.simpleName}"
-                )
-                FolderNavigationResolver.start(this@SubFolderActivity, target)
-            } catch (e: Exception) {
-                android.util.Log.e("SubFolderActivity", "Folder navigation resolve failed path=$path", e)
-                val intent = Intent(this@SubFolderActivity, SubFolderActivity::class.java).apply {
-                    putExtra("EXTRA_FOLDER_PATH", path)
-                    putExtra("EXTRA_IS_WEBDAV", isWebDav)
+                val actions = remember {
+                    MixedWaterfallActions(
+                        onBackClick = { finish() },
+                        onItemClick = { item ->
+                            val state = viewModel.uiState.value
+                            if (state.isSelectionMode) {
+                                viewModel.toggleSelection(item.key)
+                            } else when (item) {
+                                is MixedWaterfallItemUi.FolderItem -> {
+                                    lifecycleScope.launch {
+                                        try {
+                                            val target = FolderNavigationResolver.resolveTarget(
+                                                this@SubFolderActivity,
+                                                item.folder.path,
+                                                !item.folder.isLocal
+                                            )
+                                            FolderNavigationResolver.start(this@SubFolderActivity, target)
+                                        } catch (e: Exception) {
+                                            startActivity(Intent(this@SubFolderActivity, SubFolderActivity::class.java).apply {
+                                                putExtra("EXTRA_FOLDER_PATH", item.folder.path)
+                                                putExtra("EXTRA_IS_WEBDAV", !item.folder.isLocal)
+                                            })
+                                        }
+                                    }
+                                }
+                                is MixedWaterfallItemUi.MediaItem -> {
+                                    if (item.isVideo) {
+                                        ExternalVideoOpener.open(
+                                            this@SubFolderActivity,
+                                            item.photo.imageUri.toString(),
+                                            item.photo.title,
+                                            !item.photo.isLocal,
+                                            settingsManager
+                                        )
+                                    } else {
+                                        val imageOnly = state.items
+                                            .filterIsInstance<MixedWaterfallItemUi.MediaItem>()
+                                            .filterNot { it.isVideo }
+                                            .map { it.photo }
+                                        val imageIndex = imageOnly.indexOfFirst { it.id == item.photo.id }
+                                        if (imageIndex != -1) {
+                                            val session = ReaderSessions.create(
+                                                ReaderSessionSource.MIXED_FOLDER,
+                                                photos = imageOnly
+                                            )
+                                            startActivity(Intent(this@SubFolderActivity, PhotoViewActivity::class.java).apply {
+                                                putExtra(ReaderSessions.EXTRA_SESSION_ID, session.id)
+                                                putExtra("EXTRA_CURRENT_INDEX", imageIndex)
+                                                putExtra("EXTRA_IS_FAVORITES", false)
+                                            })
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        onItemLongClick = { item ->
+                            viewModel.enterSelectionMode(item.key)
+                        },
+                        onRefresh = {
+                            viewModel.loadContent(forceRefresh = true)
+                        },
+                        onColumnsChange = { cols ->
+                            viewModel.setColumns(cols)
+                        },
+                        onToggleSelectAll = {
+                            val state = viewModel.uiState.value
+                            if (state.isAllSelected) {
+                                viewModel.clearSelection()
+                            } else {
+                                viewModel.selectAll()
+                            }
+                        },
+                        onToggleFavorite = {
+                            val state = viewModel.uiState.value
+                            viewModel.batchToggleFavorite(state.selectedPhotos, state.selectedFolders)
+                        },
+                        onDeleteClick = {
+                            showDeleteConfirmDialog = true
+                        },
+                        onShareClick = {
+                            val state = viewModel.uiState.value
+                            MediaShareHelper.sharePhotos(
+                                context = this@SubFolderActivity,
+                                scope = lifecycleScope,
+                                settingsManager = settingsManager,
+                                photos = state.selectedPhotos
+                            )
+                        },
+                        onExitSelectionMode = {
+                            viewModel.exitSelectionMode()
+                        },
+                        onDimensionsResolved = { photoId, width, height ->
+                            viewModel.updateResolvedDimensions(photoId, width, height)
+                        }
+                    )
                 }
-                startActivity(intent)
-            } finally {
-                pendingFolderNavigationPath = null
-                binding.swipeRefreshLayout.isEnabled = true
+
+                WebDAVToonTheme(uiMode = uiState.uiMode) {
+                    MixedWaterfallScreen(
+                        uiState = uiState,
+                        actions = actions,
+                    )
+
+                    if (showDeleteConfirmDialog) {
+                        DeleteConfirmDialog(
+                            count = uiState.selectedCount,
+                            onConfirm = {
+                                showDeleteConfirmDialog = false
+                                confirmDeleteItems(uiState.selectedPhotos, uiState.selectedFolders)
+                            },
+                            onDismiss = { showDeleteConfirmDialog = false }
+                        )
+                    }
+
+                    if (uiState.uiMode == UiMode.Miuix) {
+                        top.yukonga.miuix.kmp.utils.MiuixPopupUtils.MiuixPopupHost()
+                    }
+                }
             }
         }
+
+        checkPermissionsAndLoad(isWebDav)
+    }
+
+    private fun confirmDeleteItems(selectedPhotos: List<Photo>, selectedFolders: List<Folder>) {
+        val localPhotos = selectedPhotos.filter { it.isLocal }
+        if (localPhotos.isNotEmpty() && LocalMediaDeleteRequest.requiresSystemRequest()) {
+            val request = runCatching {
+                LocalMediaDeleteRequest.create(this, localPhotos)
+            }.getOrNull()
+            if (request == null) {
+                Toast.makeText(this, getString(R.string.delete_failed), Toast.LENGTH_SHORT).show()
+                return
+            }
+            pendingDeleteRequest = PendingMixedDelete(selectedPhotos, selectedFolders, localPhotos)
+            localMediaDeleteLauncher.launch(request)
+        } else {
+            lifecycleScope.launch {
+                val deletedCount = viewModel.executeDelete(selectedPhotos, selectedFolders)
+                val requestedCount = selectedPhotos.size + selectedFolders.size
+                showDeleteToast(deletedCount, requestedCount)
+            }
+        }
+    }
+
+    private fun showDeleteToast(deletedCount: Int, requestedCount: Int) {
+        if (deletedCount == 0) {
+            Toast.makeText(this, getString(R.string.delete_failed), Toast.LENGTH_SHORT).show()
+            return
+        }
+        val message = if (deletedCount == requestedCount) {
+            getString(R.string.deleted_items_count, deletedCount)
+        } else {
+            getString(R.string.deleted_items_partial, deletedCount, requestedCount)
+        }
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 
     private fun hasStoragePermission(): Boolean {
@@ -239,424 +275,56 @@ class SubFolderActivity : AppCompatActivity() {
         }
     }
 
-    private fun checkPermissionsAndLoad() {
+    private fun checkPermissionsAndLoad(isWebDav: Boolean) {
         if (isWebDav) {
-            loadFolders()
             return
         }
-
         val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO)
         } else {
             arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
         }
 
-        if (hasStoragePermission()) {
-            loadFolders()
-        } else {
+        if (!hasStoragePermission()) {
+            viewModel.updateStoragePermission(false)
             requestPermissionLauncher.launch(permissions)
         }
     }
 
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menuInflater.inflate(R.menu.main_menu, menu)
-        OverflowMenuHelper.enableOptionalIcons(menu)
-
-        SearchMenuHelper.configureLiveSearch(
-            context = this,
-            searchItem = menu.findItem(R.id.action_search),
-            hint = getString(R.string.search_folders),
-            currentKeyword = { currentSearchKeyword },
-            onKeywordChanged = { keyword ->
-                currentSearchKeyword = keyword
-                applyFilterAndSort()
-            }
-        )
-
-        val rotationLockItem = menu.findItem(R.id.action_rotation_lock)
-        rotationLockItem?.isChecked = settingsManager.isRotationLocked()
-        menu.findItem(R.id.action_randomize_photos)?.isVisible = false
-        tintOverflowMenuIcons(menu)
-
-        return true
-    }
-
-    override fun onPrepareOptionsMenu(menu: Menu): Boolean {
-        OverflowMenuHelper.enableOptionalIcons(menu)
-        val isSelectionMode = adapter.isSelectionMode
-        val deleteItem = menu.findItem(R.id.action_delete)
-        deleteItem?.isVisible = isSelectionMode
-        if (isSelectionMode) {
-            deleteItem?.icon?.let { icon ->
-                DrawableCompat.setTint(icon, android.graphics.Color.RED)
-            }
-        }
-        menu.findItem(R.id.action_search)?.isVisible = !isSelectionMode
-        menu.findItem(R.id.action_settings)?.isVisible = !isSelectionMode
-        menu.findItem(R.id.action_grid_columns)?.isVisible = !isSelectionMode
-        menu.findItem(R.id.action_sort_order)?.isVisible = !isSelectionMode
-        menu.findItem(R.id.action_randomize_photos)?.isVisible = false
-        tintOverflowMenuIcons(menu)
-        return super.onPrepareOptionsMenu(menu)
-    }
-
-    override fun onMenuOpened(featureId: Int, menu: Menu): Boolean {
-        OverflowMenuHelper.enableOptionalIcons(menu)
-        tintOverflowMenuIcons(menu)
-        return super.onMenuOpened(featureId, menu)
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        return when (item.itemId) {
-            R.id.action_rotation_lock -> {
-                val newLockedState = !item.isChecked
-                item.isChecked = newLockedState
-                settingsManager.setRotationLocked(newLockedState)
-                applyRotationLock()
-                true
-            }
-            R.id.action_delete -> {
-                deleteSelectedFolders()
-                true
-            }
-            R.id.action_settings -> {
-                settingsLauncher.launch(Intent(this, SettingsActivity::class.java))
-                true
-            }
-            R.id.action_col_1 -> updateGridColumns(1)
-            R.id.action_col_2 -> updateGridColumns(2)
-            R.id.action_col_3 -> updateGridColumns(3)
-            R.id.action_col_4 -> updateGridColumns(4)
-            R.id.action_sort_name_asc -> updateSortOrder(SettingsManager.SORT_NAME_ASC)
-            R.id.action_sort_name_desc -> updateSortOrder(SettingsManager.SORT_NAME_DESC)
-            R.id.action_sort_date_desc -> updateSortOrder(SettingsManager.SORT_DATE_DESC)
-            R.id.action_sort_date_asc -> updateSortOrder(SettingsManager.SORT_DATE_ASC)
-            R.id.action_sort_random_folders -> updateSortOrder(SettingsManager.SORT_RANDOM_FOLDERS)
-            else -> super.onOptionsItemSelected(item)
-        }
-    }
-
     private fun applyRotationLock() {
-        if (::settingsManager.isInitialized && settingsManager.isRotationLocked()) {
-            requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        requestedOrientation = if (settingsManager.isRotationLocked()) {
+            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         } else {
-            requestedOrientation = android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         }
     }
 
-    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+    override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         applyRotationLock()
     }
 
-    private fun deleteSelectedFolders() {
-        val selectedFolders = adapter.getSelectedFolders()
-        if (selectedFolders.isEmpty()) return
-
-        androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle(R.string.confirm_delete)
-            .setMessage(getString(R.string.delete_folders_message, selectedFolders.size))
-            .setPositiveButton(R.string.delete) { _, _ ->
-                lifecycleScope.launch {
-                    showToolbarRefreshing()
-                    var count = 0
-                    selectedFolders.forEach { folder ->
-                        val repository: PhotoRepository = if (!folder.isLocal) {
-                            RustWebDavPhotoRepository(settingsManager)
-                        } else {
-                            LocalPhotoRepository(this@SubFolderActivity)
-                        }
-                        
-                        if (repository.deleteFolder(folder)) {
-                            // Try to clear memory cache to avoid showing stale data
-                            lifecycleScope.launch(Dispatchers.Main) {
-                                com.bumptech.glide.Glide.get(this@SubFolderActivity).clearMemory()
-                            }
-                            count++
-                        }
-                    }
-                    android.widget.Toast.makeText(this@SubFolderActivity, getString(R.string.deleted_folders_count, count), android.widget.Toast.LENGTH_SHORT).show()
-                    adapter.exitSelectionMode()
-                    loadFolders(forceRefresh = true)
-                }
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
-    }
-
-    private fun updateGridColumns(columns: Int): Boolean {
-        settingsManager.setGridColumns(columns)
-        (binding.recyclerView.layoutManager as? GridLayoutManager)?.spanCount = columns
-        return true
-    }
-
-    private fun resetFolderShuffleIfRandomSort() {
-        if (settingsManager.getSortOrder() == SettingsManager.SORT_RANDOM_FOLDERS) {
-            folderShuffleSeed = Random.nextLong()
-        }
-    }
-
-    private fun updateSortOrder(order: Int): Boolean {
-        val previousOrder = settingsManager.getSortOrder()
-        settingsManager.setSortOrder(order)
-        SmbSortHint.maybeShowPreviewHint(this, settingsManager, previousOrder, order)
-        if (order == SettingsManager.SORT_RANDOM_FOLDERS) {
-            folderShuffleSeed = Random.nextLong()
-        }
-        loadFolders(forceRefresh = false)
-        return true
-    }
-
-    private fun applyFilterAndSort() {
-        val filtered = if (currentSearchKeyword.isEmpty()) {
-            currentAllFolders
-        } else {
-            currentAllFolders.filter {
-                FolderSearchMatcher.matches(it.name, currentSearchKeyword)
-            }
-        }
-
-        val sortedFolders = when (settingsManager.getSortOrder()) {
-            SettingsManager.SORT_NAME_ASC -> filtered.sortedBy { it.name }
-            SettingsManager.SORT_NAME_DESC -> filtered.sortedByDescending { it.name }
-            SettingsManager.SORT_DATE_DESC -> filtered.sortedByDescending { it.dateModified }
-            SettingsManager.SORT_DATE_ASC -> filtered.sortedBy { it.dateModified }
-            SettingsManager.SORT_RANDOM_FOLDERS -> filtered.shuffled(Random(folderShuffleSeed))
-            else -> filtered
-        }
-
-        adapter.setFolders(sortedFolders)
-    }
-
-    private fun loadFolders(forceRefresh: Boolean = false) {
-        beginFolderLoading(forceRefresh)
-        val startedAt = SystemClock.elapsedRealtime()
-        val shouldAutoOpenPhotoList = !forceRefresh && currentAllFolders.isEmpty() && adapter.itemCount == 0
-
-        lifecycleScope.launch {
-            val allFolders = mutableListOf<Folder>()
-            try {
-                val repository: PhotoRepository = if (isWebDav) {
-                    RustWebDavPhotoRepository(settingsManager)
-                } else {
-                    LocalPhotoRepository(this@SubFolderActivity)
-                }
-
-                val folders = repository.getFolders(folderPath, forceRefresh).filterNot { f ->
-                    !f.isLocal && (f.name.startsWith(".") || f.path.trim('/').split('/').any { it.startsWith(".") })
-                }.toMutableList()
-
-                val directPhotos = repository.getPhotos(
-                    folderPath = folderPath,
-                    recursive = false,
-                    forceRefresh = forceRefresh
-                )
-
-                if (isWebDav && folders.isEmpty()) {
-                    val recursivePhotos = repository.getPhotos(
-                        folderPath = folderPath,
-                        recursive = true,
-                        forceRefresh = forceRefresh
-                    )
-                    val synthesizedFolders = RemoteFolderSynthesizer.synthesizeFromRecursivePhotos(
-                        currentFolderPath = folderPath,
-                        photos = recursivePhotos,
-                        endpoint = settingsManager.getFullWebDavUrl(),
-                        sortOrder = settingsManager.getSortOrder()
-                    )
-                    android.util.Log.i(
-                        "SubFolderActivity",
-                        "remoteFallback path=$folderPath directPhotos=${directPhotos.size} recursivePhotos=${recursivePhotos.size} synthesizedFolders=${synthesizedFolders.size}"
-                    )
-                    folders.addAll(synthesizedFolders)
-                }
-
-                val realChildFolders = folders.filterNot { it.path.startsWith("virtual://internal_photos") }
-                if (realChildFolders.isNotEmpty() && directPhotos.isNotEmpty()) {
-                    android.util.Log.i(
-                        "SubFolderActivity",
-                        "mixedFolderRedirect path=$folderPath isWebDav=$isWebDav folders=${realChildFolders.size} directPhotos=${directPhotos.size} elapsedMs=${SystemClock.elapsedRealtime() - startedAt}"
-                    )
-                    openMixedFolder()
-                    return@launch
-                }
-
-                if (folders.isEmpty()) {
-                    android.util.Log.i(
-                        "SubFolderActivity",
-                        "loadFolders path=$folderPath forceRefresh=$forceRefresh empty=true autoOpen=$shouldAutoOpenPhotoList elapsedMs=${SystemClock.elapsedRealtime() - startedAt}"
-                    )
-                    if (shouldAutoOpenPhotoList) {
-                        val intent = Intent(this@SubFolderActivity, MainActivity::class.java).apply {
-                            putExtra("EXTRA_FOLDER_PATH", folderPath)
-                            putExtra("EXTRA_IS_WEBDAV", isWebDav)
-                            putExtra("EXTRA_RECURSIVE", false)
-                        }
-                        startActivity(intent)
-                        finish()
-                        return@launch
-                    }
-                    android.util.Log.w(
-                        "SubFolderActivity",
-                        "Keeping current folder page after refresh/non-initial empty result path=$folderPath"
-                    )
-                } else {
-                    allFolders.addAll(folders)
-                    currentAllFolders = allFolders.toList()
-                    applyFilterAndSort()
-                    if (forceRefresh && isWebDav) {
-                        adapter.refreshVisibleRemotePreviews()
-                    }
-                    android.util.Log.i(
-                        "SubFolderActivity",
-                        "loadFolders path=$folderPath forceRefresh=$forceRefresh count=${allFolders.size} elapsedMs=${SystemClock.elapsedRealtime() - startedAt}"
-                    )
-                }
-            } catch (e: Exception) {
-                android.util.Log.e("SubFolderActivity", "Folders load failed", e)
-                hideToolbarRefreshPill()
-            }
-
-            if (currentLoadUsesToolbarPill) {
-                showToolbarRefreshCompleted()
-            } else {
-                hideToolbarRefreshPill()
-            }
-            binding.swipeRefreshLayout.isRefreshing = false
-            binding.progressBar.visibility = View.GONE
-        }
-    }
-
-    private fun beginFolderLoading(forceRefresh: Boolean) {
-        val isInitialLoad = !forceRefresh && currentAllFolders.isEmpty() && adapter.itemCount == 0
-        currentLoadUsesToolbarPill = !isInitialLoad
-        if (isInitialLoad) {
-            binding.progressBar.visibility = View.VISIBLE
-            hideToolbarRefreshPill()
-        } else {
-            binding.progressBar.visibility = View.GONE
-            showToolbarRefreshing()
-        }
-    }
-
-    private fun showToolbarRefreshing() {
-        toolbarRefreshHideJob?.cancel()
-        binding.toolbarProgressBar.root.alpha = 0f
-        binding.toolbarProgressBar.root.visibility = View.VISIBLE
-        binding.toolbarProgressBar.toolbarRefreshSpinner.visibility = View.VISIBLE
-        binding.toolbarProgressBar.toolbarRefreshDoneIcon.visibility = View.GONE
-        binding.toolbarProgressBar.toolbarRefreshText.setText(R.string.refresh_status_refreshing)
-        binding.toolbarProgressBar.root.animate().alpha(1f).setDuration(180L).start()
-    }
-
-    private fun showToolbarRefreshCompleted() {
-        toolbarRefreshHideJob?.cancel()
-        binding.toolbarProgressBar.root.visibility = View.VISIBLE
-        binding.toolbarProgressBar.root.alpha = 1f
-        binding.toolbarProgressBar.toolbarRefreshSpinner.visibility = View.GONE
-        binding.toolbarProgressBar.toolbarRefreshDoneIcon.visibility = View.VISIBLE
-        binding.toolbarProgressBar.toolbarRefreshText.setText(R.string.refresh_status_completed)
-        toolbarRefreshHideJob = lifecycleScope.launch {
-            delay(700L)
-            hideToolbarRefreshPill()
-        }
-    }
-
-    private fun hideToolbarRefreshPill() {
-        toolbarRefreshHideJob?.cancel()
-        binding.toolbarProgressBar.root.animate()
-            .alpha(0f)
-            .setDuration(160L)
-            .withEndAction {
-                binding.toolbarProgressBar.root.visibility = View.GONE
-                binding.toolbarProgressBar.root.alpha = 1f
-                binding.toolbarProgressBar.toolbarRefreshSpinner.visibility = View.VISIBLE
-                binding.toolbarProgressBar.toolbarRefreshDoneIcon.visibility = View.GONE
-            }
-            .start()
-    }
-
-    private suspend fun resolveRemotePreviewNow(folder: Folder, forceRefresh: Boolean = false) {
-        if (folder.isLocal || (!forceRefresh && folder.previewUris.isNotEmpty())) return
-
-        val sortOrder = settingsManager.getSortOrder()
-        val preview = RustWebDavPhotoRepository(settingsManager).inspectFolder(
-            folderPath = folder.path,
-            sortOrder = sortOrder,
-            forceRefresh = forceRefresh
-        ) ?: return
-        if (settingsManager.getSortOrder() != sortOrder) return
-        val updatedPreviewUris = if (forceRefresh) {
-            preview.previewUris
-        } else {
-            preview.previewUris.ifEmpty { folder.previewUris }
-        }
-
-        currentAllFolders = currentAllFolders.map { current ->
-            if (current.path == folder.path) {
-                current.copy(
-                    previewUris = updatedPreviewUris,
-                    hasSubFolders = current.hasSubFolders || preview.hasSubFolders
-                )
-            } else {
-                current
-            }
-        }
-
-        adapter.updateFolderPreview(folder.path, updatedPreviewUris, folder.hasSubFolders || preview.hasSubFolders)
-    }
-
-    private fun openMixedFolder() {
-        val intent = Intent(this, MixedFolderActivity::class.java).apply {
-            putExtra("EXTRA_FOLDER_PATH", folderPath)
-            putExtra("EXTRA_IS_WEBDAV", isWebDav)
-            addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
-        }
-        startActivity(intent)
-        overridePendingTransition(0, 0)
-        finish()
-        overridePendingTransition(0, 0)
-    }
-
-    private fun tintOverflowMenuIcons(menu: Menu) {
-        val normalColor = if (isDarkModeEnabled()) {
-            android.graphics.Color.WHITE
-        } else {
-            ContextCompat.getColor(this, R.color.onSurface)
-        }
-        val deleteColor = ContextCompat.getColor(this, R.color.primary_red)
-        val submenuItems = listOf(
-            R.id.action_col_1,
-            R.id.action_col_2,
-            R.id.action_col_3,
-            R.id.action_col_4,
-            R.id.action_sort_name_asc,
-            R.id.action_sort_name_desc,
-            R.id.action_sort_date_desc,
-            R.id.action_sort_date_asc,
-            R.id.action_sort_random_folders
-        )
-
-        listOf(
-            R.id.action_select,
-            R.id.action_settings,
-            R.id.action_grid_columns,
-            R.id.action_sort_order,
-            R.id.action_rotation_lock
-        ).forEach { id ->
-            menu.findItem(id)?.icon?.mutate()?.let { DrawableCompat.setTint(it, normalColor) }
-        }
-
-        submenuItems.forEach { id ->
-            menu.findItem(id)?.icon?.mutate()?.let { DrawableCompat.setTint(it, normalColor) }
-        }
-
-        menu.findItem(R.id.action_delete)?.icon?.mutate()?.let { DrawableCompat.setTint(it, deleteColor) }
-    }
-
-    private fun isDarkModeEnabled(): Boolean {
+    private fun isNightModeActive(): Boolean {
         val nightModeFlags = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
         return nightModeFlags == Configuration.UI_MODE_NIGHT_YES
     }
+}
 
+@Composable
+private fun DeleteConfirmDialog(count: Int, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.confirm_delete)) },
+        text = { Text(stringResource(R.string.delete_folders_message, count)) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(stringResource(R.string.delete))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
+    )
 }

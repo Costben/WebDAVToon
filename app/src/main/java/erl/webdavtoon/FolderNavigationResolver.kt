@@ -14,6 +14,13 @@ object FolderNavigationResolver {
         data class MediaWaterfall(val path: String, val isWebDav: Boolean) : Target()
     }
 
+    suspend fun resolveTarget(
+        context: Context,
+        folderPath: String,
+        isWebDav: Boolean,
+        forceRefresh: Boolean = false
+    ): Target = resolve(context, SettingsManager(context), folderPath, isWebDav, forceRefresh)
+
     suspend fun resolve(
         context: Context,
         settingsManager: SettingsManager,
