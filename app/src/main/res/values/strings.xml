@@ -190,4 +190,12 @@
     <string name="discovery_empty">No devices found — enter the address manually</string>
     <string name="smb_guest_hint">Leave the username empty to connect as guest</string>
     <string name="smb_preview_sort_hint">Folder previews don’t follow sort order on SMB servers</string>
-</resources>
+    <string name="back">Back</string>
+<string name="current_server">Current server</string>
+    <string name="slot_name">Slot %1$d</string>
+    <string name="server_endpoint_format">%1$s://%2$s:%3$d</string>
+    <string name="material_ui_mode">Material UI mode</string>
+    <string name="ui_mode_switch_summary">Switch interface style instantly</string>
+<string name="display_options">Display options</string>
+    <string name="reader_video_editing">Reader, video and editing</string>
+    <string name="material_settings_placeholder">Material settings placeholder</string></resources>

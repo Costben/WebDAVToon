@@ -182,4 +182,12 @@
     <string name="discovery_empty">未发现设备 — 请手动输入地址</string>
     <string name="smb_guest_hint">留空用户名将以访客（guest）身份连接</string>
     <string name="smb_preview_sort_hint">SMB 服务器的文件夹预览图不随排序方式变化</string>
-</resources>
+    <string name="back">返回</string>
+<string name="current_server">当前服务器</string>
+    <string name="slot_name">槽位 %1$d</string>
+    <string name="server_endpoint_format">%1$s://%2$s:%3$d</string>
+    <string name="material_ui_mode">Material 界面模式</string>
+    <string name="ui_mode_switch_summary">即时切换界面风格</string>
+<string name="display_options">显示选项</string>
+    <string name="reader_video_editing">阅读、视频与编辑</string>
+    <string name="material_settings_placeholder">Material 设置占位界面</string></resources>
