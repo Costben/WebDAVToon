@@ -1,0 +1,277 @@
+package erl.webdavtoon.ui.screen.folder
+
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.bumptech.glide.Glide
+import erl.webdavtoon.AppSettingsStore
+import erl.webdavtoon.Folder
+import erl.webdavtoon.FolderSearchMatcher
+import erl.webdavtoon.LocalPhotoRepository
+import erl.webdavtoon.PrivacyModeState
+import erl.webdavtoon.R
+import erl.webdavtoon.RustWebDavPhotoRepository
+import erl.webdavtoon.SettingsManager
+import erl.webdavtoon.VisibleRemotePreviewScheduler
+import erl.webdavtoon.PhotoRepository
+import erl.webdavtoon.ui.UiMode
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlin.random.Random
+
+class FolderViewModel @JvmOverloads constructor(app: Application) : AndroidViewModel(app) {
+    private val context = app.applicationContext
+    private val settingsManager = SettingsManager(context)
+    private val appSettings = AppSettingsStore(context)
+    private val _uiState = MutableStateFlow(snapshotSettings(FolderUiState()))
+    val uiState = _uiState.asStateFlow()
+    private var shuffleSeed = Random.nextLong()
+    private val previewScheduler = VisibleRemotePreviewScheduler(viewModelScope) { folder, force ->
+        loadRemotePreview(folder, force)
+    }
+
+    init {
+        observeSettings()
+        refreshSlots()
+        loadFolders()
+    }
+
+    private fun observeSettings() {
+        observe(appSettings.observeUiMode()) { copy(uiMode = it) }
+        observe(appSettings.observeInt(AppSettingsStore.GRID_COLUMNS, 2)) { copy(gridColumns = it) }
+        observe(appSettings.observeInt(AppSettingsStore.SORT_ORDER, SettingsManager.SORT_DATE_DESC)) {
+            copy(sortOrder = it)
+        }
+        observe(appSettings.observeBoolean(AppSettingsStore.ROTATION_LOCKED, false)) { copy(rotationLocked = it) }
+    }
+
+    private fun <T> observe(flow: kotlinx.coroutines.flow.Flow<T>, transform: FolderUiState.(T) -> FolderUiState) {
+        viewModelScope.launch { flow.collect { value -> _uiState.update { it.transform(value) } } }
+    }
+
+    fun loadFolders(forceRefresh: Boolean = false) {
+        _uiState.update {
+            it.copy(
+                loading = !forceRefresh && it.rawFolders.isEmpty(),
+                isRefreshing = forceRefresh || it.rawFolders.isNotEmpty(),
+                refreshStatus = RefreshStatus.Refreshing,
+                error = null,
+                isWebDavEnabled = settingsManager.isWebDavEnabled(),
+            )
+        }
+        viewModelScope.launch {
+            try {
+                val folders = withContext(Dispatchers.IO) {
+                    val result = mutableListOf<Folder>()
+                    var emptyReason: String? = null
+                    if (settingsManager.isWebDavEnabled()) {
+                        val remoteRepo = RustWebDavPhotoRepository(settingsManager)
+                        val remote = remoteRepo.getFolders("/", forceRefresh).filterNot { folder ->
+                            folder.name.startsWith(".") ||
+                                folder.path.trim('/').split('/').any { it.startsWith(".") }
+                        }
+                        result += remote
+                        if (remote.isEmpty()) emptyReason = remoteRepo.diagnoseEmptyFolderResult("/")
+                    }
+                    try {
+                        val local = LocalPhotoRepository(context).getFolders("", forceRefresh)
+                        if (local.isNotEmpty()) {
+                            result += Folder(
+                                path = "virtual://local_root",
+                                name = context.getString(R.string.local_photos),
+                                isLocal = true,
+                                photoCount = local.sumOf { it.photoCount },
+                                previewUris = local.flatMap { it.previewUris }.take(4),
+                                hasSubFolders = true,
+                            )
+                        }
+                    } catch (_: Exception) {
+                        // A missing local media permission should not hide remote folders.
+                    }
+                    if (result.none { !it.isLocal }) emptyReason?.let { reason ->
+                        if (result.isEmpty()) throw IllegalStateException(reason)
+                    }
+                    result
+                }
+                _uiState.update {
+                    it.copy(
+                        rawFolders = folders,
+                        loading = false,
+                        isRefreshing = false,
+                        refreshStatus = RefreshStatus.Completed,
+                        error = null,
+                    )
+                }
+                publishFolders()
+            } catch (error: Exception) {
+                _uiState.update {
+                    it.copy(
+                        loading = false,
+                        isRefreshing = false,
+                        refreshStatus = RefreshStatus.Completed,
+                        error = error.message ?: "Folder load failed",
+                    )
+                }
+            }
+        }
+    }
+
+    fun setSearchKeyword(keyword: String) {
+        _uiState.update { it.copy(searchKeyword = keyword, isSearching = keyword.isNotBlank()) }
+        publishFolders()
+    }
+
+    fun setSortOrder(order: Int) {
+        settingsManager.setSortOrder(order)
+        if (order == SettingsManager.SORT_RANDOM_FOLDERS) resetShuffleSeed()
+        _uiState.update { it.copy(sortOrder = order) }
+        publishFolders()
+    }
+
+    fun resetShuffleSeed() {
+        shuffleSeed = Random.nextLong()
+        publishFolders()
+    }
+
+    fun onFolderPreviewVisible(path: String, visible: Boolean) {
+        _uiState.value.rawFolders.firstOrNull { it.path == path }?.let { previewScheduler.setVisible(it, visible) }
+    }
+
+    fun requestRemotePreview(folder: Folder, forceRefresh: Boolean = false) {
+        if (folder.isLocal || (!forceRefresh && folder.previewUris.isNotEmpty())) return
+        previewScheduler.enqueue(folder, forceRefresh)
+    }
+
+    private suspend fun loadRemotePreview(folder: Folder, forceRefresh: Boolean) {
+        if (folder.isLocal || (!forceRefresh && folder.previewUris.isNotEmpty())) return
+        val sortOrder = settingsManager.getSortOrder()
+        val preview = RustWebDavPhotoRepository(settingsManager).inspectFolder(folder.path, sortOrder, forceRefresh)
+            ?: return
+        if (settingsManager.getSortOrder() != sortOrder) return
+        _uiState.update { state ->
+            state.copy(rawFolders = state.rawFolders.map { current ->
+                if (current.path != folder.path) current else current.copy(
+                    previewUris = if (forceRefresh) preview.previewUris else preview.previewUris.ifEmpty { current.previewUris },
+                    hasSubFolders = current.hasSubFolders || preview.hasSubFolders,
+                )
+            })
+        }
+        publishFolders()
+    }
+
+    fun toggleSelection(path: String) {
+        _uiState.update {
+            val selected = it.selectedPaths.toMutableSet().apply {
+                if (!add(path)) remove(path)
+            }
+            it.copy(selectedPaths = selected, selectedCount = selected.size, isSelectionMode = selected.isNotEmpty())
+        }
+        publishFolders()
+    }
+
+    fun selectAll() {
+        val paths = _uiState.value.rawFolders.map { it.path }.toSet()
+        _uiState.update { it.copy(selectedPaths = paths, selectedCount = paths.size, isSelectionMode = paths.isNotEmpty()) }
+        publishFolders()
+    }
+
+    fun clearSelection() {
+        _uiState.update { it.copy(selectedPaths = emptySet(), selectedCount = 0, isSelectionMode = false) }
+        publishFolders()
+    }
+
+    fun deleteSelected(onComplete: (deletedCount: Int) -> Unit) {
+        val selected = _uiState.value.rawFolders.filter { it.path in _uiState.value.selectedPaths }
+        viewModelScope.launch(Dispatchers.IO) {
+            var count = 0
+            selected.forEach { folder ->
+                val repository: PhotoRepository = if (folder.isLocal) LocalPhotoRepository(context)
+                else RustWebDavPhotoRepository(settingsManager)
+                if (repository.deleteFolder(folder)) count++
+            }
+            withContext(Dispatchers.Main) {
+                Glide.get(context).clearMemory()
+                clearSelection()
+                onComplete(count)
+                loadFolders(forceRefresh = true)
+            }
+        }
+    }
+
+    fun setGridColumns(columns: Int) {
+        val value = columns.coerceIn(1, 4)
+        settingsManager.setGridColumns(value)
+        _uiState.update { it.copy(gridColumns = value) }
+    }
+
+    fun toggleRotationLock() {
+        val locked = !_uiState.value.rotationLocked
+        settingsManager.setRotationLocked(locked)
+        _uiState.update { it.copy(rotationLocked = locked) }
+    }
+
+    fun refreshSlots() {
+        val current = settingsManager.getCurrentSlot()
+        val slots = settingsManager.getAllSlotsUnfiltered().map { slot ->
+            erl.webdavtoon.ui.screen.settings.WebDavSlotUi(
+                slot = slot,
+                alias = settingsManager.getWebDavAlias(slot),
+                protocol = settingsManager.getWebDavProtocol(slot),
+                url = settingsManager.getWebDavUrl(slot),
+                port = settingsManager.getWebDavPort(slot),
+                username = settingsManager.getWebDavUsername(slot),
+                domain = settingsManager.getWebDavDomain(slot),
+                rememberPassword = settingsManager.isWebDavRememberPassword(slot),
+                isPrivate = settingsManager.isWebDavPrivate(slot),
+                enabled = settingsManager.isWebDavEnabled(slot),
+                hasPassword = settingsManager.getWebDavPassword(slot).isNotBlank(),
+                isCurrent = slot == current,
+            )
+        }
+        _uiState.update { it.copy(currentSlot = current, slots = slots, isWebDavEnabled = settingsManager.isWebDavEnabled()) }
+    }
+
+    fun selectSlot(slot: Int) {
+        settingsManager.setCurrentSlot(slot)
+        refreshSlots()
+        loadFolders(forceRefresh = true)
+    }
+
+    private fun publishFolders() {
+        val state = _uiState.value
+        val filtered = state.rawFolders.filter { FolderSearchMatcher.matches(it.name, state.searchKeyword) }
+        val sorted = when (state.sortOrder) {
+            SettingsManager.SORT_NAME_ASC -> filtered.sortedBy { it.name }
+            SettingsManager.SORT_NAME_DESC -> filtered.sortedByDescending { it.name }
+            SettingsManager.SORT_DATE_ASC -> filtered.sortedBy { it.dateModified }
+            SettingsManager.SORT_RANDOM_FOLDERS -> filtered.shuffled(Random(shuffleSeed))
+            else -> filtered.sortedByDescending { it.dateModified }
+        }
+        val selected = state.selectedPaths
+        _uiState.update { it.copy(folders = sorted.map { folder ->
+            FolderItemUi(
+                path = folder.path,
+                name = folder.name,
+                isLocal = folder.isLocal,
+                photoCount = folder.photoCount,
+                previewUris = folder.previewUris.map { uri -> uri.toString() },
+                hasSubFolders = folder.hasSubFolders,
+                isSelected = folder.path in selected,
+            )
+        }) }
+    }
+
+    private fun snapshotSettings(state: FolderUiState): FolderUiState = state.copy(
+        sortOrder = settingsManager.getSortOrder(),
+        gridColumns = settingsManager.getGridColumns(),
+        rotationLocked = settingsManager.isRotationLocked(),
+        uiMode = settingsManager.getUiMode(),
+        isPrivacyMode = PrivacyModeState.isPrivacyMode,
+        isWebDavEnabled = settingsManager.isWebDavEnabled(),
+    )
+}
