@@ -69,6 +69,7 @@ fun AppAdaptiveNavigationScaffold(
     isPrivacyMode: Boolean,
     actions: NavigationDrawerActions,
     modifier: Modifier = Modifier,
+    drawerEdgeWidthPercent: Int = 33,
     content: @Composable () -> Unit,
 ) {
     val wide = LocalConfiguration.current.screenWidthDp >= 600
@@ -78,6 +79,14 @@ fun AppAdaptiveNavigationScaffold(
             Box(Modifier.weight(1f).fillMaxHeight()) { content() }
         }
     } else {
-        AppNavigationDrawer(drawerState, slots, isPrivacyMode, actions, modifier, content = content)
+        AppNavigationDrawer(
+            drawerState = drawerState,
+            slots = slots,
+            isPrivacyMode = isPrivacyMode,
+            actions = actions,
+            modifier = modifier,
+            drawerEdgeWidthPercent = drawerEdgeWidthPercent,
+            content = content,
+        )
     }
 }

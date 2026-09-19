@@ -103,6 +103,7 @@ fun FolderScreen(
         drawerState = drawerState,
         slots = uiState.slots,
         isPrivacyMode = uiState.isPrivacyMode,
+        drawerEdgeWidthPercent = uiState.drawerEdgeWidthPercent,
         actions = drawerActions,
         modifier = modifier,
     ) {

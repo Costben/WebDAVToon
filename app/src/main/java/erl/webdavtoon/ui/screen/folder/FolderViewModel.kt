@@ -48,6 +48,9 @@ class FolderViewModel @JvmOverloads constructor(app: Application) : AndroidViewM
             copy(sortOrder = it)
         }
         observe(appSettings.observeBoolean(AppSettingsStore.ROTATION_LOCKED, false)) { copy(rotationLocked = it) }
+        observe(appSettings.observeInt(AppSettingsStore.DRAWER_EDGE_WIDTH_PERCENT, SettingsManager.DEFAULT_DRAWER_EDGE_WIDTH_PERCENT)) {
+            copy(drawerEdgeWidthPercent = it)
+        }
     }
 
     private fun <T> observe(flow: kotlinx.coroutines.flow.Flow<T>, transform: FolderUiState.(T) -> FolderUiState) {
@@ -273,5 +276,6 @@ class FolderViewModel @JvmOverloads constructor(app: Application) : AndroidViewM
         uiMode = settingsManager.getUiMode(),
         isPrivacyMode = PrivacyModeState.isPrivacyMode,
         isWebDavEnabled = settingsManager.isWebDavEnabled(),
+        drawerEdgeWidthPercent = settingsManager.getDrawerEdgeWidthPercent(),
     )
 }

@@ -24,9 +24,16 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import erl.webdavtoon.ui.UiMode
@@ -53,6 +60,7 @@ fun AppNavigationDrawer(
     actions: NavigationDrawerActions,
     modifier: Modifier = Modifier,
     uiMode: UiMode = UiMode.Miuix,
+    drawerEdgeWidthPercent: Int = 33,
     content: @Composable () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -60,9 +68,37 @@ fun AppNavigationDrawer(
         actions.onCloseDrawer()
         scope.launch { drawerState.close() }
     }
+
+    val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
+    val screenWidthPx = with(density) { configuration.screenWidthDp.dp.toPx() }
+    val maxEdgePx = screenWidthPx * (drawerEdgeWidthPercent.coerceIn(0, 100) / 100f)
+
+    var touchWithinEdge by remember { mutableStateOf(false) }
+
+    val gesturesEnabled = when {
+        drawerEdgeWidthPercent <= 0 -> false
+        drawerState.isOpen -> true
+        else -> touchWithinEdge
+    }
+
+    val drawerModifier = modifier.pointerInput(drawerEdgeWidthPercent, drawerState.isOpen) {
+        if (drawerEdgeWidthPercent <= 0 || drawerState.isOpen) return@pointerInput
+        awaitPointerEventScope {
+            while (true) {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                val down = event.changes.firstOrNull()
+                if (down != null) {
+                    touchWithinEdge = down.pressed && down.position.x <= maxEdgePx
+                }
+            }
+        }
+    }
+
     ModalNavigationDrawer(
         drawerState = drawerState,
-        modifier = modifier,
+        modifier = drawerModifier,
+        gesturesEnabled = gesturesEnabled,
         drawerContent = {
             ModalDrawerSheet(
                 drawerContainerColor = if (uiMode == UiMode.Miuix) {
