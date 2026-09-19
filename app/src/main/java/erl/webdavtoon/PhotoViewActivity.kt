@@ -37,12 +37,16 @@ class PhotoViewActivity : AppCompatActivity() {
         val savedIndex = savedInstanceState?.getInt("EXTRA_CURRENT_INDEX")
         val isFavorites = intent.getBooleanExtra("EXTRA_IS_FAVORITES", false)
 
-        if (savedInstanceState != null && savedInstanceState.containsKey("EXTRA_IS_CARD_MODE")) {
-            val isCardMode = savedInstanceState.getBoolean("EXTRA_IS_CARD_MODE")
-            viewModel.setReadingMode(if (isCardMode) ReadingMode.CARD else ReadingMode.WEBTOON)
-        }
+        val isCardModeOverride = savedInstanceState
+            ?.takeIf { it.containsKey("EXTRA_IS_CARD_MODE") }
+            ?.getBoolean("EXTRA_IS_CARD_MODE")
 
-        viewModel.initialize(sessionId, savedIndex ?: intentIndex, isFavorites)
+        viewModel.initialize(
+            sessionId = sessionId,
+            initialIndex = savedIndex ?: intentIndex,
+            isFavorites = isFavorites,
+            isCardModeOverride = isCardModeOverride
+        )
 
         // 屏幕方向联动
         lifecycleScope.launch {

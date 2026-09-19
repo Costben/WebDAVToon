@@ -239,8 +239,8 @@ fun ReaderOverlayMaterial(
                         // 1. Reading Mode Toggle
                         val isWebtoon = readingMode == ReadingMode.WEBTOON
                         MaterialBottomActionItem(
-                            iconRes = if (isWebtoon) R.drawable.ic_card_mode_md3 else R.drawable.ic_webtoon_mode_md3,
-                            label = if (isWebtoon) stringResource(R.string.default_reader_mode_card) else stringResource(R.string.default_reader_mode_webtoon),
+                            iconRes = if (isWebtoon) R.drawable.ic_webtoon_mode_md3 else R.drawable.ic_card_mode_md3,
+                            label = if (isWebtoon) stringResource(R.string.default_reader_mode_webtoon) else stringResource(R.string.default_reader_mode_card),
                             tint = MaterialTheme.colorScheme.onSurface,
                             onClick = onToggleMode,
                         )

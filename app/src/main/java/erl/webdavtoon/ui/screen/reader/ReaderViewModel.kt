@@ -29,7 +29,8 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     private val _uiState = MutableStateFlow(
         ReaderUiState(
             uiMode = appSettings.getUiMode(),
-            isOrientationLocked = settingsManager.isRotationLocked()
+            isOrientationLocked = settingsManager.isRotationLocked(),
+            readingMode = resolveDefaultReadingMode()
         )
     )
     val uiState: StateFlow<ReaderUiState> = _uiState.asStateFlow()
@@ -37,6 +38,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     private var slideshowJob: Job? = null
     private var lastSessionId: String? = null
     private var isFavoritesSource: Boolean = false
+    private var explicitModeSet: Boolean = false
 
     init {
         observeSettings()
@@ -55,11 +57,41 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun initialize(sessionId: String?, initialIndex: Int = 0, isFavorites: Boolean = false) {
+    private fun resolveDefaultReadingMode(): ReadingMode = when (settingsManager.getDefaultReaderMode()) {
+        SettingsManager.DEFAULT_READER_MODE_CARD -> ReadingMode.CARD
+        else -> ReadingMode.WEBTOON
+    }
+
+    fun initialize(
+        sessionId: String?,
+        initialIndex: Int = 0,
+        isFavorites: Boolean = false,
+        isCardModeOverride: Boolean? = null,
+    ) {
         lastSessionId = sessionId
         isFavoritesSource = isFavorites
 
-        _uiState.update { it.copy(isLoading = true, errorMessage = null, sessionId = sessionId) }
+        val targetReadingMode = when (isCardModeOverride) {
+            true -> ReadingMode.CARD
+            false -> ReadingMode.WEBTOON
+            null -> if (explicitModeSet) _uiState.value.readingMode else resolveDefaultReadingMode()
+        }
+        if (isCardModeOverride != null) {
+            explicitModeSet = true
+        }
+
+        _uiState.update {
+            it.copy(
+                isLoading = true,
+                errorMessage = null,
+                sessionId = sessionId,
+                readingMode = targetReadingMode
+            )
+        }
+
+        if (targetReadingMode != ReadingMode.CARD && _uiState.value.isSlideshowPlaying) {
+            stopSlideshow()
+        }
 
         val resolvedSession = if (sessionId != null) {
             ReaderSessions.resolve(
@@ -101,16 +133,11 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         val currentPhoto = loadedPhotos.getOrNull(targetIndex)
         val isFav = currentPhoto?.let { favoriteStore.isFavorite(it.id) } ?: false
 
-        val defaultMode = when (settingsManager.getDefaultReaderMode()) {
-            SettingsManager.DEFAULT_READER_MODE_CARD -> ReadingMode.CARD
-            else -> ReadingMode.WEBTOON
-        }
-
         _uiState.update {
             it.copy(
                 photos = loadedPhotos,
                 currentIndex = targetIndex,
-                readingMode = defaultMode,
+                readingMode = targetReadingMode,
                 isOrientationLocked = settingsManager.isRotationLocked(),
                 isFavorite = isFav,
                 isLoading = false,
@@ -157,6 +184,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun setReadingMode(mode: ReadingMode) {
+        explicitModeSet = true
         val modeString = when (mode) {
             ReadingMode.CARD -> SettingsManager.DEFAULT_READER_MODE_CARD
             ReadingMode.WEBTOON -> SettingsManager.DEFAULT_READER_MODE_WEBTOON
@@ -343,9 +371,11 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
 
     fun resetState() {
         stopSlideshow()
+        explicitModeSet = false
         _uiState.value = ReaderUiState(
             uiMode = appSettings.getUiMode(),
-            isOrientationLocked = settingsManager.isRotationLocked()
+            isOrientationLocked = settingsManager.isRotationLocked(),
+            readingMode = resolveDefaultReadingMode()
         )
     }
 
