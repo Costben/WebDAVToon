@@ -181,6 +181,9 @@ fun MixedWaterfallScreen(
                     }
                 }
                 else -> {
+                    // A single staggered grid keeps the image waterfall hugging the folders (no
+                    // holes). Folders stay in strict 1,2,3,4,5 order because every folder card has
+                    // an identical fixed height, so the greedy lane packing always alternates.
                     LazyVerticalStaggeredGrid(
                         columns = StaggeredGridCells.Fixed(effectiveColumns),
                         modifier = Modifier
@@ -198,33 +201,7 @@ fun MixedWaterfallScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         items(uiState.visibleItems, key = { it.key }) { item ->
-                            if (uiState.uiMode == UiMode.Miuix) {
-                                MediaCardMiuix(
-                                    item = item,
-                                    showFilename = uiState.showFilenames,
-                                    isSelectionMode = uiState.isSelectionMode,
-                                    onClick = { actions.onItemClick(item) },
-                                    onLongClick = { actions.onItemLongClick(item) },
-                                    onDimensionsResolved = actions.onDimensionsResolved,
-                                    onFolderVisibilityChanged = { folder, visible ->
-                                        actions.onFolderVisibilityChanged(folder, visible)
-                                        if (visible) actions.onFolderPreviewsRequested()
-                                    },
-                                )
-                            } else {
-                                MediaCardMaterial(
-                                    item = item,
-                                    showFilename = uiState.showFilenames,
-                                    isSelectionMode = uiState.isSelectionMode,
-                                    onClick = { actions.onItemClick(item) },
-                                    onLongClick = { actions.onItemLongClick(item) },
-                                    onDimensionsResolved = actions.onDimensionsResolved,
-                                    onFolderVisibilityChanged = { folder, visible ->
-                                        actions.onFolderVisibilityChanged(folder, visible)
-                                        if (visible) actions.onFolderPreviewsRequested()
-                                    },
-                                )
-                            }
+                            MixedWaterfallCard(item, uiState, actions)
                         }
                     }
                 }
@@ -271,6 +248,42 @@ fun MixedWaterfallScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun MixedWaterfallCard(
+    item: MixedWaterfallItemUi,
+    uiState: MixedWaterfallUiState,
+    actions: MixedWaterfallActions,
+    modifier: Modifier = Modifier,
+) {
+    val onFolderVisibilityChanged: (Folder, Boolean) -> Unit = { folder, visible ->
+        actions.onFolderVisibilityChanged(folder, visible)
+        if (visible) actions.onFolderPreviewsRequested()
+    }
+    if (uiState.uiMode == UiMode.Miuix) {
+        MediaCardMiuix(
+            item = item,
+            showFilename = uiState.showFilenames,
+            isSelectionMode = uiState.isSelectionMode,
+            onClick = { actions.onItemClick(item) },
+            onLongClick = { actions.onItemLongClick(item) },
+            onDimensionsResolved = actions.onDimensionsResolved,
+            onFolderVisibilityChanged = onFolderVisibilityChanged,
+            modifier = modifier,
+        )
+    } else {
+        MediaCardMaterial(
+            item = item,
+            showFilename = uiState.showFilenames,
+            isSelectionMode = uiState.isSelectionMode,
+            onClick = { actions.onItemClick(item) },
+            onLongClick = { actions.onItemLongClick(item) },
+            onDimensionsResolved = actions.onDimensionsResolved,
+            onFolderVisibilityChanged = onFolderVisibilityChanged,
+            modifier = modifier,
+        )
     }
 }
 

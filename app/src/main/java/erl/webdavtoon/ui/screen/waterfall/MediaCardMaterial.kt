@@ -8,12 +8,14 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -33,8 +35,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import kotlin.math.ceil
 import erl.webdavtoon.Folder
 import erl.webdavtoon.MediaType
 import erl.webdavtoon.R
@@ -121,99 +125,107 @@ fun WaterfallFolderCardMaterial(
 
     val cardShape = RoundedCornerShape(16.dp)
     val innerShape = if (showFilename) RoundedCornerShape(12.dp) else RoundedCornerShape(16.dp)
+    val innerPadding = if (showFilename) 8.dp else 0.dp
 
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .pointerInput(item.key, isSelectionMode) {
-                detectTapGestures(
-                    onTap = { onClick() },
-                    onLongPress = { onLongClick() },
-                )
-            },
-        shape = cardShape,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        border = if (item.isSelected) {
-            BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
-        } else {
-            null
-        },
-    ) {
-        Column(modifier = Modifier.padding(if (showFilename) 6.dp else 0.dp)) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .clip(innerShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-            ) {
-                if (item.previewUris.isEmpty()) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_ior_folder),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .size(48.dp),
-                        tint = MaterialTheme.colorScheme.primary,
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        // Round the lane width to a whole dp so both grid lanes produce exactly the same
+        // preview height. With a sub-pixel lane width the two columns end up 1px different
+        // per row, which the staggered grid accumulates until it misplaces the last folder.
+        val previewSide = Dp(ceil(maxWidth.value)) - innerPadding * 2
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .pointerInput(item.key, isSelectionMode) {
+                    detectTapGestures(
+                        onTap = { onClick() },
+                        onLongPress = { onLongClick() },
                     )
-                } else {
-                    Column(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(3.dp),
-                    ) {
-                        MaterialFolderPreviewRow(item, 0)
-                        MaterialFolderPreviewRow(item, 2)
+                },
+            shape = cardShape,
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+            border = if (item.isSelected) {
+                BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+            } else {
+                null
+            },
+        ) {
+            Column(modifier = Modifier.padding(innerPadding)) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(previewSide)
+                        .clip(innerShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                ) {
+                    if (item.previewUris.isEmpty()) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_ior_folder),
+                            contentDescription = null,
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .size(48.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    } else {
+                        Column(
+                            modifier = Modifier.fillMaxSize(),
+                            verticalArrangement = Arrangement.spacedBy(3.dp),
+                        ) {
+                            MaterialFolderPreviewRow(item, 0)
+                            MaterialFolderPreviewRow(item, 2)
+                        }
+                    }
+
+                    if (item.isSelected) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color(0x44000000)),
+                        )
+                        Icon(
+                            painter = painterResource(R.drawable.ic_ior_check_circle),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(8.dp)
+                                .size(24.dp),
+                        )
+                    } else if (isSelectionMode) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(8.dp)
+                                .size(22.dp)
+                                .background(Color(0x33000000), CircleShape)
+                                .border(1.5.dp, Color.White.copy(alpha = 0.85f), CircleShape),
+                        )
                     }
                 }
 
-                if (item.isSelected) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color(0x44000000)),
+                if (showFilename) {
+                    Text(
+                        text = item.name.trimEnd('/'),
+                        modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 8.dp),
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
-                    Icon(
-                        painter = painterResource(R.drawable.ic_ior_check_circle),
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(8.dp)
-                            .size(24.dp),
-                    )
-                } else if (isSelectionMode) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(8.dp)
-                            .size(22.dp)
-                            .background(Color(0x33000000), CircleShape)
-                            .border(1.5.dp, Color.White.copy(alpha = 0.85f), CircleShape),
+                    Text(
+                        text = if (item.isLocal) {
+                            stringResource(R.string.photos_local_suffix, item.photoCount)
+                        } else {
+                            stringResource(R.string.webdav_folder)
+                        },
+                        modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 2.dp, bottom = 2.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
-            }
-
-            if (showFilename) {
-                Text(
-                    text = item.name.trimEnd('/'),
-                    modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 6.dp),
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = if (item.isLocal) {
-                        stringResource(R.string.photos_local_suffix, item.photoCount)
-                    } else {
-                        stringResource(R.string.webdav_folder)
-                    },
-                    modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 1.dp, bottom = 2.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
             }
         }
     }
