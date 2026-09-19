@@ -18,7 +18,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import java.util.concurrent.ConcurrentHashMap
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(
     name = "webdavtoon_settings"
@@ -56,7 +55,14 @@ class AppSettingsStore(context: Context) {
         val PRIVACY_MODE_ACTIVE = booleanPreferencesKey("privacy_mode_active")
 
         private val initLock = Any()
-        private val cache = ConcurrentHashMap<String, Any>()
+
+        /**
+         * Fast-path mirror of the persisted preferences. The DataStore collector refreshes it on
+         * every write, so it must be published as a complete snapshot: a reader racing a refresh
+         * used to observe cleared entries and fall back to defaults (wrong theme, empty slot list).
+         */
+        private val cache = PreferenceSnapshotCache()
+
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
         @Volatile
@@ -87,19 +93,15 @@ class AppSettingsStore(context: Context) {
         }
 
         private fun updateCache(preferences: Preferences) {
-            cache.clear()
-            preferences.asMap().forEach { (key, value) ->
-                cache[key.name] = value
-            }
+            cache.replace(preferences.asMap().mapKeys { (key, _) -> key.name })
         }
 
-        @Suppress("UNCHECKED_CAST")
-        private fun <T> readCached(key: Preferences.Key<T>, defaultValue: T): T {
-            return cache[key.name] as? T ?: defaultValue
+        private fun <T : Any> readCached(key: Preferences.Key<T>, defaultValue: T): T {
+            return cache.read(key.name, defaultValue)
         }
 
         private fun <T> writeCached(key: Preferences.Key<T>, value: T) {
-            cache[key.name] = value as Any
+            cache.write(key.name, value as Any)
         }
 
         private fun <T> removeCached(key: Preferences.Key<T>) {

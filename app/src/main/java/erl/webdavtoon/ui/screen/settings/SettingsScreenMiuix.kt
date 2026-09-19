@@ -142,15 +142,23 @@ private fun SettingsContent(
                         )
                     },
                     endActions = {
-                        if (slot.isCurrent) {
-                            Box(
-                                modifier = Modifier
-                                    .padding(end = 10.dp)
-                                    .size(10.dp)
-                                    .background(CurrentServerDotColor, CircleShape)
-                                    .semantics { contentDescription = currentServerDescription },
-                            )
-                        }
+                        // The marker slot is always laid out (even when empty) so the summary
+                        // column keeps a constant width; otherwise selecting a row would shrink
+                        // it and re-wrap the server address.
+                        Box(
+                            modifier = Modifier
+                                .padding(end = 10.dp)
+                                .size(10.dp)
+                                .then(
+                                    if (slot.isCurrent) {
+                                        Modifier
+                                            .background(CurrentServerDotColor, CircleShape)
+                                            .semantics { contentDescription = currentServerDescription }
+                                    } else {
+                                        Modifier
+                                    },
+                                ),
+                        )
                         IconButton(onClick = { actions.onEditSlot(slot.slot) }) {
                             Icon(MiuixIcons.Light.Edit, contentDescription = stringResource(R.string.edit_server))
                         }
