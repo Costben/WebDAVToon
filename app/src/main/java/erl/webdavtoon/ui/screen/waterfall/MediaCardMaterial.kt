@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -40,6 +41,8 @@ import erl.webdavtoon.MediaType
 import erl.webdavtoon.R
 import erl.webdavtoon.WebDavImageLoader
 import erl.webdavtoon.detectMediaTypeByUri
+import erl.webdavtoon.ui.component.FolderCardMaterialSubtitleHeight
+import erl.webdavtoon.ui.component.FolderCardMaterialTitleHeight
 
 /**
  * Material 3 Expressive styled media/folder card for waterfall grid.
@@ -197,7 +200,9 @@ fun WaterfallFolderCardMaterial(
             if (showFilename) {
                 Text(
                     text = item.name.trimEnd('/'),
-                    modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 6.dp),
+                    modifier = Modifier
+                        .padding(start = 4.dp, end = 4.dp, top = 6.dp)
+                        .height(FolderCardMaterialTitleHeight),
                     style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -208,7 +213,9 @@ fun WaterfallFolderCardMaterial(
                     } else {
                         stringResource(R.string.webdav_folder)
                     },
-                    modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 1.dp, bottom = 2.dp),
+                    modifier = Modifier
+                        .padding(start = 4.dp, end = 4.dp, top = 1.dp, bottom = 2.dp)
+                        .height(FolderCardMaterialSubtitleHeight),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
