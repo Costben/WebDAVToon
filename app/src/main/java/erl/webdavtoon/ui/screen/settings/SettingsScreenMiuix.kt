@@ -182,7 +182,7 @@ private fun SettingsContent(
                 items = recursiveItems,
                 selectedIndex = recursiveValues.indexOf(uiState.recursiveImageArrangement).coerceAtLeast(0),
                 title = stringResource(R.string.recursive_image_arrangement),
-                summary = recursiveImageArrangementLabel(uiState.recursiveImageArrangement),
+                summary = stringResource(recursiveImageArrangementRes(uiState.recursiveImageArrangement)),
                 onSelectedIndexChange = { actions.onSetRecursiveImageArrangement(recursiveValues[it]) },
             )
             SwitchPreference(
@@ -223,7 +223,7 @@ private fun SettingsContent(
                 valueRange = 100f..500f,
                 steps = 399,
             )
-            ArrowPreference(title = stringResource(R.string.default_reader_mode), summary = defaultReaderModeLabel(uiState.defaultReaderMode), onClick = actions.onPickDefaultReaderMode)
+            ArrowPreference(title = stringResource(R.string.default_reader_mode), summary = stringResource(defaultReaderModeRes(uiState.defaultReaderMode)), onClick = actions.onPickDefaultReaderMode)
             ArrowPreference(title = stringResource(R.string.video_external_player_mode), summary = videoPlayerModeName(uiState.videoExternalPlayerMode), onClick = actions.onPickVideoExternalPlayerMode)
             ArrowPreference(title = stringResource(R.string.comfyui_server), summary = uiState.autoWorkflowUrl.ifBlank { stringResource(R.string.not_configured) }, onClick = actions.onEditAutoWorkflowUrl)
         }
@@ -231,7 +231,7 @@ private fun SettingsContent(
         SettingsGroup(stringResource(R.string.advanced)) {
             ArrowPreference(title = stringResource(R.string.clear_cache), summary = stringResource(R.string.clear_cache_summary), onClick = actions.onClearCache)
             if (uiState.isPrivacyMode) {
-                ArrowPreference(title = stringResource(R.string.privacy_exit_policy_title), summary = privacyExitPolicyLabel(uiState.privacyExitPolicy), onClick = actions.onPickPrivacyExitPolicy)
+                ArrowPreference(title = stringResource(R.string.privacy_exit_policy_title), summary = stringResource(privacyExitPolicyRes(uiState.privacyExitPolicy)), onClick = actions.onPickPrivacyExitPolicy)
             }
             ArrowPreference(title = stringResource(R.string.about), summary = stringResource(R.string.app_version_format, BuildConfig.VERSION_NAME), enabled = false)
             SwitchPreference(checked = uiState.rotationLocked, onCheckedChange = actions.onSetRotationLocked, title = stringResource(R.string.rotation_lock))

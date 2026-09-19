@@ -210,7 +210,7 @@ private fun SettingsMaterialContent(
             )
             MaterialSelectionRow(
                 title = stringResource(R.string.recursive_image_arrangement),
-                summary = recursiveImageArrangementLabel(uiState.recursiveImageArrangement),
+                summary = stringResource(recursiveImageArrangementRes(uiState.recursiveImageArrangement)),
                 labels = recursiveLabels,
                 selectedIndex = recursiveValues.indexOf(uiState.recursiveImageArrangement).coerceAtLeast(0),
                 onSelected = { actions.onSetRecursiveImageArrangement(recursiveValues[it]) },
@@ -264,7 +264,7 @@ private fun SettingsMaterialContent(
                 divider = true,
                 onFinished = { actions.onSetReaderMaxZoom(it.toInt()) },
             )
-            MaterialListRow(stringResource(R.string.default_reader_mode), defaultReaderModeLabel(uiState.defaultReaderMode), actions.onPickDefaultReaderMode, true)
+            MaterialListRow(stringResource(R.string.default_reader_mode), stringResource(defaultReaderModeRes(uiState.defaultReaderMode)), actions.onPickDefaultReaderMode, true)
             MaterialListRow(stringResource(R.string.video_external_player_mode), materialVideoPlayerModeName(uiState.videoExternalPlayerMode), actions.onPickVideoExternalPlayerMode, true)
             MaterialListRow(stringResource(R.string.comfyui_server), uiState.autoWorkflowUrl.ifBlank { stringResource(R.string.not_configured) }, actions.onEditAutoWorkflowUrl, false)
         }
@@ -272,7 +272,7 @@ private fun SettingsMaterialContent(
         MaterialSettingsGroup(stringResource(R.string.advanced)) {
             MaterialListRow(stringResource(R.string.clear_cache), stringResource(R.string.clear_cache_summary), actions.onClearCache, true)
             if (uiState.isPrivacyMode) {
-                MaterialListRow(stringResource(R.string.privacy_exit_policy_title), privacyExitPolicyLabel(uiState.privacyExitPolicy), actions.onPickPrivacyExitPolicy, true)
+                MaterialListRow(stringResource(R.string.privacy_exit_policy_title), stringResource(privacyExitPolicyRes(uiState.privacyExitPolicy)), actions.onPickPrivacyExitPolicy, true)
             }
             MaterialListRow(
                 title = stringResource(R.string.about),

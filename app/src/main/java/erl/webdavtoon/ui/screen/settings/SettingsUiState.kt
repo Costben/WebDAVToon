@@ -78,6 +78,23 @@ data class ServerConfigFormState(
     val error: String? = null,
 )
 
+fun privacyExitPolicyRes(policy: PrivacyModeState.ExitPolicy): Int = when (policy) {
+    PrivacyModeState.ExitPolicy.ON_BACKGROUND -> erl.webdavtoon.R.string.privacy_exit_policy_on_background
+    PrivacyModeState.ExitPolicy.ON_PROCESS_DEATH -> erl.webdavtoon.R.string.privacy_exit_policy_on_process_death
+    PrivacyModeState.ExitPolicy.MANUAL_ONLY -> erl.webdavtoon.R.string.privacy_exit_policy_manual_only
+}
+
+fun recursiveImageArrangementRes(arrangement: Int): Int = when (arrangement) {
+    SettingsManager.RECURSIVE_IMAGE_ARRANGEMENT_GLOBAL_DATE_DESC -> erl.webdavtoon.R.string.recursive_image_arrangement_global_date_desc
+    SettingsManager.RECURSIVE_IMAGE_ARRANGEMENT_GLOBAL_DATE_ASC -> erl.webdavtoon.R.string.recursive_image_arrangement_global_date_asc
+    else -> erl.webdavtoon.R.string.recursive_image_arrangement_grouped
+}
+
+fun defaultReaderModeRes(mode: String): Int = when (mode) {
+    SettingsManager.DEFAULT_READER_MODE_CARD -> erl.webdavtoon.R.string.default_reader_mode_card
+    else -> erl.webdavtoon.R.string.default_reader_mode_webtoon
+}
+
 fun privacyExitPolicyLabel(policy: PrivacyModeState.ExitPolicy): String = when (policy) {
     PrivacyModeState.ExitPolicy.ON_BACKGROUND -> "On app background"
     PrivacyModeState.ExitPolicy.ON_PROCESS_DEATH -> "On process close"

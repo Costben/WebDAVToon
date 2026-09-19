@@ -7,7 +7,18 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -15,11 +26,17 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import erl.webdavtoon.ui.screen.settings.SettingsActions
+import erl.webdavtoon.ui.screen.settings.SettingsDefaults
 import erl.webdavtoon.ui.screen.settings.SettingsEvent
 import erl.webdavtoon.ui.screen.settings.SettingsScreen
 import erl.webdavtoon.ui.screen.settings.SettingsViewModel
@@ -50,6 +67,14 @@ class SettingsActivity : ComponentActivity() {
 
     /** Drives the clear-cache confirmation; the ViewModel call is destructive and irreversible. */
     private var showClearCacheConfirm by mutableStateOf(false)
+
+    /** Picker dialog states. */
+    private var showThemePicker by mutableStateOf(false)
+    private var showLanguagePicker by mutableStateOf(false)
+    private var showDefaultReaderModePicker by mutableStateOf(false)
+    private var showVideoExternalPlayerModePicker by mutableStateOf(false)
+    private var showAutoWorkflowUrlDialog by mutableStateOf(false)
+    private var showPrivacyExitPolicyPicker by mutableStateOf(false)
 
     /** Slot whose server-config dialog is open; `null` means closed. One state, no boolean twin. */
     private var serverConfigSlot by mutableStateOf<Int?>(null)
@@ -115,6 +140,53 @@ class SettingsActivity : ComponentActivity() {
                             visible = true,
                             onAction = { action -> handleServerConfigAction(action) },
                             onDismiss = { serverConfigSlot = null },
+                        )
+                    }
+                    if (showThemePicker) {
+                        ThemePickerDialog(
+                            currentThemeId = uiState.themeId,
+                            onSelect = { viewModel.setThemeId(it) },
+                            onDismiss = { showThemePicker = false },
+                        )
+                    }
+                    if (showLanguagePicker) {
+                        LanguagePickerDialog(
+                            currentLang = uiState.language,
+                            onSelect = {
+                                viewModel.setLanguage(it)
+                                Toast.makeText(this@SettingsActivity, R.string.language_changed_tip, Toast.LENGTH_SHORT).show()
+                            },
+                            onDismiss = { showLanguagePicker = false },
+                        )
+                    }
+                    if (showDefaultReaderModePicker) {
+                        DefaultReaderModePickerDialog(
+                            currentMode = uiState.defaultReaderMode,
+                            onSelect = { viewModel.setDefaultReaderMode(it) },
+                            onDismiss = { showDefaultReaderModePicker = false },
+                        )
+                    }
+                    if (showVideoExternalPlayerModePicker) {
+                        VideoExternalPlayerModePickerDialog(
+                            currentMode = uiState.videoExternalPlayerMode,
+                            onSelect = { viewModel.setVideoExternalPlayerMode(it) },
+                            onDismiss = { showVideoExternalPlayerModePicker = false },
+                        )
+                    }
+                    if (showAutoWorkflowUrlDialog) {
+                        InputDialog(
+                            title = stringResource(R.string.comfyui_server),
+                            initialValue = uiState.autoWorkflowUrl,
+                            hint = "http://192.168.1.x:8188",
+                            onConfirm = { viewModel.setAutoWorkflowUrl(it) },
+                            onDismiss = { showAutoWorkflowUrlDialog = false },
+                        )
+                    }
+                    if (showPrivacyExitPolicyPicker) {
+                        PrivacyExitPolicyDialog(
+                            currentPolicy = uiState.privacyExitPolicy,
+                            onSelect = { viewModel.setPrivacyExitPolicy(it) },
+                            onDismiss = { showPrivacyExitPolicyPicker = false },
                         )
                     }
                     if (uiState.uiMode == erl.webdavtoon.ui.UiMode.Miuix) {
@@ -202,11 +274,8 @@ class SettingsActivity : ComponentActivity() {
         onEditSlot = { slot -> openServerConfig(slot) },
         onRefreshSlots = { viewModel.refreshSlots() },
         onSetUiMode = { viewModel.setUiMode(it) },
-        // TODO(2.5b): theme picker dialog, then viewModel.setThemeId(id).
-        onPickTheme = { },
-        // TODO(2.5b): language picker dialog. Its path must also Toast
-        // R.string.language_changed_tip; RequestRecreate covers the recreate() half.
-        onPickLanguage = { },
+        onPickTheme = { showThemePicker = true },
+        onPickLanguage = { showLanguagePicker = true },
         onSetGridColumns = { viewModel.setGridColumns(it) },
         onSetDrawerEdgeWidth = { percent ->
             viewModel.setDrawerEdgeWidthPercent(percent)
@@ -225,15 +294,10 @@ class SettingsActivity : ComponentActivity() {
         onSetWaterfallPercent = { viewModel.setWaterfallPercent(it) },
         onSetWaterfallMaxWidth = { viewModel.setWaterfallMaxWidth(it) },
         onSetReaderMaxZoom = { viewModel.setReaderMaxZoomPercent(it) },
-        // TODO(2.5b): reader mode picker dialog.
-        onPickDefaultReaderMode = { },
-        // TODO(2.5b): external video player picker dialog.
-        onPickVideoExternalPlayerMode = { },
-        // TODO(2.5b): URL editor dialog; it must reject invalid input through
-        // EditService.isValidUrl before calling setAutoWorkflowUrl.
-        onEditAutoWorkflowUrl = { },
-        // TODO(2.5b): privacy exit policy picker dialog.
-        onPickPrivacyExitPolicy = { },
+        onPickDefaultReaderMode = { showDefaultReaderModePicker = true },
+        onPickVideoExternalPlayerMode = { showVideoExternalPlayerModePicker = true },
+        onEditAutoWorkflowUrl = { showAutoWorkflowUrlDialog = true },
+        onPickPrivacyExitPolicy = { showPrivacyExitPolicyPicker = true },
         onSetRotationLocked = { locked ->
             viewModel.setRotationLocked(locked)
             // Applied from the known value rather than re-read: the ViewModel writes off the
@@ -271,6 +335,199 @@ private fun ClearCacheConfirmDialog(onConfirm: () -> Unit, onDismiss: () -> Unit
         confirmButton = {
             TextButton(onClick = onConfirm) {
                 Text(stringResource(R.string.delete))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        },
+    )
+}
+
+@Composable
+private fun ThemePickerDialog(
+    currentThemeId: Int,
+    onSelect: (Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val items = listOf(
+        ThemeHelper.THEME_FOLLOW_DEVICE to stringResource(R.string.theme_follow_device),
+        0 to stringResource(R.string.theme_midnight_blue),
+        1 to stringResource(R.string.theme_midnight_blue),
+        2 to stringResource(R.string.theme_forest_green),
+        3 to stringResource(R.string.theme_crimson_red),
+        4 to stringResource(R.string.theme_sunset_orange),
+        5 to stringResource(R.string.theme_ocean_teal),
+        6 to stringResource(R.string.theme_deep_purple),
+        7 to stringResource(R.string.theme_rose_pink),
+        8 to stringResource(R.string.theme_coffee_brown),
+        9 to stringResource(R.string.theme_neutral_grey),
+    )
+    SingleChoiceDialog(
+        title = stringResource(R.string.theme),
+        items = items,
+        selectedItem = currentThemeId,
+        onItemSelected = onSelect,
+        onDismiss = onDismiss,
+    )
+}
+
+@Composable
+private fun LanguagePickerDialog(
+    currentLang: String,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val items = listOf(
+        "default" to stringResource(R.string.follow_system),
+        "zh" to stringResource(R.string.language_chinese),
+        "en" to stringResource(R.string.language_english),
+    )
+    SingleChoiceDialog(
+        title = stringResource(R.string.language),
+        items = items,
+        selectedItem = currentLang,
+        onItemSelected = onSelect,
+        onDismiss = onDismiss,
+    )
+}
+
+@Composable
+private fun DefaultReaderModePickerDialog(
+    currentMode: String,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val items = listOf(
+        SettingsDefaults.DEFAULT_READER_MODE_WEBTOON to stringResource(R.string.default_reader_mode_webtoon),
+        SettingsDefaults.DEFAULT_READER_MODE_CARD to stringResource(R.string.default_reader_mode_card),
+    )
+    SingleChoiceDialog(
+        title = stringResource(R.string.default_reader_mode),
+        items = items,
+        selectedItem = currentMode,
+        onItemSelected = onSelect,
+        onDismiss = onDismiss,
+    )
+}
+
+@Composable
+private fun VideoExternalPlayerModePickerDialog(
+    currentMode: String,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val items = listOf(
+        SettingsDefaults.VIDEO_EXTERNAL_PLAYER_MODE_SYSTEM_DEFAULT to stringResource(R.string.video_external_player_mode_system_default),
+        SettingsDefaults.VIDEO_EXTERNAL_PLAYER_MODE_CHOOSER to stringResource(R.string.video_external_player_mode_chooser),
+    )
+    SingleChoiceDialog(
+        title = stringResource(R.string.video_external_player_mode),
+        items = items,
+        selectedItem = currentMode,
+        onItemSelected = onSelect,
+        onDismiss = onDismiss,
+    )
+}
+
+@Composable
+private fun PrivacyExitPolicyDialog(
+    currentPolicy: PrivacyModeState.ExitPolicy,
+    onSelect: (PrivacyModeState.ExitPolicy) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val items = listOf(
+        PrivacyModeState.ExitPolicy.ON_BACKGROUND to stringResource(R.string.privacy_exit_policy_on_background),
+        PrivacyModeState.ExitPolicy.ON_PROCESS_DEATH to stringResource(R.string.privacy_exit_policy_on_process_death),
+        PrivacyModeState.ExitPolicy.MANUAL_ONLY to stringResource(R.string.privacy_exit_policy_manual_only),
+    )
+    SingleChoiceDialog(
+        title = stringResource(R.string.privacy_exit_policy_title),
+        items = items,
+        selectedItem = currentPolicy,
+        onItemSelected = onSelect,
+        onDismiss = onDismiss,
+    )
+}
+
+@Composable
+private fun <T> SingleChoiceDialog(
+    title: String,
+    items: List<Pair<T, String>>,
+    selectedItem: T,
+    onItemSelected: (T) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                items(items) { (value, label) ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .selectable(
+                                selected = (value == selectedItem),
+                                onClick = {
+                                    onItemSelected(value)
+                                    onDismiss()
+                                },
+                                role = Role.RadioButton,
+                            )
+                            .padding(vertical = 12.dp, horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(
+                            selected = (value == selectedItem),
+                            onClick = null,
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        },
+    )
+}
+
+@Composable
+private fun InputDialog(
+    title: String,
+    initialValue: String,
+    hint: String = "",
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var text by remember { mutableStateOf(initialValue) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                placeholder = { Text(hint) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                onConfirm(text.trim())
+                onDismiss()
+            }) {
+                Text(stringResource(R.string.save))
             }
         },
         dismissButton = {
