@@ -77,6 +77,7 @@
             <item android:id="@+id/action_sort_date_desc" android:title="@string/sort_date_desc" android:icon="@drawable/ic_ior_sort" />
             <item android:id="@+id/action_sort_date_asc" android:title="@string/sort_date_asc" android:icon="@drawable/ic_ior_sort" />
             <item android:id="@+id/action_sort_random_folders" android:title="@string/sort_random_folders" android:icon="@drawable/ic_ior_sort" />
+            <item android:id="@+id/action_sort_random_photos" android:title="@string/sort_random_photos" android:icon="@drawable/ic_ior_sort" />
         </menu>
     </item>
     <item

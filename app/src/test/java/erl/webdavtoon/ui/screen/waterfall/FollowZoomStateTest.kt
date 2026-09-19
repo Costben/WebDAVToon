@@ -20,7 +20,48 @@ class FollowZoomStateTest {
         assertEquals(2, state.currentColumns)
         assertEquals(2.0f, state.virtualColumns, 0.001f)
         assertEquals(1.0f, state.scale, 0.001f)
+        assertEquals(2, state.previewColumns)
         assertFalse(state.isZooming)
+    }
+
+    @Test
+    fun `preview columns tracks the rounded target while pinching`() {
+        val state = FollowZoomState(
+            currentColumns = 2,
+            minColumns = 1,
+            maxColumns = 5
+        )
+
+        state.onPinchStart()
+        // 2 / 1.5 = 1.33 -> preview rounds to 1 column mid-gesture
+        state.onPinch(Offset.Zero, 1.5f, IntSize(1000, 1000))
+        assertEquals(1, state.previewColumns)
+        assertTrue(state.isZooming)
+
+        // 2 / 0.6 = 3.33 -> preview rounds to 3 columns mid-gesture
+        state.onPinch(Offset.Zero, 0.6f / 1.5f, IntSize(1000, 1000))
+        assertEquals(3, state.previewColumns)
+
+        state.onPinchEnd()
+        assertEquals(3, state.previewColumns)
+        assertFalse(state.isZooming)
+    }
+
+    @Test
+    fun `preview columns clamps to configured bounds`() {
+        val state = FollowZoomState(
+            currentColumns = 2,
+            minColumns = 1,
+            maxColumns = 4
+        )
+
+        state.onPinchStart()
+        state.onPinch(Offset.Zero, 0.05f, IntSize(1000, 1000))
+        assertEquals(4, state.previewColumns)
+
+        state.onPinchEnd()
+        assertEquals(4, state.previewColumns)
+        assertEquals(4, state.currentColumns)
     }
 
     @Test

@@ -24,9 +24,11 @@ import androidx.compose.material3.CircularProgressIndicator as M3CircularProgres
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon as M3Icon
 import androidx.compose.material3.IconButton as M3IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold as M3Scaffold
 import androidx.compose.material3.Text as M3Text
 import androidx.compose.material3.TopAppBar as M3TopAppBar
@@ -39,22 +41,37 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import erl.webdavtoon.Folder
 import erl.webdavtoon.R
+import erl.webdavtoon.SettingsManager
 import erl.webdavtoon.ui.UiMode
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator as MiuixCircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Icon as MiuixIcon
 import top.yukonga.miuix.kmp.basic.IconButton as MiuixIconButton
+import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
+import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.Text as MiuixText
 import top.yukonga.miuix.kmp.basic.TopAppBar as MiuixTopAppBar
+import top.yukonga.miuix.kmp.basic.rememberTopAppBarState
+import top.yukonga.miuix.kmp.basic.DropdownEntry
+import top.yukonga.miuix.kmp.basic.DropdownItem
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
+import top.yukonga.miuix.kmp.icon.extended.ChevronBackward
+import top.yukonga.miuix.kmp.icon.extended.ChevronForward
 import top.yukonga.miuix.kmp.icon.extended.Close
 import top.yukonga.miuix.kmp.icon.extended.GridView
+import top.yukonga.miuix.kmp.icon.extended.Lock
+import top.yukonga.miuix.kmp.icon.extended.More
 import top.yukonga.miuix.kmp.icon.extended.Refresh
+import top.yukonga.miuix.kmp.icon.extended.Search
+import top.yukonga.miuix.kmp.icon.extended.Settings
+import top.yukonga.miuix.kmp.icon.extended.Sort
+import top.yukonga.miuix.kmp.menu.WindowIconCascadingDropdownMenu
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 data class MixedWaterfallActions(
@@ -63,6 +80,12 @@ data class MixedWaterfallActions(
     val onItemLongClick: (MixedWaterfallItemUi) -> Unit,
     val onRefresh: () -> Unit,
     val onColumnsChange: (Int) -> Unit,
+    val onSearchQueryChange: (String) -> Unit = {},
+    val onClearSearch: () -> Unit = {},
+    val onSetSortOrder: (Int) -> Unit = {},
+    val onToggleRotationLock: () -> Unit = {},
+    val onOpenSettings: () -> Unit = {},
+    val onOpenRecursiveBrowser: () -> Unit = {},
     val onToggleSelectAll: () -> Unit,
     val onToggleFavorite: () -> Unit,
     val onDeleteClick: () -> Unit,
@@ -90,6 +113,14 @@ fun MixedWaterfallScreen(
         onColumnsChanged = actions.onColumnsChange,
     )
 
+    val effectiveColumns = if (zoomState.isZooming) {
+        zoomState.previewColumns
+    } else {
+        uiState.columns.coerceIn(1, 5)
+    }
+
+    val topAppBarScrollBehavior = MiuixScrollBehavior(rememberTopAppBarState())
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -99,7 +130,11 @@ fun MixedWaterfallScreen(
             )
     ) {
         if (uiState.uiMode == UiMode.Miuix) {
-            MixedWaterfallTopBarMiuix(uiState = uiState, actions = actions)
+            MixedWaterfallTopBarMiuix(
+                uiState = uiState,
+                actions = actions,
+                scrollBehavior = topAppBarScrollBehavior,
+            )
         } else {
             MixedWaterfallTopBarMaterial(uiState = uiState, actions = actions)
         }
@@ -122,7 +157,7 @@ fun MixedWaterfallScreen(
                         }
                     }
                 }
-                !uiState.loading && uiState.items.isEmpty() -> {
+                !uiState.loading && uiState.visibleItems.isEmpty() -> {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -146,15 +181,22 @@ fun MixedWaterfallScreen(
                 }
                 else -> {
                     LazyVerticalStaggeredGrid(
-                        columns = StaggeredGridCells.Fixed(uiState.columns),
+                        columns = StaggeredGridCells.Fixed(effectiveColumns),
                         modifier = Modifier
                             .fillMaxSize()
-                            .followZoom(zoomState),
+                            .followZoom(zoomState)
+                            .then(
+                                if (uiState.uiMode == UiMode.Miuix) {
+                                    Modifier.nestedScroll(topAppBarScrollBehavior.nestedScrollConnection)
+                                } else {
+                                    Modifier
+                                }
+                            ),
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
                         verticalItemSpacing = 8.dp,
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        items(uiState.items, key = { it.key }) { item ->
+                        items(uiState.visibleItems, key = { it.key }) { item ->
                             if (uiState.uiMode == UiMode.Miuix) {
                                 MediaCardMiuix(
                                     item = item,
@@ -184,6 +226,18 @@ fun MixedWaterfallScreen(
                             }
                         }
                     }
+                }
+            }
+
+            if (!uiState.isSelectionMode && !uiState.isFavorites) {
+                FloatingActionButton(
+                    onClick = actions.onOpenRecursiveBrowser,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .navigationBarsPadding()
+                        .padding(20.dp),
+                ) {
+                    M3Text("+")
                 }
             }
 
@@ -223,9 +277,10 @@ fun MixedWaterfallScreen(
 private fun MixedWaterfallTopBarMiuix(
     uiState: MixedWaterfallUiState,
     actions: MixedWaterfallActions,
+    scrollBehavior: ScrollBehavior? = null,
     modifier: Modifier = Modifier,
 ) {
-    var columnsMenuExpanded by remember { mutableStateOf(false) }
+    var searchExpanded by remember { mutableStateOf(uiState.isSearching) }
 
     val titleText = if (uiState.isSelectionMode) {
         stringResource(R.string.selected_count, uiState.selectedCount)
@@ -241,69 +296,131 @@ private fun MixedWaterfallTopBarMiuix(
         }
     }
 
-    MiuixTopAppBar(
-        modifier = modifier.statusBarsPadding(),
-        title = titleText,
-        navigationIcon = {
-            MiuixIconButton(onClick = onNavClick) {
-                if (uiState.isSelectionMode) {
-                    MiuixIcon(
-                        MiuixIcons.Light.Close,
-                        contentDescription = stringResource(R.string.cancel),
-                    )
-                } else {
-                    MiuixIcon(
-                        MiuixIcons.Light.Back,
-                        contentDescription = stringResource(R.string.back),
-                    )
-                }
-            }
-        },
-        actions = {
-            if (!uiState.isSelectionMode) {
-                MiuixIconButton(onClick = actions.onRefresh) {
-                    MiuixIcon(
-                        MiuixIcons.Light.Refresh,
-                        contentDescription = stringResource(R.string.refresh_status_refreshing),
-                    )
-                }
-
-                Box {
-                    MiuixIconButton(onClick = { columnsMenuExpanded = true }) {
+    Column(modifier = modifier.statusBarsPadding()) {
+        MiuixTopAppBar(
+            title = titleText,
+            scrollBehavior = scrollBehavior,
+            navigationIcon = {
+                MiuixIconButton(onClick = onNavClick) {
+                    if (uiState.isSelectionMode) {
                         MiuixIcon(
-                            MiuixIcons.Light.GridView,
-                            contentDescription = stringResource(R.string.grid_columns),
+                            MiuixIcons.Light.Close,
+                            contentDescription = stringResource(R.string.cancel),
+                        )
+                    } else {
+                        MiuixIcon(
+                            MiuixIcons.Light.Back,
+                            contentDescription = stringResource(R.string.back),
                         )
                     }
-
-                    DropdownMenu(
-                        expanded = columnsMenuExpanded,
-                        onDismissRequest = { columnsMenuExpanded = false },
-                    ) {
-                        (1..5).forEach { col ->
-                            DropdownMenuItem(
-                                text = {
-                                    M3Text(
-                                        text = stringResource(R.string.columns_suffix, col),
-                                        color = if (uiState.columns == col) {
-                                            MaterialTheme.colorScheme.primary
-                                        } else {
-                                            MaterialTheme.colorScheme.onSurface
-                                        }
-                                    )
-                                },
-                                onClick = {
-                                    actions.onColumnsChange(col)
-                                    columnsMenuExpanded = false
-                                },
-                            )
-                        }
-                    }
                 }
-            }
-        },
-    )
+            },
+            actions = {
+                if (!uiState.isSelectionMode) {
+                    MiuixIconButton(onClick = { searchExpanded = true }) {
+                        MiuixIcon(
+                            MiuixIcons.Light.Search,
+                            contentDescription = stringResource(R.string.search_photos),
+                        )
+                    }
+                    MixedWaterfallMiuixMenuButton(uiState = uiState, actions = actions)
+                }
+            },
+        )
+        if (!uiState.isSelectionMode && searchExpanded) {
+            OutlinedTextField(
+                value = uiState.searchKeyword,
+                onValueChange = actions.onSearchQueryChange,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                singleLine = true,
+                label = { M3Text(stringResource(R.string.search_photos)) },
+                trailingIcon = {
+                    MiuixIconButton(onClick = {
+                        actions.onClearSearch()
+                        searchExpanded = false
+                    }) {
+                        MiuixIcon(
+                            MiuixIcons.Light.Close,
+                            contentDescription = stringResource(R.string.cancel),
+                        )
+                    }
+                },
+            )
+        }
+    }
 }
+
+/**
+ * The inner-page "more" menu: sort order and grid columns expand a second
+ * level, while refresh / settings / rotation lock are direct actions.
+ */
+@Composable
+private fun MixedWaterfallMiuixMenuButton(
+    uiState: MixedWaterfallUiState,
+    actions: MixedWaterfallActions,
+) {
+    val sortItems = mixedSortItems().map { (order, label) ->
+        DropdownItem(
+            text = label,
+            selected = uiState.sortOrder == order,
+            onClick = { actions.onSetSortOrder(order) },
+        )
+    }
+    val columnItems = (1..5).map { columns ->
+        DropdownItem(
+            text = stringResource(R.string.columns_suffix, columns),
+            selected = uiState.columns == columns,
+            onClick = { actions.onColumnsChange(columns) },
+        )
+    }
+
+    WindowIconCascadingDropdownMenu(
+        entries = listOf(
+            DropdownEntry(
+                items = listOf(
+                    DropdownItem(
+                        text = stringResource(R.string.sort_order),
+                        icon = { modifier -> MiuixIcon(MiuixIcons.Light.Sort, null, modifier) },
+                        children = sortItems,
+                    ),
+                    DropdownItem(
+                        text = stringResource(R.string.grid_columns),
+                        icon = { modifier -> MiuixIcon(MiuixIcons.Light.GridView, null, modifier) },
+                        children = columnItems,
+                    ),
+                    DropdownItem(
+                        text = stringResource(R.string.refresh),
+                        icon = { modifier -> MiuixIcon(MiuixIcons.Light.Refresh, null, modifier) },
+                        onClick = actions.onRefresh,
+                    ),
+                    DropdownItem(
+                        text = stringResource(R.string.settings),
+                        icon = { modifier -> MiuixIcon(MiuixIcons.Light.Settings, null, modifier) },
+                        onClick = actions.onOpenSettings,
+                    ),
+                    DropdownItem(
+                        text = stringResource(R.string.rotation_lock),
+                        summary = if (uiState.rotationLocked) "On" else "Off",
+                        icon = { modifier -> MiuixIcon(MiuixIcons.Light.Lock, null, modifier) },
+                        onClick = actions.onToggleRotationLock,
+                    ),
+                ),
+            ),
+        ),
+    ) {
+        MiuixIcon(MiuixIcons.Light.More, contentDescription = stringResource(R.string.more))
+    }
+}
+
+@Composable
+private fun mixedSortItems(): List<Pair<Int, String>> = listOf(
+    SettingsManager.SORT_NAME_ASC to stringResource(R.string.sort_name_asc),
+    SettingsManager.SORT_NAME_DESC to stringResource(R.string.sort_name_desc),
+    SettingsManager.SORT_DATE_DESC to stringResource(R.string.sort_date_desc),
+    SettingsManager.SORT_DATE_ASC to stringResource(R.string.sort_date_asc),
+    SettingsManager.SORT_RANDOM_FOLDERS to stringResource(R.string.sort_random_folders),
+    SettingsManager.SORT_RANDOM_PHOTOS to stringResource(R.string.sort_random_photos),
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -312,7 +429,8 @@ private fun MixedWaterfallTopBarMaterial(
     actions: MixedWaterfallActions,
     modifier: Modifier = Modifier,
 ) {
-    var columnsMenuExpanded by remember { mutableStateOf(false) }
+    var searchExpanded by remember { mutableStateOf(uiState.isSearching) }
+    var menuExpanded by remember { mutableStateOf(false) }
 
     val titleText = if (uiState.isSelectionMode) {
         stringResource(R.string.selected_count, uiState.selectedCount)
@@ -336,73 +454,162 @@ private fun MixedWaterfallTopBarMaterial(
         TopAppBarDefaults.topAppBarColors()
     }
 
-    M3TopAppBar(
-        modifier = modifier.statusBarsPadding(),
-        title = {
-            M3Text(
-                text = titleText,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        },
-        navigationIcon = {
-            M3IconButton(onClick = onNavClick) {
-                if (uiState.isSelectionMode) {
-                    M3Icon(
-                        MiuixIcons.Light.Close,
-                        contentDescription = stringResource(R.string.cancel),
-                    )
-                } else {
-                    M3Icon(
-                        MiuixIcons.Light.Back,
-                        contentDescription = stringResource(R.string.back),
-                    )
-                }
-            }
-        },
-        actions = {
-            if (!uiState.isSelectionMode) {
-                M3IconButton(onClick = actions.onRefresh) {
-                    M3Icon(
-                        MiuixIcons.Light.Refresh,
-                        contentDescription = stringResource(R.string.refresh_status_refreshing),
-                    )
-                }
-
-                Box {
-                    M3IconButton(onClick = { columnsMenuExpanded = true }) {
+    Column(modifier = modifier.statusBarsPadding()) {
+        M3TopAppBar(
+            title = {
+                M3Text(
+                    text = titleText,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            },
+            navigationIcon = {
+                M3IconButton(onClick = onNavClick) {
+                    if (uiState.isSelectionMode) {
                         M3Icon(
-                            MiuixIcons.Light.GridView,
-                            contentDescription = stringResource(R.string.grid_columns),
+                            MiuixIcons.Light.Close,
+                            contentDescription = stringResource(R.string.cancel),
+                        )
+                    } else {
+                        M3Icon(
+                            MiuixIcons.Light.Back,
+                            contentDescription = stringResource(R.string.back),
+                        )
+                    }
+                }
+            },
+            actions = {
+                if (!uiState.isSelectionMode) {
+                    M3IconButton(onClick = { searchExpanded = true }) {
+                        M3Icon(
+                            MiuixIcons.Light.Search,
+                            contentDescription = stringResource(R.string.search_photos),
                         )
                     }
 
-                    DropdownMenu(
-                        expanded = columnsMenuExpanded,
-                        onDismissRequest = { columnsMenuExpanded = false },
-                    ) {
-                        (1..5).forEach { col ->
-                            DropdownMenuItem(
-                                text = {
-                                    M3Text(
-                                        text = stringResource(R.string.columns_suffix, col),
-                                        color = if (uiState.columns == col) {
-                                            MaterialTheme.colorScheme.primary
-                                        } else {
-                                            MaterialTheme.colorScheme.onSurface
-                                        }
-                                    )
-                                },
-                                onClick = {
-                                    actions.onColumnsChange(col)
-                                    columnsMenuExpanded = false
-                                },
+                    Box {
+                        M3IconButton(onClick = { menuExpanded = true }) {
+                            M3Icon(
+                                MiuixIcons.Light.More,
+                                contentDescription = stringResource(R.string.more),
                             )
                         }
+                        MixedWaterfallMaterialMenu(menuExpanded, uiState, actions) { menuExpanded = false }
                     }
                 }
+            },
+            colors = colors,
+        )
+        if (!uiState.isSelectionMode && searchExpanded) {
+            OutlinedTextField(
+                value = uiState.searchKeyword,
+                onValueChange = actions.onSearchQueryChange,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                singleLine = true,
+                label = { M3Text(stringResource(R.string.search_photos)) },
+                trailingIcon = {
+                    M3IconButton(onClick = {
+                        actions.onClearSearch()
+                        searchExpanded = false
+                    }) {
+                        M3Icon(
+                            MiuixIcons.Light.Close,
+                            contentDescription = stringResource(R.string.cancel),
+                        )
+                    }
+                },
+            )
+        }
+    }
+}
+
+/** Material drill-down menu for the inner page (sort / columns / refresh / settings / rotation). */
+private enum class MixedMaterialMenuLevel { Root, Sort, Columns }
+
+@Composable
+private fun MixedWaterfallMaterialMenu(
+    expanded: Boolean,
+    uiState: MixedWaterfallUiState,
+    actions: MixedWaterfallActions,
+    onDismiss: () -> Unit,
+) {
+    val selectedTint = MaterialTheme.colorScheme.primary
+    val idleTint = MaterialTheme.colorScheme.onSurfaceVariant
+    var level by remember { mutableStateOf(MixedMaterialMenuLevel.Root) }
+
+    if (!expanded && level != MixedMaterialMenuLevel.Root) {
+        level = MixedMaterialMenuLevel.Root
+    }
+
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        when (level) {
+            MixedMaterialMenuLevel.Root -> {
+                DropdownMenuItem(
+                    text = { M3Text(stringResource(R.string.sort_order)) },
+                    leadingIcon = { M3Icon(MiuixIcons.Light.Sort, null, tint = idleTint) },
+                    trailingIcon = { M3Icon(MiuixIcons.Light.ChevronForward, null, tint = idleTint) },
+                    onClick = { level = MixedMaterialMenuLevel.Sort },
+                )
+                DropdownMenuItem(
+                    text = { M3Text(stringResource(R.string.grid_columns)) },
+                    leadingIcon = { M3Icon(MiuixIcons.Light.GridView, null, tint = idleTint) },
+                    trailingIcon = { M3Icon(MiuixIcons.Light.ChevronForward, null, tint = idleTint) },
+                    onClick = { level = MixedMaterialMenuLevel.Columns },
+                )
+                DropdownMenuItem(
+                    text = { M3Text(stringResource(R.string.refresh)) },
+                    leadingIcon = { M3Icon(MiuixIcons.Light.Refresh, null, tint = idleTint) },
+                    onClick = { actions.onRefresh(); onDismiss() },
+                )
+                DropdownMenuItem(
+                    text = { M3Text(stringResource(R.string.settings)) },
+                    leadingIcon = { M3Icon(MiuixIcons.Light.Settings, null, tint = idleTint) },
+                    onClick = { actions.onOpenSettings(); onDismiss() },
+                )
+                DropdownMenuItem(
+                    text = { M3Text(stringResource(R.string.rotation_lock)) },
+                    leadingIcon = {
+                        M3Icon(
+                            MiuixIcons.Light.Lock,
+                            null,
+                            tint = if (uiState.rotationLocked) selectedTint else idleTint,
+                        )
+                    },
+                    trailingIcon = { M3Text(if (uiState.rotationLocked) "On" else "Off") },
+                    onClick = { actions.onToggleRotationLock(); onDismiss() },
+                )
             }
-        },
-        colors = colors,
-    )
+
+            MixedMaterialMenuLevel.Sort -> {
+                DropdownMenuItem(
+                    text = { M3Text(stringResource(R.string.sort_order), color = selectedTint) },
+                    leadingIcon = { M3Icon(MiuixIcons.Light.ChevronBackward, null, tint = selectedTint) },
+                    onClick = { level = MixedMaterialMenuLevel.Root },
+                )
+                mixedSortItems().forEach { (order, label) ->
+                    val selected = uiState.sortOrder == order
+                    DropdownMenuItem(
+                        text = { M3Text(label, color = if (selected) selectedTint else Color.Unspecified) },
+                        onClick = { actions.onSetSortOrder(order); onDismiss() },
+                    )
+                }
+            }
+
+            MixedMaterialMenuLevel.Columns -> {
+                DropdownMenuItem(
+                    text = { M3Text(stringResource(R.string.grid_columns), color = selectedTint) },
+                    leadingIcon = { M3Icon(MiuixIcons.Light.ChevronBackward, null, tint = selectedTint) },
+                    onClick = { level = MixedMaterialMenuLevel.Root },
+                )
+                (1..5).forEach { columns ->
+                    val selected = uiState.columns == columns
+                    val label = stringResource(R.string.columns_suffix, columns)
+                    DropdownMenuItem(
+                        text = { M3Text(label, color = if (selected) selectedTint else Color.Unspecified) },
+                        onClick = { actions.onColumnsChange(columns); onDismiss() },
+                    )
+                }
+            }
+        }
+    }
 }

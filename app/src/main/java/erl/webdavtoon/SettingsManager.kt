@@ -65,6 +65,7 @@ class SettingsManager(context: Context) {
         const val SORT_DATE_DESC = 2
         const val SORT_DATE_ASC = 3
         const val SORT_RANDOM_FOLDERS = 4
+        const val SORT_RANDOM_PHOTOS = 5
 
         const val RECURSIVE_IMAGE_ARRANGEMENT_GROUPED = 0
         const val RECURSIVE_IMAGE_ARRANGEMENT_GLOBAL_DATE_DESC = 1

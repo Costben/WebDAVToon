@@ -128,4 +128,34 @@ class ServerConfigValidationTest {
         // Both fields are invalid; the host complaint wins because it is checked first.
         assertEquals(missingHost, validate(url = "", port = "abc"))
     }
+
+    @Test
+    fun selectProtocol_updatesPortWhenDefaultOrEmpty() {
+        val state = erl.webdavtoon.ui.screen.settings.dialog.ServerConfigDialogState(
+            protocol = "https",
+            port = "443"
+        )
+        val smbState = state.selectProtocol("smb")
+        assertEquals("smb", smbState.protocol)
+        assertEquals("445", smbState.port)
+
+        val httpState = smbState.selectProtocol("http")
+        assertEquals("http", httpState.protocol)
+        assertEquals("80", httpState.port)
+
+        val ftpState = httpState.selectProtocol("ftp")
+        assertEquals("ftp", ftpState.protocol)
+        assertEquals("21", ftpState.port)
+    }
+
+    @Test
+    fun selectProtocol_preservesCustomPort() {
+        val state = erl.webdavtoon.ui.screen.settings.dialog.ServerConfigDialogState(
+            protocol = "http",
+            port = "5005"
+        )
+        val smbState = state.selectProtocol("smb")
+        assertEquals("smb", smbState.protocol)
+        assertEquals("5005", smbState.port)
+    }
 }

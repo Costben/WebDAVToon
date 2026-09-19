@@ -189,11 +189,22 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         MediaManager.mediaViewModel = androidx.lifecycle.ViewModelProvider(this)[MediaViewModel::class.java]
         applyWaterfallFilenamePreference()
+        updateWaterfallItemMetrics()
     }
 
     private fun applyWaterfallFilenamePreference() {
         if (!::photoAdapter.isInitialized) return
         photoAdapter.setShowFilenames(settingsManager.shouldShowWaterfallFilenames())
+    }
+
+    private fun updateWaterfallItemMetrics() {
+        val layoutManager = waterfallLayoutManager ?: return
+        val cardPadding = resources.getDimensionPixelSize(R.dimen.waterfall_card_padding)
+        val captionHeight = resources.getDimensionPixelSize(R.dimen.waterfall_card_caption_height)
+        layoutManager.setItemMetrics(
+            extraHeight = cardPadding * 2 + if (settingsManager.shouldShowWaterfallFilenames()) captionHeight else 0,
+            horizontalPadding = cardPadding
+        )
     }
 
     private fun setupUi() {
@@ -357,6 +368,7 @@ class MainActivity : AppCompatActivity() {
     private fun applyWaterfallLayoutPreference() {
         if (!::binding.isInitialized || !::photoAdapter.isInitialized) return
         applyWaterfallFilenamePreference()
+        updateWaterfallItemMetrics()
         if (binding.recyclerView.layoutManager != null) return
 
         snapAnimator?.cancel()
@@ -373,10 +385,16 @@ class MainActivity : AppCompatActivity() {
     private fun installFollowZoomWaterfallLayout() {
         val columns = settingsManager.getPhotoGridColumns().coerceIn(1, 4)
         binding.recyclerView.setHasFixedSize(true)
+        val cardPadding = resources.getDimensionPixelSize(R.dimen.waterfall_card_padding)
+        val captionHeight = resources.getDimensionPixelSize(R.dimen.waterfall_card_caption_height)
         waterfallLayoutManager = FollowZoomWaterfallLayoutManager(
             spacingPx = resources.getDimensionPixelSize(R.dimen.waterfall_item_spacing),
             aspectRatioProvider = photoAdapterAspectRatioProvider()
         ).also { layoutManager ->
+            layoutManager.setItemMetrics(
+                extraHeight = cardPadding * 2 + if (settingsManager.shouldShowWaterfallFilenames()) captionHeight else 0,
+                horizontalPadding = cardPadding
+            )
             layoutManager.setVirtualColumns(columns.toFloat())
             binding.recyclerView.layoutManager = layoutManager
         }
@@ -684,6 +702,7 @@ class MainActivity : AppCompatActivity() {
             R.id.action_sort_date_desc -> updateSortOrder(SettingsManager.SORT_DATE_DESC)
             R.id.action_sort_date_asc -> updateSortOrder(SettingsManager.SORT_DATE_ASC)
             R.id.action_sort_random_folders -> updateSortOrder(SettingsManager.SORT_RANDOM_FOLDERS)
+            R.id.action_sort_random_photos -> updateSortOrder(SettingsManager.SORT_RANDOM_PHOTOS)
             else -> super.onOptionsItemSelected(item)
         }
     }
@@ -712,7 +731,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateSortOrder(order: Int): Boolean {
         settingsManager.setPhotoSortOrder(order)
-        refreshMedia(reshuffleClusters = order == SettingsManager.SORT_RANDOM_FOLDERS)
+        refreshMedia(
+            reshuffleClusters = order == SettingsManager.SORT_RANDOM_FOLDERS ||
+                order == SettingsManager.SORT_RANDOM_PHOTOS
+        )
         return true
     }
 
@@ -851,9 +873,9 @@ class MainActivity : AppCompatActivity() {
             R.id.action_sort_name_desc,
             R.id.action_sort_date_desc,
             R.id.action_sort_date_asc,
-            R.id.action_sort_random_folders
+            R.id.action_sort_random_folders,
+            R.id.action_sort_random_photos
         )
-
         listOf(
             R.id.action_share,
             R.id.action_edit,

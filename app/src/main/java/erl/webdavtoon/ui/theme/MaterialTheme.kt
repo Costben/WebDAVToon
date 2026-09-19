@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import com.materialkolor.DynamicMaterialTheme
 import com.materialkolor.PaletteStyle
+import com.materialkolor.dynamiccolor.ColorSpec
 
 val DefaultThemeSeedColor = Color(0xFF6750A4)
 
@@ -44,10 +45,11 @@ fun MaterialTheme(
     } else {
         DynamicMaterialTheme(
             seedColor = seedColor,
-            useDarkTheme = darkTheme,
-            style = PaletteStyle.Expressive,
+            isDark = darkTheme,
+            // Match Miuix's palette: Expressive rotates the seed hue and makes the drawer disagree.
+            style = PaletteStyle.TonalSpot,
+            specVersion = ColorSpec.SpecVersion.SPEC_2021,
             content = content
         )
     }
 }
-

@@ -9,11 +9,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -22,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -29,16 +31,27 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import erl.webdavtoon.R
 import erl.webdavtoon.ui.UiMode
 import erl.webdavtoon.ui.screen.settings.WebDavSlotUi
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Add
+import top.yukonga.miuix.kmp.icon.extended.Copy
+import top.yukonga.miuix.kmp.icon.extended.Edit
+import top.yukonga.miuix.kmp.icon.extended.Favorites
+import top.yukonga.miuix.kmp.icon.extended.Ok
+import top.yukonga.miuix.kmp.icon.extended.Settings
 
 data class NavigationDrawerActions(
     val onSelectSlot: (Int) -> Unit,
@@ -128,25 +141,45 @@ fun DrawerContent(
             .padding(horizontal = 12.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("WebDAVToon", style = MaterialTheme.typography.titleLarge)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "WebDAVToon",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
             if (isPrivacyMode) {
-                Text("Private", style = MaterialTheme.typography.labelSmall)
+                Text(
+                    "Private",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
                 IconButton(onClick = actions.onExitPrivacy) {
-                    Text("Exit")
+                    Text("Exit", color = MaterialTheme.colorScheme.error)
                 }
             }
         }
-        HorizontalDivider()
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             items(slots, key = { it.slot }) { slot ->
                 NavigationDrawerItem(
                     label = {
                         Column {
-                            Text(slot.alias.ifBlank { "Server ${slot.slot}" })
+                            Text(
+                                slot.alias.ifBlank { stringResource(R.string.server_slot, slot.slot) },
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
                             Text(
                                 "${slot.protocol}://${slot.url}:${slot.port}",
                                 style = MaterialTheme.typography.bodySmall,
+                                color = if (slot.isCurrent) {
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
                             )
                         }
                     },
@@ -156,16 +189,43 @@ fun DrawerContent(
                         onClose()
                     },
                     icon = {
-                        Text(if (slot.isCurrent) "✓" else "•")
+                        if (slot.isCurrent) {
+                            Icon(
+                                imageVector = MiuixIcons.Light.Ok,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        } else {
+                            Spacer(Modifier.size(20.dp))
+                        }
                     },
                     modifier = Modifier.fillMaxWidth(),
+                    colors = NavigationDrawerItemDefaults.colors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        selectedIconColor = MaterialTheme.colorScheme.primary,
+                        selectedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        unselectedContainerColor = Color.Transparent,
+                        unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        unselectedTextColor = MaterialTheme.colorScheme.onSurface,
+                    ),
                     badge = {
                         Row {
                             IconButton(onClick = { actions.onEditSlot(slot.slot) }) {
-                                Text("Edit")
+                                Icon(
+                                    imageVector = MiuixIcons.Light.Edit,
+                                    contentDescription = stringResource(R.string.edit),
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp),
+                                )
                             }
                             IconButton(onClick = { actions.onDuplicateSlot(slot.slot) }) {
-                                Text("Copy")
+                                Icon(
+                                    imageVector = MiuixIcons.Light.Copy,
+                                    contentDescription = stringResource(R.string.duplicate_server),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(20.dp),
+                                )
                             }
                         }
                     },
@@ -174,27 +234,60 @@ fun DrawerContent(
         }
         Button(
             onClick = actions.onAddSlot,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+            ),
             modifier = Modifier.fillMaxWidth().combinedClickable(
                 onClick = actions.onAddSlot,
                 onLongClick = actions.onLongClickAddSlot,
                 role = Role.Button,
             ),
         ) {
-            Text("+")
+            Icon(
+                imageVector = MiuixIcons.Light.Add,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.size(20.dp),
+            )
             Spacer(Modifier.padding(4.dp))
-            Text("Add server")
+            Text(stringResource(R.string.add_webdav_server))
         }
         NavigationDrawerItem(
-            label = { Text("Favorites") },
+            label = { Text(stringResource(R.string.favorites)) },
             selected = false,
             onClick = { actions.onOpenFavorites(); onClose() },
-            icon = { Text("★") },
+            icon = {
+                Icon(
+                    imageVector = MiuixIcons.Light.Favorites,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp),
+                )
+            },
+            colors = NavigationDrawerItemDefaults.colors(
+                unselectedContainerColor = Color.Transparent,
+                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                unselectedTextColor = MaterialTheme.colorScheme.onSurface,
+            ),
         )
         NavigationDrawerItem(
-            label = { Text("Settings") },
+            label = { Text(stringResource(R.string.settings)) },
             selected = false,
             onClick = { actions.onOpenSettings(); onClose() },
-            icon = { Text("⚙") },
+            icon = {
+                Icon(
+                    imageVector = MiuixIcons.Light.Settings,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp),
+                )
+            },
+            colors = NavigationDrawerItemDefaults.colors(
+                unselectedContainerColor = Color.Transparent,
+                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                unselectedTextColor = MaterialTheme.colorScheme.onSurface,
+            ),
         )
     }
 }

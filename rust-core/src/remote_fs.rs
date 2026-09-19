@@ -442,13 +442,16 @@ impl RemoteService {
             if count >= 20 {
                 break;
             } // Limit to 20 items
-            if let Ok(entry) = entry_res {
-                if entry.name.is_empty() || entry.name == "/" {
-                    continue;
-                }
-                names.push(entry.name);
-                count += 1;
+            // A failed listing surfaces as per-entry errors, so a rejected
+            // request (e.g. HTTP 401) reaches here instead of the outer Result.
+            // Propagate it: reporting "successful (empty)" for an unauthorized
+            // endpoint is what made Test Connection lie.
+            let entry = entry_res?;
+            if entry.name.is_empty() || entry.name == "/" {
+                continue;
             }
+            names.push(entry.name);
+            count += 1;
         }
         Ok(names)
     }

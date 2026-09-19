@@ -42,6 +42,10 @@ data class MixedWaterfallUiState(
     val isFavorites: Boolean = false,
     val title: String = "",
     val items: List<MixedWaterfallItemUi> = emptyList(),
+    val searchKeyword: String = "",
+    val isSearching: Boolean = false,
+    val sortOrder: Int = erl.webdavtoon.SettingsManager.SORT_DATE_DESC,
+    val rotationLocked: Boolean = false,
     val rawFolders: List<Folder> = emptyList(),
     val rawPhotos: List<Photo> = emptyList(),
     val loading: Boolean = true,
@@ -58,6 +62,20 @@ data class MixedWaterfallUiState(
     val favoriteFolderPaths: Set<String> = emptySet(),
     val storagePermissionGranted: Boolean = true
 ) {
+    /** [items] filtered by the current search keyword (folders by name, media by title). */
+    val visibleItems: List<MixedWaterfallItemUi>
+        get() {
+            if (searchKeyword.isBlank()) return items
+            return items.filter { item ->
+                when (item) {
+                    is MixedWaterfallItemUi.FolderItem ->
+                        erl.webdavtoon.FolderSearchMatcher.matches(item.name, searchKeyword)
+                    is MixedWaterfallItemUi.MediaItem ->
+                        erl.webdavtoon.FolderSearchMatcher.matches(item.title, searchKeyword)
+                }
+            }
+        }
+
     val selectedCount: Int get() = selectedKeys.size
     val isAllSelected: Boolean get() = items.isNotEmpty() && selectedKeys.size == items.size
     val selectedPhotos: List<Photo>

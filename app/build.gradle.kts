@@ -211,7 +211,8 @@ dependencies {
     implementation("top.yukonga.miuix.kmp:miuix-blur-android:0.9.3")
     implementation("top.yukonga.miuix.kmp:miuix-preference-android:0.9.3")
     implementation("androidx.navigationevent:navigationevent-compose:1.1.2")
-    implementation("com.materialkolor:material-kolor:2.0.2")
+    // Keep the palette API aligned with material-color-utilities 4.1.1 used by Miuix.
+    implementation("com.materialkolor:material-kolor:4.1.1")
 
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.appcompat:appcompat:1.6.1")

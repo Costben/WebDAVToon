@@ -28,6 +28,8 @@ data class FolderUiState(
     val isRefreshing: Boolean = false,
     val refreshStatus: RefreshStatus = RefreshStatus.Idle,
     val error: String? = null,
+    /** Non-fatal remote failure shown as a banner while local folders still render. */
+    val remoteError: String? = null,
     val searchKeyword: String = "",
     val isSearching: Boolean = false,
     val sortOrder: Int = SettingsManager.SORT_DATE_DESC,
@@ -43,4 +45,5 @@ data class FolderUiState(
     val isWebDavEnabled: Boolean = true,
     val isPrivacyMode: Boolean = false,
     val drawerEdgeWidthPercent: Int = SettingsManager.DEFAULT_DRAWER_EDGE_WIDTH_PERCENT,
+    val themeId: Int = erl.webdavtoon.ThemeHelper.THEME_FOLLOW_DEVICE,
 )

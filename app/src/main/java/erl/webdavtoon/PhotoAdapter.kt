@@ -146,12 +146,6 @@ class PhotoAdapter(
             cardView.radius = 0f
             cardView.setCardBackgroundColor(android.graphics.Color.TRANSPARENT)
             cardView.elevation = 0f
-            (cardView.layoutParams as RecyclerView.LayoutParams).setMargins(0, 0, 0, 0)
-        } else {
-            cardView.radius = 12f
-            cardView.setCardBackgroundColor(android.graphics.Color.TRANSPARENT)
-            cardView.elevation = 0f
-            (cardView.layoutParams as RecyclerView.LayoutParams).setMargins(0, 0, 0, 0)
         }
     }
 
@@ -175,10 +169,6 @@ class PhotoAdapter(
         ) {
             binding.titleTextView.text = photo.title
             binding.titleTextView.visibility = if (!showFilenames || isImmersiveMode) View.GONE else View.VISIBLE
-            binding.imageView.layoutParams = binding.imageView.layoutParams.apply {
-                width = ViewGroup.LayoutParams.MATCH_PARENT
-                height = ViewGroup.LayoutParams.MATCH_PARENT
-            }
 
             if (isSelectionMode) {
                 binding.selectionOverlay.visibility = if (isSelected) View.VISIBLE else View.GONE

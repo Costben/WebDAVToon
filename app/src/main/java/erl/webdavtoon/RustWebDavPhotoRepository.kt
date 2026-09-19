@@ -3,6 +3,7 @@ package erl.webdavtoon
 import android.net.Uri
 import android.os.SystemClock
 import android.util.Log
+import erl.webdavtoon.ui.screen.settings.dialog.formatTestConnectionError
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import uniffi.rust_core.MediaType as RustMediaType
@@ -198,7 +199,9 @@ class RustWebDavPhotoRepository(
             }
         } catch (e: Exception) {
             android.util.Log.e("RustWebDavPhotoRepo", "Failed to diagnose empty remote folder result", e)
-            null
+            // Report the real failure instead of a silent empty result: previously
+            // a rejected request (e.g. 401) looked like "connected, but empty".
+            formatTestConnectionError(e.message) ?: e.message
         }
     }
 

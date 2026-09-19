@@ -117,7 +117,10 @@ class SettingsActivity : ComponentActivity() {
             ) {
                 val uiState by viewModel.uiState.collectAsState()
                 val cfgState by serverConfigViewModel.state.collectAsState()
-                WebDAVToonTheme(uiMode = uiState.uiMode) {
+                WebDAVToonTheme(
+                    uiMode = uiState.uiMode,
+                    themeId = uiState.themeId,
+                ) {
                     SettingsScreen(uiState = uiState, actions = settingsActions())
                     if (showClearCacheConfirm) {
                         ClearCacheConfirmDialog(

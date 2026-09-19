@@ -1,11 +1,14 @@
 package erl.webdavtoon.ui.screen.folder
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -23,10 +26,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import erl.webdavtoon.ui.UiMode
 import erl.webdavtoon.ui.component.AppAdaptiveNavigationScaffold
 import erl.webdavtoon.ui.component.NavigationDrawerActions
+import erl.webdavtoon.ui.screen.waterfall.rememberFollowZoomState
+import erl.webdavtoon.ui.screen.waterfall.followZoom
+import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
+import top.yukonga.miuix.kmp.basic.ScrollBehavior
+import top.yukonga.miuix.kmp.basic.rememberTopAppBarState
 import kotlinx.coroutines.launch
 
 /**
@@ -99,6 +109,8 @@ fun FolderScreen(
         if (uiState.isSelectionMode) actions.onClearSelection() else actions.onBack()
     }
 
+    val topAppBarScrollBehavior = MiuixScrollBehavior(rememberTopAppBarState())
+
     AppAdaptiveNavigationScaffold(
         drawerState = drawerState,
         slots = uiState.slots,
@@ -110,8 +122,15 @@ fun FolderScreen(
         Box(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.fillMaxSize()) {
                 when (uiState.uiMode) {
-                    UiMode.Miuix -> FolderTopBarMiuix(uiState = uiState, actions = topBarActions)
+                    UiMode.Miuix -> FolderTopBarMiuix(
+                        uiState = uiState,
+                        actions = topBarActions,
+                        scrollBehavior = topAppBarScrollBehavior,
+                    )
                     UiMode.Material -> FolderTopBarMaterial(uiState = uiState, actions = topBarActions)
+                }
+                uiState.remoteError?.let { message ->
+                    RemoteErrorBanner(message = message)
                 }
                 PullToRefreshBox(
                     isRefreshing = uiState.isRefreshing,
@@ -121,6 +140,7 @@ fun FolderScreen(
                     FolderGrid(
                         uiState = uiState,
                         actions = actions,
+                        scrollBehavior = topAppBarScrollBehavior,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -142,8 +162,20 @@ fun FolderScreen(
 private fun FolderGrid(
     uiState: FolderUiState,
     actions: FolderScreenActions,
+    scrollBehavior: ScrollBehavior? = null,
     modifier: Modifier = Modifier,
 ) {
+    val zoomState = rememberFollowZoomState(
+        currentColumns = uiState.gridColumns,
+        minColumns = 1,
+        maxColumns = 4,
+        onColumnsChanged = actions.onSetGridColumns,
+    )
+    val effectiveColumns = if (zoomState.isZooming) {
+        zoomState.previewColumns
+    } else {
+        uiState.gridColumns.coerceIn(1, 4)
+    }
     when {
         uiState.loading -> Box(modifier, contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
@@ -157,8 +189,17 @@ private fun FolderGrid(
             modifier = modifier,
         )
         else -> LazyVerticalGrid(
-            columns = GridCells.Fixed(uiState.gridColumns.coerceIn(1, 4)),
-            modifier = modifier.navigationBarsPadding(),
+            columns = GridCells.Fixed(effectiveColumns),
+            modifier = modifier
+                .navigationBarsPadding()
+                .followZoom(zoomState)
+                .then(
+                    if (uiState.uiMode == UiMode.Miuix && scrollBehavior != null) {
+                        Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
+                    } else {
+                        Modifier
+                    }
+                ),
             contentPadding = PaddingValues(12.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -187,6 +228,34 @@ private fun FolderGrid(
                 }
             }
         }
+    }
+}
+
+/**
+ * Non-blocking strip for remote (WebDAV/SMB/FTP) failures. Local folders can
+ * still be browsed, but the rejection must not stay invisible the way an
+ * empty remote result used to.
+ */
+@Composable
+private fun RemoteErrorBanner(message: String, modifier: Modifier = Modifier) {
+    // The full Rust error is multi-line; the banner shows just the summary line
+    // (the dialog keeps the verbatim detail).
+    val summary = message.lineSequence().firstOrNull { it.isNotBlank() } ?: message
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.errorContainer)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = summary,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onErrorContainer,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 

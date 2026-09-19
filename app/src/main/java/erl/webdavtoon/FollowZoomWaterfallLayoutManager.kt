@@ -30,6 +30,8 @@ class FollowZoomWaterfallLayoutManager(
     )
 
     private var virtualColumns: Float = 2f
+    private var itemExtraHeight: Int = 0
+    private var itemHorizontalPadding: Int = 0
     private var verticalScrollOffset: Int = 0
     private var contentHeight: Int = 0
     private var frames: List<WaterfallItemFrame> = emptyList()
@@ -67,6 +69,17 @@ class FollowZoomWaterfallLayoutManager(
     override fun supportsPredictiveItemAnimations(): Boolean = false
 
     fun getVirtualColumns(): Float = virtualColumns
+
+    /** Extra vertical space per item (caption/name row) and horizontal card padding. */
+    fun setItemMetrics(extraHeight: Int, horizontalPadding: Int) {
+        val safeExtra = extraHeight.coerceAtLeast(0)
+        val safePadding = horizontalPadding.coerceAtLeast(0)
+        if (itemExtraHeight == safeExtra && itemHorizontalPadding == safePadding) return
+        itemExtraHeight = safeExtra
+        itemHorizontalPadding = safePadding
+        markLayoutDirty()
+        requestLayout()
+    }
 
     fun beginInteractiveZoom(
         focusX: Float? = null,
@@ -381,7 +394,9 @@ class FollowZoomWaterfallLayoutManager(
             aspectRatios = aspectRatios,
             containerWidth = width,
             spacing = spacingPx,
-            columns = columns
+            columns = columns,
+            itemExtraHeight = itemExtraHeight,
+            itemHorizontalPadding = itemHorizontalPadding
         ).also { layout ->
             discreteLayouts[columns] = layout
         }

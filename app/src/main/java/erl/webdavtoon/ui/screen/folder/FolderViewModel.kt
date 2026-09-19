@@ -51,6 +51,9 @@ class FolderViewModel @JvmOverloads constructor(app: Application) : AndroidViewM
         observe(appSettings.observeInt(AppSettingsStore.DRAWER_EDGE_WIDTH_PERCENT, SettingsManager.DEFAULT_DRAWER_EDGE_WIDTH_PERCENT)) {
             copy(drawerEdgeWidthPercent = it)
         }
+        observe(appSettings.observeInt(AppSettingsStore.THEME_ID, erl.webdavtoon.ThemeHelper.THEME_FOLLOW_DEVICE)) {
+            copy(themeId = it)
+        }
     }
 
     private fun <T> observe(flow: kotlinx.coroutines.flow.Flow<T>, transform: FolderUiState.(T) -> FolderUiState) {
@@ -64,14 +67,15 @@ class FolderViewModel @JvmOverloads constructor(app: Application) : AndroidViewM
                 isRefreshing = forceRefresh || it.rawFolders.isNotEmpty(),
                 refreshStatus = RefreshStatus.Refreshing,
                 error = null,
+                remoteError = null,
                 isWebDavEnabled = settingsManager.isWebDavEnabled(),
             )
         }
         viewModelScope.launch {
             try {
-                val folders = withContext(Dispatchers.IO) {
+                val (folders, remoteError) = withContext(Dispatchers.IO) {
                     val result = mutableListOf<Folder>()
-                    var emptyReason: String? = null
+                    var remoteFailure: String? = null
                     if (settingsManager.isWebDavEnabled()) {
                         val remoteRepo = RustWebDavPhotoRepository(settingsManager)
                         val remote = remoteRepo.getFolders("/", forceRefresh).filterNot { folder ->
@@ -79,7 +83,9 @@ class FolderViewModel @JvmOverloads constructor(app: Application) : AndroidViewM
                                 folder.path.trim('/').split('/').any { it.startsWith(".") }
                         }
                         result += remote
-                        if (remote.isEmpty()) emptyReason = remoteRepo.diagnoseEmptyFolderResult("/")
+                        if (remote.isEmpty()) {
+                            remoteFailure = remoteRepo.diagnoseEmptyFolderResult("/")
+                        }
                     }
                     try {
                         val local = LocalPhotoRepository(context).getFolders("", forceRefresh)
@@ -96,10 +102,11 @@ class FolderViewModel @JvmOverloads constructor(app: Application) : AndroidViewM
                     } catch (_: Exception) {
                         // A missing local media permission should not hide remote folders.
                     }
-                    if (result.none { !it.isLocal }) emptyReason?.let { reason ->
-                        if (result.isEmpty()) throw IllegalStateException(reason)
+                    // Nothing at all to show: surface the remote reason as a fatal error.
+                    if (result.isEmpty() && remoteFailure != null) {
+                        throw IllegalStateException(remoteFailure)
                     }
-                    result
+                    result to remoteFailure
                 }
                 _uiState.update {
                     it.copy(
@@ -108,6 +115,7 @@ class FolderViewModel @JvmOverloads constructor(app: Application) : AndroidViewM
                         isRefreshing = false,
                         refreshStatus = RefreshStatus.Completed,
                         error = null,
+                        remoteError = remoteError,
                     )
                 }
                 publishFolders()
@@ -282,5 +290,6 @@ class FolderViewModel @JvmOverloads constructor(app: Application) : AndroidViewM
         isPrivacyMode = PrivacyModeState.isPrivacyMode,
         isWebDavEnabled = settingsManager.isWebDavEnabled(),
         drawerEdgeWidthPercent = settingsManager.getDrawerEdgeWidthPercent(),
+        themeId = settingsManager.getThemeId(),
     )
 }

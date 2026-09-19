@@ -103,19 +103,20 @@ fun ZoomableImage(
         offset = Offset.Zero
     }
 
-    // Loading & retry state
+    // Loading & retry state.
+    // These are keyed on (photo.id, retryTrigger) so the reset happens during
+    // composition, *before* AndroidView.update runs. Resetting them in a
+    // LaunchedEffect instead would race the Glide callback: a synchronous
+    // memory-cache hit delivers onDimensionsReady (setting isLoaded=true)
+    // during update, and the later effect would overwrite it back to
+    // isLoading=true with no further callback to clear it — leaving a spinner
+    // forever after switching from Webtoon to Card mode.
     var retryTrigger by remember { mutableIntStateOf(0) }
-    var isLoading by remember { mutableStateOf(true) }
-    var isError by remember { mutableStateOf(false) }
-    var isLoaded by remember { mutableStateOf(false) }
+    var isLoading by remember(photo.id, retryTrigger) { mutableStateOf(true) }
+    var isError by remember(photo.id, retryTrigger) { mutableStateOf(false) }
+    var isLoaded by remember(photo.id, retryTrigger) { mutableStateOf(false) }
 
     val context = LocalContext.current
-
-    LaunchedEffect(photo.id, retryTrigger) {
-        isLoading = true
-        isError = false
-        isLoaded = false
-    }
 
     val progressProxy = remember(photo.id, retryTrigger, context) {
         object : ProgressBar(context) {

@@ -71,8 +71,8 @@ fun FolderCardMiuix(
             )
             Text(
                 text = folder.name.trimEnd('/'),
-                modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 8.dp),
-                style = MiuixTheme.textStyles.title3,
+                modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 6.dp),
+                style = MiuixTheme.textStyles.footnote1,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

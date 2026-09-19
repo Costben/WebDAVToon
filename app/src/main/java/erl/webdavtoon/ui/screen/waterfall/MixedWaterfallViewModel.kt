@@ -46,6 +46,7 @@ class MixedWaterfallViewModel(app: Application) : AndroidViewModel(app) {
     private val cachedDimensions = ConcurrentHashMap<String, Pair<Int, Int>>()
     private val webDavSlotMutex = Mutex()
     private var folderShuffleSeed = Random.nextLong()
+    private var photoShuffleSeed = Random.nextLong()
     private var loadJob: Job? = null
     private val previewBackfill = RemoteFolderPreviewBackfill(viewModelScope) { folder, force ->
         loadRemoteFolderPreview(folder, force)
@@ -56,6 +57,8 @@ class MixedWaterfallViewModel(app: Application) : AndroidViewModel(app) {
             uiMode = appSettings.getUiMode(),
             columns = appSettings.getOrDefaultInt(AppSettingsStore.PHOTO_GRID_COLUMNS, 2).coerceIn(1, 5),
             virtualColumns = appSettings.getOrDefaultInt(AppSettingsStore.PHOTO_GRID_COLUMNS, 2).coerceIn(1, 5).toFloat(),
+            sortOrder = settingsManager.getPhotoSortOrder(),
+            rotationLocked = settingsManager.isRotationLocked(),
             showFilenames = appSettings.getOrDefaultBoolean(AppSettingsStore.WATERFALL_SHOW_FILENAMES, true)
         )
     )
@@ -86,6 +89,16 @@ class MixedWaterfallViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             appSettings.observeBoolean(AppSettingsStore.WATERFALL_SHOW_FILENAMES, true).collect { show ->
                 _uiState.update { it.copy(showFilenames = show) }
+            }
+        }
+        viewModelScope.launch {
+            appSettings.observeInt(AppSettingsStore.PHOTO_SORT_ORDER, SettingsManager.SORT_DATE_DESC).collect { order ->
+                _uiState.update { it.copy(sortOrder = order) }
+            }
+        }
+        viewModelScope.launch {
+            appSettings.observeBoolean(AppSettingsStore.ROTATION_LOCKED, false).collect { locked ->
+                _uiState.update { it.copy(rotationLocked = locked) }
             }
         }
     }
@@ -136,14 +149,14 @@ class MixedWaterfallViewModel(app: Application) : AndroidViewModel(app) {
                     if (isFavs) {
                         val favPhotos = settingsManager.getFavoritePhotos()
                         val favFolders = settingsManager.getFavoriteFolders()
-                        val sortedMedia = FolderPreviewOrdering.sortPhotos(
+                        val sortedMedia = sortMediaForDisplay(
                             favPhotos,
                             settingsManager.getPhotoSortOrder()
                         )
                         val items = MixedWaterfallPlanner.buildItems(
                             folders = favFolders,
                             media = sortedMedia,
-                            folderSortOrder = settingsManager.getSortOrder(),
+                            folderSortOrder = settingsManager.getPhotoSortOrder(),
                             folderShuffleSeed = folderShuffleSeed
                         )
                         Triple(favFolders, sortedMedia, items)
@@ -180,12 +193,12 @@ class MixedWaterfallViewModel(app: Application) : AndroidViewModel(app) {
                                 currentFolderPath = path,
                                 photos = recursiveMedia,
                                 endpoint = settingsManager.getFullWebDavUrl(),
-                                sortOrder = settingsManager.getSortOrder()
+                                sortOrder = settingsManager.getPhotoSortOrder()
                             )
                         } else {
                             loadedFolders
                         }
-                        val sortedMedia = FolderPreviewOrdering.sortPhotos(
+                        val sortedMedia = sortMediaForDisplay(
                             directMedia,
                             settingsManager.getPhotoSortOrder()
                         )
@@ -199,7 +212,7 @@ class MixedWaterfallViewModel(app: Application) : AndroidViewModel(app) {
                         val items = MixedWaterfallPlanner.buildItems(
                             folders = sourcedFolders,
                             media = sortedMedia,
-                            folderSortOrder = settingsManager.getSortOrder(),
+                            folderSortOrder = settingsManager.getPhotoSortOrder(),
                             folderShuffleSeed = folderShuffleSeed
                         )
                         Triple(sourcedFolders, sortedMedia, items)
@@ -408,6 +421,28 @@ class MixedWaterfallViewModel(app: Application) : AndroidViewModel(app) {
         val clamped = columns.coerceIn(1, 5)
         appSettings.putInt(AppSettingsStore.PHOTO_GRID_COLUMNS, clamped)
         _uiState.update { it.copy(columns = clamped, virtualColumns = clamped.toFloat()) }
+    }
+
+    fun setSearchKeyword(keyword: String) {
+        _uiState.update { it.copy(searchKeyword = keyword, isSearching = keyword.isNotBlank()) }
+    }
+
+    fun setSortOrder(order: Int) {
+        settingsManager.setPhotoSortOrder(order)
+        if (order == SettingsManager.SORT_RANDOM_FOLDERS) {
+            folderShuffleSeed = Random.nextLong()
+        }
+        if (order == SettingsManager.SORT_RANDOM_PHOTOS) {
+            photoShuffleSeed = Random.nextLong()
+        }
+        _uiState.update { it.copy(sortOrder = order) }
+        loadContent()
+    }
+
+    fun toggleRotationLock() {
+        val locked = !_uiState.value.rotationLocked
+        settingsManager.setRotationLocked(locked)
+        _uiState.update { it.copy(rotationLocked = locked) }
     }
 
     fun toggleFavorite(photo: Photo) {
@@ -640,8 +675,22 @@ class MixedWaterfallViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun resetFolderShuffleIfRandomSort() {
-        if (settingsManager.getSortOrder() == SettingsManager.SORT_RANDOM_FOLDERS) {
+        val order = settingsManager.getPhotoSortOrder()
+        if (order == SettingsManager.SORT_RANDOM_FOLDERS) {
             folderShuffleSeed = Random.nextLong()
+        }
+        if (order == SettingsManager.SORT_RANDOM_PHOTOS) {
+            photoShuffleSeed = Random.nextLong()
+        }
+    }
+
+    /** Date-ordered media, shuffled when the "random photos" sort is active. */
+    private fun sortMediaForDisplay(photos: List<Photo>, sortOrder: Int): List<Photo> {
+        val sorted = FolderPreviewOrdering.sortPhotos(photos, sortOrder)
+        return if (sortOrder == SettingsManager.SORT_RANDOM_PHOTOS) {
+            sorted.shuffled(Random(photoShuffleSeed))
+        } else {
+            sorted
         }
     }
 

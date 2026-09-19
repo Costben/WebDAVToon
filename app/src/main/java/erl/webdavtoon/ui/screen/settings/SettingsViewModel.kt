@@ -133,15 +133,9 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         eventChannel.send(SettingsEvent.ResultChanged)
     }
 
-    /** Reserves the next slot from the loaded snapshot and persists selection off the main thread. */
+    /** Opening a draft must not switch away from the current server, including on cancel. */
     fun addSlot(): Int {
-        val slot = (_uiState.value.slots.maxOfOrNull { it.slot } ?: -1) + 1
-        io {
-            settingsManager.setCurrentSlot(slot)
-            publishSnapshot(loading = false)
-            eventChannel.send(SettingsEvent.ResultChanged)
-        }
-        return slot
+        return (settingsManager.getAllSlotsUnfiltered().maxOrNull() ?: -1) + 1
     }
 
     fun setUiMode(mode: UiMode) = io { settingsManager.setUiMode(mode); _uiState.update { it.copy(uiMode = mode) } }
@@ -200,4 +194,3 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch(Dispatchers.IO) { block() }
     }
 }
-

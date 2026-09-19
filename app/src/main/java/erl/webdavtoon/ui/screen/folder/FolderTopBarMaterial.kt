@@ -1,12 +1,12 @@
 ﻿package erl.webdavtoon.ui.screen.folder
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -15,26 +15,25 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import erl.webdavtoon.R
 import erl.webdavtoon.SettingsManager
 import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.ChevronBackward
+import top.yukonga.miuix.kmp.icon.extended.ChevronForward
 import top.yukonga.miuix.kmp.icon.extended.Close
 import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.icon.extended.GridView
+import top.yukonga.miuix.kmp.icon.extended.Lock
 import top.yukonga.miuix.kmp.icon.extended.More
 import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.icon.extended.Search
@@ -60,7 +59,7 @@ fun FolderTopBarMaterial(
     }
 
     Column(modifier = modifier.statusBarsPadding()) {
-        TopAppBar(
+        CenterAlignedTopAppBar(
             title = {
                 Text(
                     text = if (uiState.isSelectionMode) stringResource(R.string.selected_count, uiState.selectedCount)
@@ -86,17 +85,18 @@ fun FolderTopBarMaterial(
                         Icon(MiuixIcons.Light.Delete, contentDescription = stringResource(R.string.delete), tint = Color.Red)
                     }
                 } else {
-                    MaterialRefreshStatus(uiState.refreshStatus, actions.onRefresh)
                     IconButton(onClick = {
                         searchExpanded = true
                         actions.onToggleSearch()
                     }) {
                         Icon(MiuixIcons.Light.Search, contentDescription = stringResource(R.string.search_folders))
                     }
-                    IconButton(onClick = { menuExpanded = true }) {
-                        Icon(MiuixIcons.Light.More, contentDescription = stringResource(R.string.more))
+                    Box {
+                        IconButton(onClick = { menuExpanded = true }) {
+                            Icon(MiuixIcons.Light.More, contentDescription = stringResource(R.string.more))
+                        }
+                        FolderMaterialMenu(menuExpanded, uiState, actions) { menuExpanded = false }
                     }
-                    FolderMaterialMenu(menuExpanded, uiState, actions) { menuExpanded = false }
                 }
             },
             colors = colors,
@@ -122,25 +122,13 @@ fun FolderTopBarMaterial(
     }
 }
 
-@Composable
-private fun MaterialRefreshStatus(status: RefreshStatus, onRefresh: () -> Unit) {
-    when (status) {
-        RefreshStatus.Refreshing -> Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 4.dp)) {
-            CircularProgressIndicator(modifier = Modifier.padding(6.dp), strokeWidth = 2.dp)
-            Text(stringResource(R.string.refresh_status_refreshing), style = MaterialTheme.typography.labelSmall)
-        }
-        RefreshStatus.Completed -> IconButton(onClick = onRefresh) {
-            Icon(
-                painter = painterResource(R.drawable.ic_ior_check_circle),
-                contentDescription = stringResource(R.string.refresh_status_completed),
-                tint = MaterialTheme.colorScheme.primary,
-            )
-        }
-        RefreshStatus.Idle -> IconButton(onClick = onRefresh) {
-            Icon(MiuixIcons.Light.Refresh, contentDescription = stringResource(R.string.refresh_status_refreshing))
-        }
-    }
-}
+/**
+ * Two-level menu. Material3 has no native cascading popup (a nested
+ * `DropdownMenu` overlaps its parent), so the second level is a drill-down:
+ * the top level lists the four groups, and "sort order" / "grid columns"
+ * replace the menu body with their options plus a back row.
+ */
+private enum class MaterialMenuLevel { Root, Sort, Columns }
 
 @Composable
 private fun FolderMaterialMenu(
@@ -149,34 +137,85 @@ private fun FolderMaterialMenu(
     actions: FolderTopBarActions,
     onDismiss: () -> Unit,
 ) {
+    val selectedTint = MaterialTheme.colorScheme.primary
+    val idleTint = MaterialTheme.colorScheme.onSurfaceVariant
+    var level by remember { mutableStateOf(MaterialMenuLevel.Root) }
+
+    // Reset to the top level whenever the menu is reopened.
+    if (!expanded && level != MaterialMenuLevel.Root) {
+        level = MaterialMenuLevel.Root
+    }
+
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
-        DropdownMenuItem(text = { Text(stringResource(R.string.sort_order)) }, enabled = false, onClick = {})
-        materialSortItems().forEach { (order, label) ->
-            DropdownMenuItem(
-                text = { Text(if (uiState.sortOrder == order) "✓ $label" else label) },
-                leadingIcon = if (uiState.sortOrder == order) ({ Icon(MiuixIcons.Light.Sort, null) }) else null,
-                onClick = { actions.onSetSortOrder(order); onDismiss() },
-            )
+        when (level) {
+            MaterialMenuLevel.Root -> {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.sort_order)) },
+                    leadingIcon = { Icon(MiuixIcons.Light.Sort, null, tint = idleTint) },
+                    trailingIcon = { Icon(MiuixIcons.Light.ChevronForward, null, tint = idleTint) },
+                    onClick = { level = MaterialMenuLevel.Sort },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.grid_columns)) },
+                    leadingIcon = { Icon(MiuixIcons.Light.GridView, null, tint = idleTint) },
+                    trailingIcon = { Icon(MiuixIcons.Light.ChevronForward, null, tint = idleTint) },
+                    onClick = { level = MaterialMenuLevel.Columns },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.refresh)) },
+                    leadingIcon = { Icon(MiuixIcons.Light.Refresh, null, tint = idleTint) },
+                    onClick = { actions.onRefresh(); onDismiss() },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.settings)) },
+                    leadingIcon = { Icon(MiuixIcons.Light.Settings, null, tint = idleTint) },
+                    onClick = { actions.onOpenSettings(); onDismiss() },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.rotation_lock)) },
+                    leadingIcon = {
+                        Icon(
+                            MiuixIcons.Light.Lock,
+                            null,
+                            tint = if (uiState.rotationLocked) selectedTint else idleTint,
+                        )
+                    },
+                    trailingIcon = { Text(if (uiState.rotationLocked) "On" else "Off") },
+                    onClick = { actions.onToggleRotationLock(); onDismiss() },
+                )
+            }
+
+            MaterialMenuLevel.Sort -> {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.sort_order), color = selectedTint) },
+                    leadingIcon = { Icon(MiuixIcons.Light.ChevronBackward, null, tint = selectedTint) },
+                    onClick = { level = MaterialMenuLevel.Root },
+                )
+                materialSortItems().forEach { (order, label) ->
+                    val selected = uiState.sortOrder == order
+                    DropdownMenuItem(
+                        text = { Text(label, color = if (selected) selectedTint else Color.Unspecified) },
+                        onClick = { actions.onSetSortOrder(order); onDismiss() },
+                    )
+                }
+            }
+
+            MaterialMenuLevel.Columns -> {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.grid_columns), color = selectedTint) },
+                    leadingIcon = { Icon(MiuixIcons.Light.ChevronBackward, null, tint = selectedTint) },
+                    onClick = { level = MaterialMenuLevel.Root },
+                )
+                (1..4).forEach { columns ->
+                    val selected = uiState.gridColumns == columns
+                    val label = stringResource(R.string.columns_suffix, columns)
+                    DropdownMenuItem(
+                        text = { Text(label, color = if (selected) selectedTint else Color.Unspecified) },
+                        onClick = { actions.onSetGridColumns(columns); onDismiss() },
+                    )
+                }
+            }
         }
-        DropdownMenuItem(text = { Text(stringResource(R.string.grid_columns)) }, enabled = false, onClick = {})
-        (1..4).forEach { columns ->
-            val label = stringResource(R.string.columns_suffix, columns)
-            DropdownMenuItem(
-                text = { Text(if (uiState.gridColumns == columns) "✓ $label" else label) },
-                leadingIcon = if (uiState.gridColumns == columns) ({ Icon(MiuixIcons.Light.GridView, null) }) else null,
-                onClick = { actions.onSetGridColumns(columns); onDismiss() },
-            )
-        }
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.rotation_lock)) },
-            trailingIcon = { Text(if (uiState.rotationLocked) "On" else "Off") },
-            onClick = { actions.onToggleRotationLock(); onDismiss() },
-        )
-        DropdownMenuItem(
-            text = { Text(stringResource(R.string.settings)) },
-            leadingIcon = { Icon(MiuixIcons.Light.Settings, null) },
-            onClick = { actions.onOpenSettings(); onDismiss() },
-        )
     }
 }
 

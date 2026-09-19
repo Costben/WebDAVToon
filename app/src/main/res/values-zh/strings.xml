@@ -50,6 +50,7 @@
     <string name="sort_date_desc">日期 (最新在前)</string>
     <string name="sort_date_asc">日期 (最早在前)</string>
     <string name="sort_random_folders">文件夹随机</string>
+    <string name="sort_random_photos">图片随机</string>
     <string name="browse_all">浏览全部</string>
     <string name="recursive_image_arrangement">递归图片排列</string>
     <string name="recursive_image_arrangement_grouped">按文件夹聚合（默认）</string>
@@ -170,6 +171,7 @@
     <string name="reader_max_zoom_dialog_title">设置最大缩放比例</string>
     <string name="reader_max_zoom_hint">输入最大缩放比例（100–500）</string>
     <string name="rotation_lock">旋转锁定</string>
+    <string name="refresh">刷新</string>
     <string name="more">更多</string>    <string name="video_settings">视频</string>    <string name="video_external_player_mode">外部播放器模式</string>
     <string name="video_external_player_mode_system_default">默认外部播放器</string>
     <string name="video_external_player_mode_chooser">每次询问</string>    <string name="smb_list_shares">列出共享</string>

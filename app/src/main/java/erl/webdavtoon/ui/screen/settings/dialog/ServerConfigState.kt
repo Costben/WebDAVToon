@@ -51,6 +51,17 @@ data class ServerConfigDialogState(
     /** `true` when the host-discovery sheet should be on screen. */
     val discoveryVisible: Boolean get() = discoveringHosts || discoveredHosts.isNotEmpty()
 
+    fun selectProtocol(newProtocol: String): ServerConfigDialogState {
+        val oldDefaultPort = WebDavEndpointNormalizer.defaultPortFor(protocol).toString()
+        val shouldUpdatePort = port.isBlank() || port == oldDefaultPort
+        val newPort = if (shouldUpdatePort) {
+            WebDavEndpointNormalizer.defaultPortFor(newProtocol).toString()
+        } else {
+            port
+        }
+        return copy(protocol = newProtocol, port = newPort)
+    }
+
     fun form(): ServerConfigFormState = ServerConfigFormState(
         slot = slot,
         alias = alias,
@@ -149,6 +160,19 @@ fun smbEnumParamsOf(form: ServerConfigFormState) = ServerConfigDialogHelper.smbE
     form.domain,
 )
 
+internal fun formatTestConnectionError(rawError: String?): String? {
+    if (rawError == null) return null
+    return when {
+        rawError.contains("401") || rawError.contains("Not Authorized", ignoreCase = true) || rawError.contains("Unauthorized", ignoreCase = true) ->
+            "认证失败 (401 Unauthorized)：请检查用户名与密码是否正确\n$rawError"
+        rawError.contains("Connection refused", ignoreCase = true) || rawError.contains("ECONNREFUSED") ->
+            "连接被拒绝：请检查服务器 IP 和端口是否正确\n$rawError"
+        rawError.contains("timed out", ignoreCase = true) || rawError.contains("ETIMEDOUT") ->
+            "连接超时：无法访问该网络地址，请检查局域网连接或防火墙\n$rawError"
+        else -> rawError
+    }
+}
+
 /**
  * Backend seam for the dialog's side effects. [RustServerConfigBackend] is the
  * production implementation; tests and previews inject a fake so discovery and
@@ -239,7 +263,7 @@ class ServerConfigViewModel @JvmOverloads constructor(
         update { copy(testing = true, error = null, testResult = null) }
         runCatching { backend.testConnection(buildRemoteConfig(form)) }
             .onSuccess { result -> update { copy(testing = false, testResult = result) } }
-            .onFailure { failure -> update { copy(testing = false, error = failure.message) } }
+            .onFailure { failure -> update { copy(testing = false, error = formatTestConnectionError(failure.message)) } }
     }
 
     fun enumerateShares() = viewModelScope.launch(Dispatchers.IO) {
@@ -306,6 +330,8 @@ class ServerConfigViewModel @JvmOverloads constructor(
             rememberPassword = snapshot.rememberPassword,
             isPrivate = snapshot.isPrivate,
             domain = snapshot.domain,
+            // Select a new server only after validation, never while opening its draft.
+            switchToSlotOnSave = snapshot.slot !in settings.getAllSlotsUnfiltered(),
         )
         eventsChannel.send(ServerConfigEvent.Saved(snapshot.slot))
     }

@@ -29,13 +29,17 @@ object FollowZoomWaterfallLayoutEngine {
         aspectRatios: List<Float>,
         containerWidth: Int,
         spacing: Int,
-        virtualColumns: Float
+        virtualColumns: Float,
+        itemExtraHeight: Int = 0,
+        itemHorizontalPadding: Int = 0
     ): WaterfallLayoutResult {
         return computeLayout(
             aspectRatios = aspectRatios.toFloatArray(),
             containerWidth = containerWidth,
             spacing = spacing,
-            virtualColumns = virtualColumns
+            virtualColumns = virtualColumns,
+            itemExtraHeight = itemExtraHeight,
+            itemHorizontalPadding = itemHorizontalPadding
         )
     }
 
@@ -43,7 +47,9 @@ object FollowZoomWaterfallLayoutEngine {
         aspectRatios: FloatArray,
         containerWidth: Int,
         spacing: Int,
-        virtualColumns: Float
+        virtualColumns: Float,
+        itemExtraHeight: Int = 0,
+        itemHorizontalPadding: Int = 0
     ): WaterfallLayoutResult {
         if (aspectRatios.isEmpty() || containerWidth <= 0) {
             return WaterfallLayoutResult(emptyList(), 0)
@@ -54,12 +60,21 @@ object FollowZoomWaterfallLayoutEngine {
         val upperColumns = ceil(clampedColumns).toInt().coerceIn(MIN_COLUMNS, MAX_COLUMNS)
 
         if (lowerColumns == upperColumns) {
-            return computeDiscreteLayout(aspectRatios, containerWidth, spacing, lowerColumns)
+            return computeDiscreteLayout(
+                aspectRatios, containerWidth, spacing, lowerColumns,
+                itemExtraHeight, itemHorizontalPadding
+            )
         }
 
         val progress = clampedColumns - lowerColumns
-        val lower = computeDiscreteLayout(aspectRatios, containerWidth, spacing, lowerColumns)
-        val upper = computeDiscreteLayout(aspectRatios, containerWidth, spacing, upperColumns)
+        val lower = computeDiscreteLayout(
+            aspectRatios, containerWidth, spacing, lowerColumns,
+            itemExtraHeight, itemHorizontalPadding
+        )
+        val upper = computeDiscreteLayout(
+            aspectRatios, containerWidth, spacing, upperColumns,
+            itemExtraHeight, itemHorizontalPadding
+        )
         return interpolateLayout(lower, upper, progress)
     }
 
@@ -67,9 +82,14 @@ object FollowZoomWaterfallLayoutEngine {
         aspectRatios: FloatArray,
         containerWidth: Int,
         spacing: Int,
-        columns: Int
+        columns: Int,
+        itemExtraHeight: Int = 0,
+        itemHorizontalPadding: Int = 0
     ): WaterfallLayoutResult {
-        return buildDiscreteLayout(aspectRatios, containerWidth, spacing, columns)
+        return buildDiscreteLayout(
+            aspectRatios, containerWidth, spacing, columns,
+            itemExtraHeight, itemHorizontalPadding
+        )
     }
 
     fun interpolateLayout(
@@ -154,19 +174,22 @@ object FollowZoomWaterfallLayoutEngine {
         aspectRatios: FloatArray,
         containerWidth: Int,
         spacing: Int,
-        columns: Int
+        columns: Int,
+        itemExtraHeight: Int = 0,
+        itemHorizontalPadding: Int = 0
     ): WaterfallLayoutResult {
         val columnCount = columns.coerceIn(MIN_COLUMNS, MAX_COLUMNS)
         val safeSpacing = spacing.coerceAtLeast(0)
         val usableWidth = max(containerWidth - safeSpacing * (columnCount - 1), columnCount)
         val columnWidth = usableWidth / columnCount
+        val innerWidth = max(columnWidth - itemHorizontalPadding * 2, 1)
         val columnHeights = IntArray(columnCount)
         val frames = MutableList(aspectRatios.size) { index ->
             val column = index % columnCount
             val ratio = aspectRatios[index].takeIf { it > 0f } ?: DEFAULT_ASPECT_RATIO
             val left = column * (columnWidth + safeSpacing)
             val top = columnHeights[column]
-            val height = max((columnWidth / ratio).roundToInt(), 1)
+            val height = max((innerWidth / ratio).roundToInt() + itemExtraHeight, 1)
             columnHeights[column] = top + height + safeSpacing
             WaterfallItemFrame(
                 index = index,

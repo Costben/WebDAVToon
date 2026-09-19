@@ -50,6 +50,7 @@
     <string name="sort_date_desc">Date (Newest First)</string>
     <string name="sort_date_asc">Date (Oldest First)</string>
     <string name="sort_random_folders">Random Folders</string>
+    <string name="sort_random_photos">Random Photos</string>
     <string name="browse_all">Browse all</string>
     <string name="recursive_image_arrangement">Recursive image arrangement</string>
     <string name="recursive_image_arrangement_grouped">Group by folder (default)</string>
@@ -134,6 +135,7 @@
     <string name="cache_cleared">Cache cleared</string>
     <string name="cache_clear_failed">Failed to clear cache: %1$s</string>
     <string name="rotation_lock">Rotation Lock</string>
+    <string name="refresh">Refresh</string>
     <string name="more">More</string>
     <string name="webdav_display_value" translatable="false">WEBDAV</string>
     <string name="app_version_format" translatable="false">v%1$s</string>    <string name="open_photo_grid" translatable="false">Open photo grid</string>

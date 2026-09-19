@@ -66,7 +66,10 @@ class PhotoViewActivity : AppCompatActivity() {
 
         setContent {
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-            WebDAVToonTheme(uiMode = uiState.uiMode) {
+            WebDAVToonTheme(
+                uiMode = uiState.uiMode,
+                themeId = erl.webdavtoon.SettingsManager(this).getThemeId(),
+            ) {
                 ReaderScreen(
                     viewModel = viewModel,
                     onBack = { finish() }

@@ -172,6 +172,29 @@ class MixedFolderActivity : AppCompatActivity() {
                         onColumnsChange = { cols ->
                             viewModel.setColumns(cols)
                         },
+                        onSearchQueryChange = { query ->
+                            viewModel.setSearchKeyword(query)
+                        },
+                        onClearSearch = {
+                            viewModel.setSearchKeyword("")
+                        },
+                        onSetSortOrder = { order ->
+                            viewModel.setSortOrder(order)
+                        },
+                        onToggleRotationLock = {
+                            viewModel.toggleRotationLock()
+                            applyRotationLock()
+                        },
+                        onOpenSettings = {
+                            startActivity(Intent(this@MixedFolderActivity, SettingsActivity::class.java))
+                        },
+                        onOpenRecursiveBrowser = {
+                            startActivity(Intent(this@MixedFolderActivity, MainActivity::class.java).apply {
+                                putExtra("EXTRA_FOLDER_PATH", folderPath)
+                                putExtra("EXTRA_IS_WEBDAV", isWebDav)
+                                putExtra("EXTRA_RECURSIVE", true)
+                            })
+                        },
                         onToggleSelectAll = {
                             val state = viewModel.uiState.value
                             if (state.isAllSelected) {
@@ -211,7 +234,10 @@ class MixedFolderActivity : AppCompatActivity() {
                     )
                 }
 
-                WebDAVToonTheme(uiMode = uiState.uiMode) {
+                WebDAVToonTheme(
+                    uiMode = uiState.uiMode,
+                    themeId = settingsManager.getThemeId(),
+                ) {
                     MixedWaterfallScreen(
                         uiState = uiState,
                         actions = actions,

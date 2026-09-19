@@ -92,7 +92,10 @@ class FolderViewActivity : AppCompatActivity() {
                 val uiState by viewModel.uiState.collectAsState()
                 val cfgState by serverConfigViewModel.state.collectAsState()
 
-                WebDAVToonTheme(uiMode = uiState.uiMode) {
+                WebDAVToonTheme(
+                    uiMode = uiState.uiMode,
+                    themeId = uiState.themeId,
+                ) {
                     FolderScreen(
                         uiState = uiState,
                         actions = createFolderActions(),
@@ -274,8 +277,6 @@ class FolderViewActivity : AppCompatActivity() {
         onDuplicateSlot = { slot -> duplicateSlot(slot) },
         onAddSlot = {
             val nextSlot = (settingsManager.getAllSlotsUnfiltered().maxOrNull() ?: -1) + 1
-            settingsManager.setCurrentSlot(nextSlot)
-            viewModel.refreshSlots()
             openServerConfig(nextSlot)
         },
         onEnterPrivacy = {
@@ -450,4 +451,3 @@ private fun DeleteConfirmDialog(count: Int, onConfirm: () -> Unit, onDismiss: ()
         }
     )
 }
-

@@ -7,7 +7,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationRail
 import androidx.compose.material3.NavigationRailItem
@@ -18,6 +20,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalConfiguration
 import erl.webdavtoon.ui.screen.settings.WebDavSlotUi
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Add
+import top.yukonga.miuix.kmp.icon.extended.Favorites
+import top.yukonga.miuix.kmp.icon.extended.Ok
+import top.yukonga.miuix.kmp.icon.extended.Settings
 
 @Composable
 fun AppSideRail(
@@ -40,24 +47,50 @@ fun AppSideRail(
             NavigationRailItem(
                 selected = slot.isCurrent,
                 onClick = { actions.onSelectSlot(slot.slot) },
-                icon = { Text(if (slot.isCurrent) "✓" else "•") },
+                icon = {
+                    if (slot.isCurrent) {
+                        Icon(
+                            imageVector = MiuixIcons.Light.Ok,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                },
                 label = { Text(slot.alias.ifBlank { "${slot.slot}" }) },
             )
         }
         NavigationRailItem(
             selected = false,
             onClick = actions.onAddSlot,
-            icon = { Text("+") },
+            icon = {
+                Icon(
+                    imageVector = MiuixIcons.Light.Add,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                )
+            },
         )
         NavigationRailItem(
             selected = false,
             onClick = actions.onOpenFavorites,
-            icon = { Text("★") },
+            icon = {
+                Icon(
+                    imageVector = MiuixIcons.Light.Favorites,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                )
+            },
         )
         NavigationRailItem(
             selected = false,
             onClick = actions.onOpenSettings,
-            icon = { Text("⚙") },
+            icon = {
+                Icon(
+                    imageVector = MiuixIcons.Light.Settings,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                )
+            },
         )
     }
 }

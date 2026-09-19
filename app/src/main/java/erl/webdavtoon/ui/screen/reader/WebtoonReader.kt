@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -21,16 +20,13 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import erl.webdavtoon.Photo
 import erl.webdavtoon.WebDavImageLoader
-import kotlinx.coroutines.launch
 
 /**
  * Vertical Webtoon reader engine supporting zero-gap image stitching and responsive fast scrolling.
@@ -48,15 +44,13 @@ fun WebtoonReader(
         return
     }
 
-    val coroutineScope = rememberCoroutineScope()
     val initialPage = currentIndex.coerceIn(0, (photos.size - 1).coerceAtLeast(0))
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialPage)
-    var isFastScrolling by remember { mutableStateOf(false) }
 
     // 1. Sync scroll position when user actively scrolls LazyColumn
     val firstVisibleIndex by remember { derivedStateOf { listState.firstVisibleItemIndex } }
     LaunchedEffect(firstVisibleIndex, listState.isScrollInProgress) {
-        if (listState.isScrollInProgress && !isFastScrolling) {
+        if (listState.isScrollInProgress) {
             val safeIndex = firstVisibleIndex.coerceIn(0, (photos.size - 1).coerceAtLeast(0))
             if (safeIndex != currentIndex) {
                 onIndexChanged(safeIndex)
@@ -66,7 +60,7 @@ fun WebtoonReader(
 
     // 2. Scroll to item when external currentIndex changes (e.g. bottom slider, chapter jump)
     LaunchedEffect(currentIndex) {
-        if (!listState.isScrollInProgress && !isFastScrolling) {
+        if (!listState.isScrollInProgress) {
             val targetIndex = currentIndex.coerceIn(0, (photos.size - 1).coerceAtLeast(0))
             if (targetIndex != listState.firstVisibleItemIndex) {
                 listState.scrollToItem(targetIndex)
@@ -97,29 +91,6 @@ fun WebtoonReader(
                 )
             }
         }
-
-        // Floating FastScroller along the right screen edge
-        if (photos.size > 1) {
-            FastScroller(
-                totalCount = photos.size,
-                currentIndex = currentIndex,
-                onScrollToIndex = { targetIndex ->
-                    val safeTarget = targetIndex.coerceIn(0, (photos.size - 1).coerceAtLeast(0))
-                    coroutineScope.launch {
-                        listState.scrollToItem(safeTarget)
-                    }
-                    if (safeTarget != currentIndex) {
-                        onIndexChanged(safeTarget)
-                    }
-                },
-                isFastScrolling = isFastScrolling,
-                onFastScrollingChanged = { isFastScrolling = it },
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .fillMaxHeight(0.7f)
-                    .padding(end = 4.dp)
-            )
-        }
     }
 }
 
@@ -132,11 +103,22 @@ private fun WebtoonImageItem(
     onSingleTap: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val aspectRatioModifier = if (photo.width > 0 && photo.height > 0) {
-        Modifier.aspectRatio(photo.width.toFloat() / photo.height.toFloat())
-    } else {
-        Modifier
+    // Remote photos arrive from the Rust listing without intrinsic dimensions, so
+    // the ratio starts unknown and is learned once the drawable is ready. Without
+    // it a fast scroll measures the tile against the square placeholder and the
+    // real image ends up letterboxed inside that square.
+    var resolvedAspectRatio by remember(photo.id) {
+        mutableStateOf(
+            if (photo.width > 0 && photo.height > 0) {
+                photo.width.toFloat() / photo.height.toFloat()
+            } else {
+                null
+            }
+        )
     }
+
+    val aspectRatioModifier = resolvedAspectRatio?.let { Modifier.aspectRatio(it) } ?: Modifier
+    val imageModifier = if (resolvedAspectRatio != null) Modifier.fillMaxSize() else Modifier.fillMaxWidth()
 
     Box(
         modifier = modifier
@@ -149,7 +131,7 @@ private fun WebtoonImageItem(
             )
     ) {
         AndroidView(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = imageModifier,
             factory = { ctx ->
                 ImageView(ctx).apply {
                     adjustViewBounds = true
@@ -163,6 +145,11 @@ private fun WebtoonImageItem(
                 }
             },
             update = { imageView ->
+                val onDimensionsReady: (Int, Int) -> Unit = { width, height ->
+                    if (width > 0 && height > 0) {
+                        resolvedAspectRatio = width.toFloat() / height.toFloat()
+                    }
+                }
                 if (photo.isLocal) {
                     WebDavImageLoader.loadLocalImage(
                         context = imageView.context,
@@ -172,7 +159,8 @@ private fun WebtoonImageItem(
                         limitSize = false,
                         isWebtoonReader = true,
                         width = if (photo.width > 0) photo.width else null,
-                        height = if (photo.height > 0) photo.height else null
+                        height = if (photo.height > 0) photo.height else null,
+                        onDimensionsReady = onDimensionsReady
                     )
                 } else {
                     WebDavImageLoader.loadWebDavImage(
@@ -183,7 +171,8 @@ private fun WebtoonImageItem(
                         limitSize = false,
                         isWebtoonReader = true,
                         width = if (photo.width > 0) photo.width else null,
-                        height = if (photo.height > 0) photo.height else null
+                        height = if (photo.height > 0) photo.height else null,
+                        onDimensionsReady = onDimensionsReady
                     )
                 }
             },

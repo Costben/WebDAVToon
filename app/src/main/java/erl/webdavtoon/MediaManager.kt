@@ -43,8 +43,11 @@ object MediaManager {
         val baseSorted = sortMediaItems(photos, sortOrder)
         if (baseSorted.isEmpty()) return baseSorted
 
+        val shouldRandomizePhotos = randomizePhotos || sortOrder == SettingsManager.SORT_RANDOM_PHOTOS
+        val effectivePhotoSeed = if (photoShuffleSeed != 0L) photoShuffleSeed else Random.nextLong()
+
         if (!isRecursive) {
-            return if (randomizePhotos) baseSorted.shuffled(Random(photoShuffleSeed)) else baseSorted
+            return if (shouldRandomizePhotos) baseSorted.shuffled(Random(effectivePhotoSeed)) else baseSorted
         }
 
         if (recursiveImageArrangement != SettingsManager.RECURSIVE_IMAGE_ARRANGEMENT_GROUPED) {
@@ -61,7 +64,7 @@ object MediaManager {
         }
 
         if (grouped.size <= 1) {
-            return if (randomizePhotos) baseSorted.shuffled(Random(photoShuffleSeed)) else baseSorted
+            return if (shouldRandomizePhotos) baseSorted.shuffled(Random(effectivePhotoSeed)) else baseSorted
         }
 
         val sortedFolderPaths = sortFolderPaths(
@@ -73,7 +76,7 @@ object MediaManager {
         )
 
         val result = ArrayList<Photo>(baseSorted.size)
-        result.addAll(flattenFolderGroups(grouped, sortedFolderPaths, randomizePhotos, photoShuffleSeed))
+        result.addAll(flattenFolderGroups(grouped, sortedFolderPaths, shouldRandomizePhotos, effectivePhotoSeed))
         return result
     }
 
@@ -170,7 +173,10 @@ object MediaManager {
         } else {
             currentState.clusterShuffleSeed
         }
-        val photoShuffleSeed = if (query.randomizePhotos && (reshuffleClusters || currentState.photoShuffleSeed == 0L)) {
+        val photoShuffleSeed = if (
+            (query.randomizePhotos || reshuffleClusters) &&
+            (reshuffleClusters || currentState.photoShuffleSeed == 0L)
+        ) {
             Random.nextLong()
         } else {
             currentState.photoShuffleSeed

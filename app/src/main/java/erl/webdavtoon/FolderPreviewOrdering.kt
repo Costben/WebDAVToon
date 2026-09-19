@@ -83,7 +83,8 @@ object FolderPreviewOrdering {
                 .thenBy { it.originalIndex }
 
             SettingsManager.SORT_DATE_DESC,
-            SettingsManager.SORT_RANDOM_FOLDERS -> compareByDescending<IndexedCandidate<T>> {
+            SettingsManager.SORT_RANDOM_FOLDERS,
+            SettingsManager.SORT_RANDOM_PHOTOS -> compareByDescending<IndexedCandidate<T>> {
                 it.candidate.dateModified
             }.thenBy { it.candidate.title.lowercase(Locale.ROOT) }
                 .thenBy { it.candidate.sourceOrder }

@@ -20,7 +20,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
@@ -61,6 +60,15 @@ class FollowZoomState(
     )
         private set
 
+    /**
+     * The integer column count the grid should re-layout to while the pinch is
+     * in progress, so the user can preview the result before releasing.
+     */
+    var previewColumns: Int by mutableIntStateOf(
+        currentColumns.coerceIn(minColumns, maxColumns)
+    )
+        private set
+
     var onColumnsChanged: (Int) -> Unit = onColumnsChanged
         internal set
 
@@ -82,6 +90,7 @@ class FollowZoomState(
             val clamped = columns.coerceIn(minColumns, maxColumns)
             currentColumns = clamped
             virtualColumns = clamped.toFloat()
+            previewColumns = clamped
         }
     }
 
@@ -96,6 +105,7 @@ class FollowZoomState(
         targetVirtualColumns = startColumns
         scale = 1.0f
         virtualColumns = startColumns
+        previewColumns = startColumns.roundToInt().coerceIn(minColumns, maxColumns)
         isZooming = true
 
         if (containerSize.width > 0 && containerSize.height > 0) {
@@ -120,8 +130,9 @@ class FollowZoomState(
         val rawVirtual = startColumns / gestureScale
         targetVirtualColumns = rawVirtual.coerceIn(minColumns.toFloat(), maxColumns.toFloat())
         virtualColumns = targetVirtualColumns
+        previewColumns = targetVirtualColumns.roundToInt().coerceIn(minColumns, maxColumns)
 
-        // Visual scale with gentle dampening so it doesn't explode
+        // Kept in sync for the snap animation; no longer drives a full-layer scale.
         scale = calculateDampenedScale(gestureScale)
 
         if (containerSize.width > 0 && containerSize.height > 0) {
@@ -139,8 +150,9 @@ class FollowZoomState(
         val targetColumns = targetVirtualColumns.roundToInt().coerceIn(minColumns, maxColumns)
         val columnsChanged = targetColumns != currentColumns
 
+        currentColumns = targetColumns
+        previewColumns = targetColumns
         if (columnsChanged) {
-            currentColumns = targetColumns
             onColumnsChanged(targetColumns)
         }
 
@@ -188,6 +200,7 @@ class FollowZoomState(
         isZooming = false
         transformOrigin = TransformOrigin.Center
         virtualColumns = currentColumns.toFloat()
+        previewColumns = currentColumns.coerceIn(minColumns, maxColumns)
         onVirtualColumnsChanged?.invoke(virtualColumns, false)
     }
 
@@ -312,13 +325,6 @@ fun Modifier.followZoom(state: FollowZoomState): Modifier {
                     state.onPinchEnd()
                 }
             )
-        }
-        .graphicsLayer {
-            if (state.isZooming || state.scale != 1f) {
-                scaleX = state.scale
-                scaleY = state.scale
-                transformOrigin = state.transformOrigin
-            }
         }
 }
 

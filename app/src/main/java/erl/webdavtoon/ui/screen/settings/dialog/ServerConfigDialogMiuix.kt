@@ -1,6 +1,8 @@
 package erl.webdavtoon.ui.screen.settings.dialog
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -8,10 +10,19 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -91,13 +102,42 @@ private fun ServerConfigDialogMiuixContent(
             label = stringResource(R.string.alias_hint),
             singleLine = true,
         )
-        TextField(
-            value = state.protocol,
-            onValueChange = { value -> onAction(ServerConfigAction.Update { copy(protocol = value) }) },
-            modifier = Modifier.fillMaxWidth(),
-            label = stringResource(R.string.protocol_hint),
-            singleLine = true,
-        )
+        var protocolExpanded by remember { mutableStateOf(false) }
+        val protocolDescription = "${stringResource(R.string.protocol_hint)}: ${state.protocol}"
+        Box(modifier = Modifier.fillMaxWidth()) {
+            TextField(
+                value = state.protocol,
+                onValueChange = {},
+                modifier = Modifier.fillMaxWidth(),
+                label = stringResource(R.string.protocol_hint),
+                singleLine = true,
+            )
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .semantics { contentDescription = protocolDescription }
+                    .clickable(role = Role.Button) { protocolExpanded = true }
+            ) {
+                Text(
+                    text = "▾",
+                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = 16.dp),
+                )
+            }
+            DropdownMenu(
+                expanded = protocolExpanded,
+                onDismissRequest = { protocolExpanded = false }
+            ) {
+                state.protocols.forEach { proto ->
+                    DropdownMenuItem(
+                        text = { androidx.compose.material3.Text(proto) },
+                        onClick = {
+                            onAction(ServerConfigAction.Update { selectProtocol(proto) })
+                            protocolExpanded = false
+                        }
+                    )
+                }
+            }
+        }
         TextButton(
             text = stringResource(R.string.discover_devices),
             onClick = { onAction(ServerConfigAction.DiscoverHosts) },
