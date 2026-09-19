@@ -5,25 +5,32 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import erl.webdavtoon.BuildConfig
 import erl.webdavtoon.R
 import erl.webdavtoon.ui.UiMode
+import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.DropdownItem
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.TopAppBar
@@ -33,7 +40,6 @@ import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.CloudFill
 import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.icon.extended.Edit
-import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlaySpinnerPreference
 import top.yukonga.miuix.kmp.preference.SliderPreference
@@ -123,13 +129,28 @@ private fun SettingsContent(
     ) {
         SettingsGroup(stringResource(R.string.webdav_server)) {
             uiState.slots.forEach { slot ->
-                ArrowPreference(
+                val currentServerDescription = stringResource(R.string.current_server)
+                BasicComponent(
                     title = slot.alias.ifBlank { stringResource(R.string.slot_name, slot.slot) },
                     summary = if (slot.url.isBlank()) stringResource(R.string.not_configured)
                     else stringResource(R.string.server_endpoint_format, slot.protocol, slot.url, slot.port),
-                    startAction = { SettingsIcon(MiuixIcons.Light.CloudFill, R.string.webdav_server) },
+                    startAction = {
+                        SettingsIcon(
+                            icon = MiuixIcons.Light.CloudFill,
+                            descriptionRes = R.string.webdav_server,
+                            modifier = Modifier.padding(end = 4.dp),
+                        )
+                    },
                     endActions = {
-                        if (slot.isCurrent) SettingsIcon(MiuixIcons.Light.Settings, R.string.current_server)
+                        if (slot.isCurrent) {
+                            Box(
+                                modifier = Modifier
+                                    .padding(end = 10.dp)
+                                    .size(10.dp)
+                                    .background(CurrentServerDotColor, CircleShape)
+                                    .semantics { contentDescription = currentServerDescription },
+                            )
+                        }
                         IconButton(onClick = { actions.onEditSlot(slot.slot) }) {
                             Icon(MiuixIcons.Light.Edit, contentDescription = stringResource(R.string.edit_server))
                         }
@@ -138,6 +159,7 @@ private fun SettingsContent(
                         }
                     },
                     onClick = { actions.onSelectSlot(slot.slot) },
+                    insideMargin = SlotRowInsideMargin,
                 )
             }
             ArrowPreference(
@@ -246,9 +268,18 @@ private fun SettingsGroup(title: String, content: @Composable androidx.compose.f
 }
 
 @Composable
-private fun SettingsIcon(icon: ImageVector, descriptionRes: Int) {
-    Icon(icon, contentDescription = stringResource(descriptionRes))
+private fun SettingsIcon(icon: ImageVector, descriptionRes: Int, modifier: Modifier = Modifier) {
+    Icon(icon, contentDescription = stringResource(descriptionRes), modifier = modifier)
 }
+
+/** Marker for the slot the app is currently connected to. */
+private val CurrentServerDotColor = Color(0xFF34C759)
+
+/**
+ * Slot rows keep the leading icon aligned with other rows but trim the trailing inset so the
+ * Delete action button lines up with the trailing chevron column used by arrow preferences.
+ */
+private val SlotRowInsideMargin = PaddingValues(start = 16.dp, top = 16.dp, end = 1.dp, bottom = 16.dp)
 
 private fun sortValueForIndex(index: Int): Int = when (index) {
     0 -> SettingsDefaults.SORT_NAME_ASC

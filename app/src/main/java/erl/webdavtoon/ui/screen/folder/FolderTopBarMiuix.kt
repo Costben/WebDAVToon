@@ -19,6 +19,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import erl.webdavtoon.ui.UiMode
+import erl.webdavtoon.ui.component.AnimatedSearchField
 import erl.webdavtoon.R
 import erl.webdavtoon.SettingsManager
 import top.yukonga.miuix.kmp.basic.DropdownEntry
@@ -112,24 +114,18 @@ fun FolderTopBarMiuix(
                 },
             )
         }
-        if (!uiState.isSelectionMode && searchExpanded) {
-            OutlinedTextField(
-                value = uiState.searchKeyword,
-                onValueChange = actions.onSearchQueryChange,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                singleLine = true,
-                label = { Text(stringResource(R.string.search_folders)) },
-                trailingIcon = {
-                    IconButton(onClick = {
-                        actions.onClearSearch()
-                        actions.onSearchQueryChange("")
-                        searchExpanded = false
-                    }) {
-                        Icon(MiuixIcons.Light.Close, contentDescription = stringResource(R.string.cancel))
-                    }
-                },
-            )
-        }
+        AnimatedSearchField(
+            value = uiState.searchKeyword,
+            onValueChange = actions.onSearchQueryChange,
+            placeholder = stringResource(R.string.search_folders),
+            uiMode = UiMode.Miuix,
+            visible = !uiState.isSelectionMode && searchExpanded,
+            onClose = {
+                actions.onClearSearch()
+                actions.onSearchQueryChange("")
+                searchExpanded = false
+            },
+        )
     }
 }
 

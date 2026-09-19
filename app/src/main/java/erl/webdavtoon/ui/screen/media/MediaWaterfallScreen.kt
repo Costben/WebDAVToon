@@ -51,6 +51,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import erl.webdavtoon.R
 import erl.webdavtoon.SettingsManager
+import erl.webdavtoon.ui.component.AnimatedSearchField
 import erl.webdavtoon.ui.UiMode
 import erl.webdavtoon.ui.component.AppAdaptiveNavigationScaffold
 import erl.webdavtoon.ui.component.NavigationDrawerActions
@@ -366,25 +367,17 @@ private fun MediaTopBarMiuix(
                 }
             },
         )
-        if (!uiState.isSelectionMode && searchExpanded) {
-            OutlinedTextField(
-                value = uiState.searchKeyword,
-                onValueChange = actions.onSearchQueryChange,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                singleLine = true,
-                label = { M3Text(stringResource(R.string.search_photos)) },
-                trailingIcon = {
-                    MiuixIconButton(onClick = {
-                        actions.onClearSearch()
-                        searchExpanded = false
-                    }) {
-                        MiuixIcon(MiuixIcons.Light.Close, contentDescription = stringResource(R.string.cancel))
-                    }
-                },
-            )
-        }
+        AnimatedSearchField(
+            value = uiState.searchKeyword,
+            onValueChange = actions.onSearchQueryChange,
+            placeholder = stringResource(R.string.search_photos),
+            uiMode = UiMode.Miuix,
+            visible = !uiState.isSelectionMode && searchExpanded,
+            onClose = {
+                actions.onClearSearch()
+                searchExpanded = false
+            },
+        )
     }
 }
 
@@ -509,25 +502,17 @@ private fun MediaTopBarMaterial(
             },
             colors = colors,
         )
-        if (!uiState.isSelectionMode && searchExpanded) {
-            OutlinedTextField(
-                value = uiState.searchKeyword,
-                onValueChange = actions.onSearchQueryChange,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                singleLine = true,
-                label = { M3Text(stringResource(R.string.search_photos)) },
-                trailingIcon = {
-                    M3IconButton(onClick = {
-                        actions.onClearSearch()
-                        searchExpanded = false
-                    }) {
-                        M3Icon(MiuixIcons.Light.Close, contentDescription = stringResource(R.string.cancel))
-                    }
-                },
-            )
-        }
+        AnimatedSearchField(
+            value = uiState.searchKeyword,
+            onValueChange = actions.onSearchQueryChange,
+            placeholder = stringResource(R.string.search_photos),
+            uiMode = UiMode.Material,
+            visible = !uiState.isSelectionMode && searchExpanded,
+            onClose = {
+                actions.onClearSearch()
+                searchExpanded = false
+            },
+        )
     }
 }
 
