@@ -18,6 +18,7 @@ import erl.webdavtoon.Photo
 import erl.webdavtoon.PhotoAspectRatioResolver
 import erl.webdavtoon.PhotoRepository
 import erl.webdavtoon.R
+import erl.webdavtoon.RemoteFolderPreviewBackfill
 import erl.webdavtoon.RemoteFolderSynthesizer
 import erl.webdavtoon.RustWebDavPhotoRepository
 import erl.webdavtoon.SettingsManager
@@ -46,6 +47,9 @@ class MixedWaterfallViewModel(app: Application) : AndroidViewModel(app) {
     private val webDavSlotMutex = Mutex()
     private var folderShuffleSeed = Random.nextLong()
     private var loadJob: Job? = null
+    private val previewBackfill = RemoteFolderPreviewBackfill(viewModelScope) { folder, force ->
+        loadRemoteFolderPreview(folder, force)
+    }
 
     private val _uiState = MutableStateFlow(
         MixedWaterfallUiState(
@@ -118,6 +122,7 @@ class MixedWaterfallViewModel(app: Application) : AndroidViewModel(app) {
                     error = null
                 )
             }
+            previewBackfill.retire(forgetResolved = forceRefresh)
             try {
                 if (forceRefresh) {
                     resetFolderShuffleIfRandomSort()
@@ -232,11 +237,12 @@ class MixedWaterfallViewModel(app: Application) : AndroidViewModel(app) {
                         favoriteFolderPaths = favFolderPaths,
                         selectedKeys = retainedSelectedKeys,
                         isSelectionMode = isSelecting,
-                        loading = false,
+                         loading = false,
                         isRefreshing = false,
                         error = null
                     )
                 }
+                requestMissingFolderPreviews(forceRefresh = forceRefresh)
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(
@@ -543,13 +549,23 @@ class MixedWaterfallViewModel(app: Application) : AndroidViewModel(app) {
         deletedCount
     }
 
+    fun onFolderPreviewVisible(folder: Folder, visible: Boolean) {
+        previewBackfill.setVisible(folder, visible)
+    }
+
+    fun requestMissingFolderPreviews(forceRefresh: Boolean = false) {
+        previewBackfill.requestVisiblePreviews(forceRefresh = forceRefresh)
+    }
+
     fun updateFolderPreview(folder: Folder, previewUris: List<Uri>, hasSubFolders: Boolean) {
         val folderKey = MixedWaterfallIdentity.folderKey(folder)
         val stringUris = previewUris.map { it.toString() }
+        var matched = 0
         _uiState.update { state ->
             state.copy(
                 items = state.items.map { item ->
                     if (item is MixedWaterfallItemUi.FolderItem && item.key == folderKey) {
+                        matched++
                         val updatedFolder = item.folder.copy(
                             previewUris = previewUris,
                             hasSubFolders = item.folder.hasSubFolders || hasSubFolders
@@ -561,8 +577,34 @@ class MixedWaterfallViewModel(app: Application) : AndroidViewModel(app) {
                     } else {
                         item
                     }
+                },
+                rawFolders = state.rawFolders.map { current ->
+                    if (current.path != folder.path) current else current.copy(
+                        previewUris = previewUris,
+                        hasSubFolders = current.hasSubFolders || hasSubFolders
+                    )
                 }
             )
+        }
+        android.util.Log.i(
+            "MixedWaterfallVM",
+            "updateFolderPreview path=${folder.path} previews=${previewUris.size} matched=$matched itemCount=${_uiState.value.items.size} first=${previewUris.firstOrNull()}"
+        )
+    }
+
+    private suspend fun loadRemoteFolderPreview(folder: Folder, forceRefresh: Boolean) {
+        if (folder.isLocal) return
+        val sortOrder = settingsManager.getSortOrder()
+        val preview = withFolderSourceSlot(folder, restoreAfter = true) {
+            RustWebDavPhotoRepository(settingsManager).inspectFolder(folder.path, sortOrder, forceRefresh)
+        } ?: return
+        if (settingsManager.getSortOrder() != sortOrder) return
+        val hasPreview = preview.previewUris.isNotEmpty()
+        updateFolderPreview(folder, preview.previewUris, preview.hasSubFolders)
+        if (hasPreview) {
+            previewBackfill.markResolved(folder)
+        } else {
+            previewBackfill.markFailed(folder)
         }
     }
 

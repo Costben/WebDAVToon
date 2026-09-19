@@ -200,6 +200,12 @@ class SubFolderActivity : AppCompatActivity() {
                         },
                         onDimensionsResolved = { photoId, width, height ->
                             viewModel.updateResolvedDimensions(photoId, width, height)
+                        },
+                        onFolderVisibilityChanged = { folder, visible ->
+                            viewModel.onFolderPreviewVisible(folder, visible)
+                        },
+                        onFolderPreviewsRequested = {
+                            viewModel.requestMissingFolderPreviews()
                         }
                     )
                 }

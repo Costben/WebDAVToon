@@ -42,6 +42,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import erl.webdavtoon.Folder
 import erl.webdavtoon.R
 import erl.webdavtoon.ui.UiMode
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator as MiuixCircularProgressIndicator
@@ -68,6 +69,8 @@ data class MixedWaterfallActions(
     val onShareClick: () -> Unit,
     val onExitSelectionMode: () -> Unit,
     val onDimensionsResolved: (photoId: String, width: Int, height: Int) -> Unit,
+    val onFolderVisibilityChanged: (folder: Folder, visible: Boolean) -> Unit = { _, _ -> },
+    val onFolderPreviewsRequested: () -> Unit = {},
 )
 
 @Composable
@@ -160,6 +163,10 @@ fun MixedWaterfallScreen(
                                     onClick = { actions.onItemClick(item) },
                                     onLongClick = { actions.onItemLongClick(item) },
                                     onDimensionsResolved = actions.onDimensionsResolved,
+                                    onFolderVisibilityChanged = { folder, visible ->
+                                        actions.onFolderVisibilityChanged(folder, visible)
+                                        if (visible) actions.onFolderPreviewsRequested()
+                                    },
                                 )
                             } else {
                                 MediaCardMaterial(
@@ -169,6 +176,10 @@ fun MixedWaterfallScreen(
                                     onClick = { actions.onItemClick(item) },
                                     onLongClick = { actions.onItemLongClick(item) },
                                     onDimensionsResolved = actions.onDimensionsResolved,
+                                    onFolderVisibilityChanged = { folder, visible ->
+                                        actions.onFolderVisibilityChanged(folder, visible)
+                                        if (visible) actions.onFolderPreviewsRequested()
+                                    },
                                 )
                             }
                         }

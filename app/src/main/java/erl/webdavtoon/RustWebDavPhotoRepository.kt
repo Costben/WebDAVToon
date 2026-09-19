@@ -328,9 +328,25 @@ class RustWebDavPhotoRepository(
             val previewsBySortOrder = buildPreviewUrisBySortOrder(previewPhotos, sortOrder)
             val previewUris = previewsBySortOrder[sortOrder].orEmpty()
             if (previewUris.isEmpty() && inspection.previewUris.isNotEmpty()) {
+                // The sort-aware recursive scan found nothing usable (shallow folder,
+                // unsupported media, or a scan that came back empty). Fall back to the
+                // previews the inspection already produced instead of discarding them.
+                val fallbackUris = inspection.previewUris.take(PREVIEW_LIMIT).map(Uri::parse)
                 Log.i(
                     "RustWebDavPhotoRepo",
-                    "inspectFolder ignoredLegacyPreviews path=$folderPath sortOrder=$sortOrder legacyPreviews=${inspection.previewUris.size}"
+                    "inspectFolder fallbackLegacyPreviews path=$folderPath sortOrder=$sortOrder legacyPreviews=${inspection.previewUris.size}"
+                )
+                RemoteFolderPreviewMemoryCache.putAll(
+                    accountKey = accountKey,
+                    path = folderPath,
+                    hasSubFolders = inspection.hasSubFolders,
+                    previewUriStringsBySortOrder = previewsBySortOrder.mapValues { (_, uris) ->
+                        uris.map { it.toString() }
+                    } + previewCacheSortOrders.associateWith { fallbackUris.map { it.toString() } }
+                )
+                return@withContext RemoteFolderPreview(
+                    hasSubFolders = inspection.hasSubFolders,
+                    previewUris = fallbackUris
                 )
             }
             Log.i(

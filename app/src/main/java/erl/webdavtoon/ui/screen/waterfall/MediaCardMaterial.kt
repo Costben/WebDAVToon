@@ -24,6 +24,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,6 +35,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import erl.webdavtoon.Folder
 import erl.webdavtoon.MediaType
 import erl.webdavtoon.R
 import erl.webdavtoon.WebDavImageLoader
@@ -50,6 +52,7 @@ fun MediaCardMaterial(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     onDimensionsResolved: ((photoId: String, width: Int, height: Int) -> Unit)? = null,
+    onFolderVisibilityChanged: ((folder: Folder, visible: Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     when (item) {
@@ -71,6 +74,7 @@ fun MediaCardMaterial(
                 isSelectionMode = isSelectionMode,
                 onClick = onClick,
                 onLongClick = onLongClick,
+                onVisibilityChanged = onFolderVisibilityChanged,
                 modifier = modifier,
             )
         }
@@ -84,6 +88,7 @@ fun WaterfallFolderCardMaterial(
     isSelectionMode: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
+    onVisibilityChanged: ((folder: Folder, visible: Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     if (item is MixedWaterfallItemUi.FolderItem) {
@@ -93,6 +98,7 @@ fun WaterfallFolderCardMaterial(
             isSelectionMode = isSelectionMode,
             onClick = onClick,
             onLongClick = onLongClick,
+            onVisibilityChanged = onVisibilityChanged,
             modifier = modifier,
         )
     }
@@ -105,8 +111,14 @@ fun WaterfallFolderCardMaterial(
     isSelectionMode: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
+    onVisibilityChanged: ((folder: Folder, visible: Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
+    DisposableEffect(item.key, onVisibilityChanged) {
+        onVisibilityChanged?.invoke(item.folder, true)
+        onDispose { onVisibilityChanged?.invoke(item.folder, false) }
+    }
+
     val cardShape = RoundedCornerShape(16.dp)
     val innerShape = if (showFilename) RoundedCornerShape(12.dp) else RoundedCornerShape(16.dp)
 

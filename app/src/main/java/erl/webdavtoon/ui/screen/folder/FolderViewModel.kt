@@ -142,7 +142,12 @@ class FolderViewModel @JvmOverloads constructor(app: Application) : AndroidViewM
     }
 
     fun onFolderPreviewVisible(path: String, visible: Boolean) {
-        _uiState.value.rawFolders.firstOrNull { it.path == path }?.let { previewScheduler.setVisible(it, visible) }
+        _uiState.value.rawFolders.firstOrNull { it.path == path }?.let { folder ->
+            previewScheduler.setVisible(folder, visible)
+            if (visible) {
+                requestRemotePreview(folder)
+            }
+        }
     }
 
     fun requestRemotePreview(folder: Folder, forceRefresh: Boolean = false) {
