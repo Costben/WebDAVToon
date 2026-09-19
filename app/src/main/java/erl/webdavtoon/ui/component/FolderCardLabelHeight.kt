@@ -23,37 +23,3 @@ val FolderCardLabelHeight: Dp
     @Composable get() = with(LocalDensity.current) { FolderCardLabelHeightSp.toDp() }
 
 private val FolderCardLabelHeightSp = 20.sp
-
-/**
- * Fixed height for the folder-card subtitle line (Miuix `footnote1`).
- *
- * Same reasoning as [FolderCardLabelHeight]: the subtitle uses Miuix `footnote1`,
- * whose `lineHeight` is unspecified, so its box would follow the fallback font
- * metrics. Pinning it keeps every folder card an identical height so the
- * staggered grid cannot accumulate a left/right column drift.
- */
-val FolderCardSubtitleHeight: Dp
-    @Composable get() = with(LocalDensity.current) { FolderCardSubtitleHeightSp.toDp() }
-
-private val FolderCardSubtitleHeightSp = 19.sp
-
-/**
- * Fixed height for the folder-card title line in the Material UI mode.
- *
- * Material's `titleMedium` box can still grow with fallback glyph metrics for
- * mixed scripts, so it is pinned here as well to keep folder cards uniform.
- */
-val FolderCardMaterialTitleHeight: Dp
-    @Composable get() = with(LocalDensity.current) { FolderCardMaterialTitleHeightSp.toDp() }
-
-private val FolderCardMaterialTitleHeightSp = 24.sp
-
-/**
- * Fixed height for the folder-card subtitle line in the Material UI mode.
- *
- * See [FolderCardMaterialTitleHeight].
- */
-val FolderCardMaterialSubtitleHeight: Dp
-    @Composable get() = with(LocalDensity.current) { FolderCardMaterialSubtitleHeightSp.toDp() }
-
-private val FolderCardMaterialSubtitleHeightSp = 16.sp

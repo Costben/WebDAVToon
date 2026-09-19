@@ -37,7 +37,6 @@ import erl.webdavtoon.R
 import erl.webdavtoon.WebDavImageLoader
 import erl.webdavtoon.detectMediaTypeByUri
 import erl.webdavtoon.ui.component.FolderCardLabelHeight
-import erl.webdavtoon.ui.component.FolderCardSubtitleHeight
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
@@ -203,9 +202,7 @@ fun WaterfallFolderCardMiuix(
                     } else {
                         stringResource(R.string.webdav_folder)
                     },
-                    modifier = Modifier
-                        .padding(start = 4.dp, end = 4.dp, top = 1.dp, bottom = 2.dp)
-                        .height(FolderCardSubtitleHeight),
+                    modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 1.dp, bottom = 2.dp),
                     style = MiuixTheme.textStyles.footnote1,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
