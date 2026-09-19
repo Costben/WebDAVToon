@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -35,6 +36,7 @@ import erl.webdavtoon.MediaType
 import erl.webdavtoon.R
 import erl.webdavtoon.WebDavImageLoader
 import erl.webdavtoon.detectMediaTypeByUri
+import erl.webdavtoon.ui.component.FolderCardLabelHeight
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
@@ -188,8 +190,9 @@ fun WaterfallFolderCardMiuix(
             if (showFilename) {
                 Text(
                     text = item.name.trimEnd('/'),
-                    modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 6.dp),
-                    style = MiuixTheme.textStyles.footnote1,
+                    modifier = Modifier
+                        .padding(start = 4.dp, end = 4.dp, top = 6.dp)
+                        .height(FolderCardLabelHeight),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
