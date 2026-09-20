@@ -72,7 +72,6 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.ChevronBackward
 import top.yukonga.miuix.kmp.icon.extended.ChevronForward
 import top.yukonga.miuix.kmp.icon.extended.Close
-import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.icon.extended.Edit
 import top.yukonga.miuix.kmp.icon.extended.GridView
 import top.yukonga.miuix.kmp.icon.extended.Info
@@ -360,13 +359,6 @@ private fun MediaTopBarMiuix(
                     MiuixIconButton(onClick = actions.onEditClick) {
                         MiuixIcon(MiuixIcons.Light.Edit, contentDescription = stringResource(R.string.edit))
                     }
-                    MiuixIconButton(onClick = actions.onDeleteClick) {
-                        MiuixIcon(
-                            MiuixIcons.Light.Delete,
-                            contentDescription = stringResource(R.string.delete),
-                            tint = Color.Red,
-                        )
-                    }
                 } else {
                     MiuixIconButton(onClick = { searchExpanded = true }) {
                         MiuixIcon(MiuixIcons.Light.Search, contentDescription = stringResource(R.string.search_photos))
@@ -488,13 +480,6 @@ private fun MediaTopBarMaterial(
                     }
                     M3IconButton(onClick = actions.onEditClick) {
                         M3Icon(MiuixIcons.Light.Edit, contentDescription = stringResource(R.string.edit))
-                    }
-                    M3IconButton(onClick = actions.onDeleteClick) {
-                        M3Icon(
-                            MiuixIcons.Light.Delete,
-                            contentDescription = stringResource(R.string.delete),
-                            tint = Color.Red,
-                        )
                     }
                 } else {
                     M3IconButton(onClick = { searchExpanded = true }) {
