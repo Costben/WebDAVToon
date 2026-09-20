@@ -457,6 +457,9 @@ fun FollowZoomWaterfallLayout(
 
         val placeables = ArrayList<PlaceableFrame>(visible.size)
         for (index in visible) {
+            // Skip indices the current item list no longer provides (the cached layout can be
+            // one frame ahead of a shrinking list, e.g. while filtering).
+            if (index >= itemCount) continue
             val frame = result.frames.getOrNull(index) ?: continue
             val itemWidth = frame.width.coerceAtLeast(1)
             val itemHeight = frame.height.coerceAtLeast(1)

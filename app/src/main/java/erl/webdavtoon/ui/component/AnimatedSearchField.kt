@@ -24,7 +24,6 @@ import top.yukonga.miuix.kmp.basic.IconButton as MiuixIconButton
 import top.yukonga.miuix.kmp.basic.TextField as MiuixTextField
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Close
-import top.yukonga.miuix.kmp.icon.extended.Search
 
 private val SearchFieldShape = RoundedCornerShape(18.dp)
 private val SearchFieldCornerRadius = 18.dp
@@ -78,10 +77,17 @@ private fun MiuixSearchField(
         useLabelAsPlaceholder = true,
         singleLine = true,
         leadingIcon = {
-            MiuixIcon(MiuixIcons.Light.Search, contentDescription = null)
+            MiuixIcon(
+                FunnelIcon,
+                contentDescription = null,
+                modifier = Modifier.padding(start = 8.dp, end = 6.dp),
+            )
         },
         trailingIcon = {
-            MiuixIconButton(onClick = onClose) {
+            MiuixIconButton(
+                onClick = onClose,
+                modifier = Modifier.padding(end = 8.dp),
+            ) {
                 MiuixIcon(MiuixIcons.Light.Close, contentDescription = stringResource(R.string.cancel))
             }
         },
@@ -105,10 +111,17 @@ private fun MaterialSearchField(
         shape = SearchFieldShape,
         placeholder = { Text(placeholder) },
         leadingIcon = {
-            Icon(MiuixIcons.Light.Search, contentDescription = null)
+            Icon(
+                FunnelIcon,
+                contentDescription = null,
+                modifier = Modifier.padding(start = 8.dp, end = 6.dp),
+            )
         },
         trailingIcon = {
-            IconButton(onClick = onClose) {
+            IconButton(
+                onClick = onClose,
+                modifier = Modifier.padding(end = 8.dp),
+            ) {
                 Icon(MiuixIcons.Light.Close, contentDescription = stringResource(R.string.cancel))
             }
         },

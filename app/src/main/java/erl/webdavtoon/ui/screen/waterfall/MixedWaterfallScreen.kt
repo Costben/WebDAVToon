@@ -45,6 +45,7 @@ import erl.webdavtoon.Folder
 import erl.webdavtoon.R
 import erl.webdavtoon.SettingsManager
 import erl.webdavtoon.ui.component.AnimatedSearchField
+import erl.webdavtoon.ui.component.FunnelIcon
 import erl.webdavtoon.ui.UiMode
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator as MiuixCircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Icon as MiuixIcon
@@ -65,7 +66,6 @@ import top.yukonga.miuix.kmp.icon.extended.GridView
 import top.yukonga.miuix.kmp.icon.extended.Lock
 import top.yukonga.miuix.kmp.icon.extended.More
 import top.yukonga.miuix.kmp.icon.extended.Refresh
-import top.yukonga.miuix.kmp.icon.extended.Search
 import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.icon.extended.Sort
 import top.yukonga.miuix.kmp.menu.WindowIconCascadingDropdownMenu
@@ -206,8 +206,11 @@ fun MixedWaterfallScreen(
                                 }
                             ),
                     ) { index, widthPx, heightPx ->
+                        // A filtered list can shrink while a stale subcomposition is still
+                        // alive, so guard the index instead of crashing the composer.
+                        val item = visibleItems.getOrNull(index) ?: return@FollowZoomWaterfallLayout
                         MixedWaterfallCard(
-                            visibleItems[index],
+                            item,
                             uiState,
                             actions,
                             fillHeight = true,
@@ -353,8 +356,8 @@ private fun MixedWaterfallTopBarMiuix(
                 if (!uiState.isSelectionMode) {
                     MiuixIconButton(onClick = { searchExpanded = true }) {
                         MiuixIcon(
-                            MiuixIcons.Light.Search,
-                            contentDescription = stringResource(R.string.search_photos),
+                            FunnelIcon,
+                            contentDescription = stringResource(R.string.filter),
                         )
                     }
                     MixedWaterfallMiuixMenuButton(uiState = uiState, actions = actions)
@@ -508,8 +511,8 @@ private fun MixedWaterfallTopBarMaterial(
                 if (!uiState.isSelectionMode) {
                     M3IconButton(onClick = { searchExpanded = true }) {
                         M3Icon(
-                            MiuixIcons.Light.Search,
-                            contentDescription = stringResource(R.string.search_photos),
+                            FunnelIcon,
+                            contentDescription = stringResource(R.string.filter),
                         )
                     }
 

@@ -31,8 +31,9 @@
     <string name="delete_folders_message">Are you sure you want to delete %1$d folder(s)? This action cannot be undone.</string>
     <string name="delete">Delete</string>
     <string name="cancel">Cancel</string>
-    <string name="search_folders">Search folders</string>
-    <string name="search_photos">Search photos</string>
+    <string name="search_folders">Filter folders</string>
+    <string name="search_photos">Filter name</string>
+    <string name="filter">Filter</string>
     <string name="select_items">Select items</string>
     <string name="selected_count">Selected %1$d</string>
     <string name="delete_photos">Delete Photos</string>

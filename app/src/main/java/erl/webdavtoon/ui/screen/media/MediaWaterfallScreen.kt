@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import erl.webdavtoon.R
 import erl.webdavtoon.SettingsManager
 import erl.webdavtoon.ui.component.AnimatedSearchField
+import erl.webdavtoon.ui.component.FunnelIcon
 import erl.webdavtoon.ui.UiMode
 import erl.webdavtoon.ui.component.AppAdaptiveNavigationScaffold
 import erl.webdavtoon.ui.component.NavigationDrawerActions
@@ -78,7 +79,6 @@ import top.yukonga.miuix.kmp.icon.extended.Info
 import top.yukonga.miuix.kmp.icon.extended.Lock
 import top.yukonga.miuix.kmp.icon.extended.More
 import top.yukonga.miuix.kmp.icon.extended.Refresh
-import top.yukonga.miuix.kmp.icon.extended.Search
 import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.icon.extended.Sidebar
 import top.yukonga.miuix.kmp.icon.extended.Sort
@@ -248,7 +248,9 @@ fun MediaWaterfallScreen(
                                     }
                                 ),
                         ) { index, widthPx, heightPx ->
-                            val item = visibleItems[index]
+                            // A filtered list can shrink while a stale subcomposition is still
+                            // alive, so guard the index instead of crashing the composer.
+                            val item = visibleItems.getOrNull(index) ?: return@FollowZoomWaterfallLayout
                             if (uiState.uiMode == UiMode.Miuix) {
                                 MediaCardMiuix(
                                     item = item,
@@ -362,7 +364,7 @@ private fun MediaTopBarMiuix(
                     }
                 } else {
                     MiuixIconButton(onClick = { searchExpanded = true }) {
-                        MiuixIcon(MiuixIcons.Light.Search, contentDescription = stringResource(R.string.search_photos))
+                        MiuixIcon(FunnelIcon, contentDescription = stringResource(R.string.filter))
                     }
                     MediaMiuixMenuButton(uiState = uiState, actions = actions)
                 }
@@ -485,7 +487,7 @@ private fun MediaTopBarMaterial(
                     }
                 } else {
                     M3IconButton(onClick = { searchExpanded = true }) {
-                        M3Icon(MiuixIcons.Light.Search, contentDescription = stringResource(R.string.search_photos))
+                        M3Icon(FunnelIcon, contentDescription = stringResource(R.string.filter))
                     }
                     Box {
                         M3IconButton(onClick = { menuExpanded = true }) {

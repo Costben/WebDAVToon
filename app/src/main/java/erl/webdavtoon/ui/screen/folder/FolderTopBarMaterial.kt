@@ -27,6 +27,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import erl.webdavtoon.ui.UiMode
 import erl.webdavtoon.ui.component.AnimatedSearchField
+import erl.webdavtoon.ui.component.FunnelIcon
 import erl.webdavtoon.R
 import erl.webdavtoon.SettingsManager
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -38,7 +39,6 @@ import top.yukonga.miuix.kmp.icon.extended.GridView
 import top.yukonga.miuix.kmp.icon.extended.Lock
 import top.yukonga.miuix.kmp.icon.extended.More
 import top.yukonga.miuix.kmp.icon.extended.Refresh
-import top.yukonga.miuix.kmp.icon.extended.Search
 import top.yukonga.miuix.kmp.icon.extended.SelectAll
 import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.icon.extended.Sidebar
@@ -91,7 +91,7 @@ fun FolderTopBarMaterial(
                         searchExpanded = true
                         actions.onToggleSearch()
                     }) {
-                        Icon(MiuixIcons.Light.Search, contentDescription = stringResource(R.string.search_folders))
+                        Icon(FunnelIcon, contentDescription = stringResource(R.string.filter))
                     }
                     Box {
                         IconButton(onClick = { menuExpanded = true }) {

@@ -206,7 +206,9 @@ private fun FolderGrid(
                     }
                 ),
         ) { index, _, _ ->
-            val folder = folders[index]
+            // Filtering can shrink the list while a subcomposition for a stale index is still
+            // alive, so a missing index must render nothing instead of crashing the composer.
+            val folder = folders.getOrNull(index) ?: return@FollowZoomWaterfallLayout
             val onClick = {
                 if (uiState.isSelectionMode) actions.onToggleSelection(folder.path)
                 else actions.onFolderClick(folder)
