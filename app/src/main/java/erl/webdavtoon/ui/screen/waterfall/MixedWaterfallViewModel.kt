@@ -55,8 +55,8 @@ class MixedWaterfallViewModel(app: Application) : AndroidViewModel(app) {
     private val _uiState = MutableStateFlow(
         MixedWaterfallUiState(
             uiMode = appSettings.getUiMode(),
-            columns = appSettings.getOrDefaultInt(AppSettingsStore.PHOTO_GRID_COLUMNS, 2).coerceIn(1, 5),
-            virtualColumns = appSettings.getOrDefaultInt(AppSettingsStore.PHOTO_GRID_COLUMNS, 2).coerceIn(1, 5).toFloat(),
+            columns = appSettings.getOrDefaultInt(AppSettingsStore.GRID_COLUMNS, 2).coerceIn(1, 4),
+            virtualColumns = appSettings.getOrDefaultInt(AppSettingsStore.GRID_COLUMNS, 2).coerceIn(1, 4).toFloat(),
             sortOrder = settingsManager.getPhotoSortOrder(),
             rotationLocked = settingsManager.isRotationLocked(),
             showFilenames = appSettings.getOrDefaultBoolean(AppSettingsStore.WATERFALL_SHOW_FILENAMES, true)
@@ -75,8 +75,8 @@ class MixedWaterfallViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         viewModelScope.launch {
-            appSettings.observeInt(AppSettingsStore.PHOTO_GRID_COLUMNS, 2).collect { cols ->
-                val clamped = cols.coerceIn(1, 5)
+            appSettings.observeInt(AppSettingsStore.GRID_COLUMNS, 2).collect { cols ->
+                val clamped = cols.coerceIn(1, 4)
                 _uiState.update { state ->
                     if (state.isZooming) {
                         state.copy(columns = clamped)
@@ -418,8 +418,8 @@ class MixedWaterfallViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun setColumns(columns: Int) {
-        val clamped = columns.coerceIn(1, 5)
-        appSettings.putInt(AppSettingsStore.PHOTO_GRID_COLUMNS, clamped)
+        val clamped = columns.coerceIn(1, 4)
+        appSettings.putInt(AppSettingsStore.GRID_COLUMNS, clamped)
         _uiState.update { it.copy(columns = clamped, virtualColumns = clamped.toFloat()) }
     }
 

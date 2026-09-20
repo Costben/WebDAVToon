@@ -107,7 +107,7 @@ fun MixedWaterfallScreen(
     val zoomState = rememberFollowZoomGridState(
         columns = uiState.columns,
         minColumns = 1,
-        maxColumns = 5,
+        maxColumns = 4,
         onColumnsChanged = actions.onColumnsChange,
     )
     val aspectRatios = remember(visibleItems) { visibleItems.map { it.aspectRatio } }
@@ -189,7 +189,7 @@ fun MixedWaterfallScreen(
                         aspectRatios = aspectRatios,
                         columns = uiState.columns,
                         minColumns = 1,
-                        maxColumns = 5,
+                        maxColumns = 4,
                         onColumnsChanged = actions.onColumnsChange,
                         spacing = 8.dp,
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
@@ -391,7 +391,7 @@ private fun MixedWaterfallMiuixMenuButton(
             onClick = { actions.onSetSortOrder(order) },
         )
     }
-    val columnItems = (1..5).map { columns ->
+    val columnItems = (1..4).map { columns ->
         DropdownItem(
             text = stringResource(R.string.columns_suffix, columns),
             selected = uiState.columns == columns,
@@ -617,7 +617,7 @@ private fun MixedWaterfallMaterialMenu(
                     leadingIcon = { M3Icon(MiuixIcons.Light.ChevronBackward, null, tint = selectedTint) },
                     onClick = { level = MixedMaterialMenuLevel.Root },
                 )
-                (1..5).forEach { columns ->
+                (1..4).forEach { columns ->
                     val selected = uiState.columns == columns
                     val label = stringResource(R.string.columns_suffix, columns)
                     DropdownMenuItem(

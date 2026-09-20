@@ -84,9 +84,6 @@ class SettingsManager(context: Context) {
     fun getGridColumns(): Int = appSettings.getOrDefaultInt(AppSettingsStore.GRID_COLUMNS, 2)
     fun setGridColumns(count: Int) = appSettings.putInt(AppSettingsStore.GRID_COLUMNS, count)
 
-    fun getPhotoGridColumns(): Int = appSettings.getOrDefaultInt(AppSettingsStore.PHOTO_GRID_COLUMNS, 2)
-    fun setPhotoGridColumns(count: Int) = appSettings.putInt(AppSettingsStore.PHOTO_GRID_COLUMNS, count)
-
     fun getSortOrder(): Int = appSettings.getOrDefaultInt(AppSettingsStore.SORT_ORDER, 2)
     fun setSortOrder(order: Int) = appSettings.putInt(AppSettingsStore.SORT_ORDER, order)
 

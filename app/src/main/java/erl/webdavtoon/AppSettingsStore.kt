@@ -28,7 +28,6 @@ class AppSettingsStore(context: Context) {
 
     companion object {
         val GRID_COLUMNS = intPreferencesKey("grid_columns")
-        val PHOTO_GRID_COLUMNS = intPreferencesKey("photo_grid_columns")
         val SORT_ORDER = intPreferencesKey("sort_order")
         val PHOTO_SORT_ORDER = intPreferencesKey("photo_sort_order")
         val RECURSIVE_IMAGE_ARRANGEMENT = intPreferencesKey("recursive_image_arrangement")

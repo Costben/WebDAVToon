@@ -55,7 +55,7 @@ class MediaWaterfallViewModel(app: Application) : AndroidViewModel(app) {
     private val _uiState = MutableStateFlow(
         MediaWaterfallUiState(
             uiMode = appSettings.getUiMode(),
-            columns = settingsManager.getPhotoGridColumns().coerceIn(1, 4),
+            columns = settingsManager.getGridColumns().coerceIn(1, 4),
             sortOrder = settingsManager.getPhotoSortOrder(),
             rotationLocked = settingsManager.isRotationLocked(),
             showFilenames = settingsManager.shouldShowWaterfallFilenames(),
@@ -76,7 +76,7 @@ class MediaWaterfallViewModel(app: Application) : AndroidViewModel(app) {
             appSettings.observeUiMode().collect { mode -> _uiState.update { it.copy(uiMode = mode) } }
         }
         viewModelScope.launch {
-            appSettings.observeInt(AppSettingsStore.PHOTO_GRID_COLUMNS, 2).collect { cols ->
+            appSettings.observeInt(AppSettingsStore.GRID_COLUMNS, 2).collect { cols ->
                 val clamped = cols.coerceIn(1, 4)
                 _uiState.update { it.copy(columns = clamped) }
             }
@@ -241,7 +241,7 @@ class MediaWaterfallViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setColumns(columns: Int) {
         val clamped = columns.coerceIn(1, 4)
-        appSettings.putInt(AppSettingsStore.PHOTO_GRID_COLUMNS, clamped)
+        appSettings.putInt(AppSettingsStore.GRID_COLUMNS, clamped)
         _uiState.update { it.copy(columns = clamped) }
     }
 

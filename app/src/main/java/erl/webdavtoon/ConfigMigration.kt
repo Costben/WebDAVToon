@@ -15,10 +15,12 @@ object ConfigMigration {
         val secureStore = AndroidKeystoreWebDavPasswordStore(context)
 
         withContext(Dispatchers.IO) {
-            legacy.getInt(SettingsManager.KEY_GRID_COLUMNS, 2)
-                .let { appSettings.putIntSync(AppSettingsStore.GRID_COLUMNS, it) }
-            legacy.getInt(SettingsManager.KEY_PHOTO_GRID_COLUMNS, 2)
-                .let { appSettings.putIntSync(AppSettingsStore.PHOTO_GRID_COLUMNS, it) }
+            val legacyPhotoColumns = legacy.getInt(SettingsManager.KEY_PHOTO_GRID_COLUMNS, 2)
+            val legacyGridColumns = legacy.getInt(SettingsManager.KEY_GRID_COLUMNS, 2)
+            appSettings.putIntSync(
+                AppSettingsStore.GRID_COLUMNS,
+                if (legacyPhotoColumns != 2) legacyPhotoColumns else legacyGridColumns,
+            )
             legacy.getInt(SettingsManager.KEY_SORT_ORDER, 2)
                 .let { appSettings.putIntSync(AppSettingsStore.SORT_ORDER, it) }
             legacy.getInt(SettingsManager.KEY_PHOTO_SORT_ORDER, 2)
