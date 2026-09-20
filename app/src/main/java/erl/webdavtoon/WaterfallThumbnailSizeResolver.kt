@@ -11,6 +11,25 @@ data class WaterfallThumbnailTargetSize(
 object WaterfallThumbnailSizeResolver {
     private const val DEFAULT_PERCENT_BASELINE = 70
 
+    /**
+     * Shared step for waterfall decode widths. Requesting every intermediate width produced by
+     * a pinch (or by each column count) creates one Glide cache entry per size, so an image is
+     * decoded again as soon as the size drifts by a pixel. Rounding up to a shared step lets
+     * those requests reuse the same entry, at the cost of decoding at most `TARGET_WIDTH_BUCKET`
+     * pixels wider than requested.
+     */
+    const val TARGET_WIDTH_BUCKET = 64
+
+    fun bucketWidth(width: Int, bucketSize: Int = TARGET_WIDTH_BUCKET): Int {
+        val safeWidth = width.coerceAtLeast(1)
+        val safeBucket = bucketSize.coerceAtLeast(1)
+        return ((safeWidth + safeBucket - 1) / safeBucket) * safeBucket
+    }
+
+    /** [bucketSize] of 0 (or less) disables the rounding. */
+    fun maybeBucketWidth(width: Int, bucketSize: Int): Int =
+        if (bucketSize <= 0) width.coerceAtLeast(1) else bucketWidth(width, bucketSize)
+
     fun resolve(
         displayWidth: Int,
         displayHeight: Int,

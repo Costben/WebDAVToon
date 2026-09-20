@@ -23,6 +23,8 @@ data class SettingsActions(
     val onSetWaterfallQualityMode: (String) -> Unit,
     val onSetWaterfallPercent: (Int) -> Unit,
     val onSetWaterfallMaxWidth: (Int) -> Unit,
+    val onSetWaterfallWidthBucket: (Int) -> Unit,
+    val onSetGlideMemoryCacheScreens: (Int) -> Unit,
     val onSetReaderMaxZoom: (Int) -> Unit,
     val onPickDefaultReaderMode: () -> Unit,
     val onPickVideoExternalPlayerMode: () -> Unit,

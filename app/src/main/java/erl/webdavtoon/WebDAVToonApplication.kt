@@ -10,6 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import com.bumptech.glide.Glide
 import com.bumptech.glide.GlideBuilder
 import com.bumptech.glide.load.engine.cache.InternalCacheDiskCacheFactory
+import com.bumptech.glide.load.engine.cache.MemorySizeCalculator
 import com.bumptech.glide.module.AppGlideModule
 import kotlinx.coroutines.runBlocking
 import okhttp3.ConnectionPool
@@ -136,6 +137,21 @@ class MyGlideModule : AppGlideModule() {
     override fun applyOptions(context: Context, builder: GlideBuilder) {
         val diskCacheSizeBytes = 2L * 1024 * 1024 * 1024L
         builder.setDiskCache(InternalCacheDiskCacheFactory(context, diskCacheSizeBytes))
+
+        // Tuned from settings: decoding one bitmap per requested width only pays off when
+        // enough of them stay resident to be re-used after scrolling or zooming back.
+        val memoryCacheScreens = SettingsManager(context).getGlideMemoryCacheScreens().toFloat()
+        val memorySizeCalculator = MemorySizeCalculator.Builder(context)
+            .setMemoryCacheScreens(memoryCacheScreens)
+            .setBitmapPoolScreens(memoryCacheScreens)
+            .build()
+        builder.setMemorySizeCalculator(memorySizeCalculator)
+        Log.i(
+            "MyGlideModule",
+            "Glide memory cache screens=$memoryCacheScreens " +
+                "memoryCache=${memorySizeCalculator.memoryCacheSize} " +
+                "pool=${memorySizeCalculator.bitmapPoolSize}"
+        )
 
         val sourceExecutor = com.bumptech.glide.load.engine.executor.GlideExecutor.newSourceBuilder()
             .setThreadCount(20)

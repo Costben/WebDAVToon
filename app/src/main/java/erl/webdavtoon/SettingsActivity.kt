@@ -296,6 +296,8 @@ class SettingsActivity : ComponentActivity() {
         onSetWaterfallQualityMode = { viewModel.setWaterfallQualityMode(it) },
         onSetWaterfallPercent = { viewModel.setWaterfallPercent(it) },
         onSetWaterfallMaxWidth = { viewModel.setWaterfallMaxWidth(it) },
+        onSetWaterfallWidthBucket = { viewModel.setWaterfallWidthBucket(it) },
+        onSetGlideMemoryCacheScreens = { viewModel.setGlideMemoryCacheScreens(it) },
         onSetReaderMaxZoom = { viewModel.setReaderMaxZoomPercent(it) },
         onPickDefaultReaderMode = { showDefaultReaderModePicker = true },
         onPickVideoExternalPlayerMode = { showVideoExternalPlayerModePicker = true },

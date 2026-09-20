@@ -34,6 +34,8 @@ data class SettingsUiState(
     val waterfallQualityMode: String = SettingsManager.WATERFALL_MODE_PERCENT,
     val waterfallPercent: Int = 70,
     val waterfallMaxWidth: Int = 600,
+    val waterfallWidthBucket: Int = SettingsManager.DEFAULT_WATERFALL_WIDTH_BUCKET,
+    val glideMemoryCacheScreens: Int = SettingsManager.DEFAULT_GLIDE_MEMORY_CACHE_SCREENS,
     val readerMaxZoomPercent: Int = 300,
     val defaultReaderMode: String = SettingsManager.DEFAULT_READER_MODE_WEBTOON,
     val videoExternalPlayerMode: String = SettingsManager.VIDEO_EXTERNAL_PLAYER_MODE_SYSTEM_DEFAULT,
@@ -59,6 +61,8 @@ object SettingsDefaults {
     const val DEFAULT_READER_MODE_CARD = SettingsManager.DEFAULT_READER_MODE_CARD
     const val VIDEO_EXTERNAL_PLAYER_MODE_SYSTEM_DEFAULT = SettingsManager.VIDEO_EXTERNAL_PLAYER_MODE_SYSTEM_DEFAULT
     const val VIDEO_EXTERNAL_PLAYER_MODE_CHOOSER = SettingsManager.VIDEO_EXTERNAL_PLAYER_MODE_CHOOSER
+    val WATERFALL_WIDTH_BUCKET_VALUES = SettingsManager.WATERFALL_WIDTH_BUCKET_VALUES
+    val GLIDE_MEMORY_CACHE_SCREEN_VALUES = SettingsManager.GLIDE_MEMORY_CACHE_SCREEN_VALUES
 }
 
 data class ServerConfigFormState(

@@ -193,4 +193,14 @@
 <string name="display_options">显示选项</string>
     <string name="reader_video_editing">阅读、视频与编辑</string>
     <string name="material_settings_placeholder">Material 设置占位界面</string>
-    <string name="port_invalid">端口无效（1-65535）</string></resources>
+    <string name="port_invalid">端口无效（1-65535）</string>
+    <string name="performance">性能</string>
+    <string name="waterfall_width_bucket">缩略图解码分档</string>
+    <string name="waterfall_width_bucket_summary">档位越大，捏合时同一张图重复解码越少，但每张位图会略大一些。</string>
+    <string name="waterfall_width_bucket_off">关闭</string>
+    <string name="px_suffix">%1$d 像素</string>
+    <string name="glide_memory_cache">解码位图内存缓存</string>
+    <string name="glide_memory_cache_summary">缓存越大，往回翻看时重复读取越少，但更占内存。重启应用后生效。</string>
+    <string name="screens_suffix">%1$d 屏</string>
+    <string name="restart_to_apply">重启应用后生效</string>
+</resources>

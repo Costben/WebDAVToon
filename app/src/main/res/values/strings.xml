@@ -202,4 +202,13 @@
     <string name="reader_video_editing">Reader, video and editing</string>
     <string name="material_settings_placeholder">Material settings placeholder</string>
     <string name="port_invalid">Invalid port (1-65535)</string>
+    <string name="performance">Performance</string>
+    <string name="waterfall_width_bucket">Thumbnail decode step</string>
+    <string name="waterfall_width_bucket_summary">A larger step decodes the same picture fewer times while pinching, but every bitmap is slightly wider.</string>
+    <string name="waterfall_width_bucket_off">Off</string>
+    <string name="px_suffix">%1$d px</string>
+    <string name="glide_memory_cache">Decoded image memory cache</string>
+    <string name="glide_memory_cache_summary">A larger cache re-reads less when scrolling back through pictures, using more memory. Restart to apply.</string>
+    <string name="screens_suffix">%1$d screens</string>
+    <string name="restart_to_apply">Takes effect after restarting the app</string>
 </resources>

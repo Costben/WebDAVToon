@@ -51,6 +51,12 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         observe(appSettings.observeString(AppSettingsStore.WATERFALL_QUALITY_MODE, SettingsManager.WATERFALL_MODE_PERCENT)) { copy(waterfallQualityMode = it) }
         observe(appSettings.observeInt(AppSettingsStore.WATERFALL_PERCENT, 70)) { copy(waterfallPercent = it) }
         observe(appSettings.observeInt(AppSettingsStore.WATERFALL_MAX_WIDTH, 600)) { copy(waterfallMaxWidth = it) }
+        observe(appSettings.observeInt(AppSettingsStore.WATERFALL_WIDTH_BUCKET, SettingsManager.DEFAULT_WATERFALL_WIDTH_BUCKET)) {
+            copy(waterfallWidthBucket = settingsManager.getWaterfallWidthBucket())
+        }
+        observe(appSettings.observeInt(AppSettingsStore.GLIDE_MEMORY_CACHE_SCREENS, SettingsManager.DEFAULT_GLIDE_MEMORY_CACHE_SCREENS)) {
+            copy(glideMemoryCacheScreens = settingsManager.getGlideMemoryCacheScreens())
+        }
         observe(appSettings.observeInt(AppSettingsStore.READER_MAX_ZOOM_PERCENT, 300)) { copy(readerMaxZoomPercent = it) }
         observe(appSettings.observeString(AppSettingsStore.DEFAULT_READER_MODE, SettingsManager.DEFAULT_READER_MODE_WEBTOON)) { copy(defaultReaderMode = it) }
         observe(appSettings.observeString(AppSettingsStore.VIDEO_EXTERNAL_PLAYER_MODE, SettingsManager.VIDEO_EXTERNAL_PLAYER_MODE_SYSTEM_DEFAULT)) { copy(videoExternalPlayerMode = it) }
@@ -101,6 +107,8 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
                 waterfallQualityMode = settingsManager.getWaterfallQualityMode(),
                 waterfallPercent = settingsManager.getWaterfallPercent(),
                 waterfallMaxWidth = settingsManager.getWaterfallMaxWidth(),
+                waterfallWidthBucket = settingsManager.getWaterfallWidthBucket(),
+                glideMemoryCacheScreens = settingsManager.getGlideMemoryCacheScreens(),
                 readerMaxZoomPercent = settingsManager.getReaderMaxZoomPercent(),
                 defaultReaderMode = settingsManager.getDefaultReaderMode(),
                 videoExternalPlayerMode = settingsManager.getVideoExternalPlayerMode(),
@@ -149,6 +157,16 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setWaterfallQualityMode(m: String) = io { settingsManager.setWaterfallQualityMode(m); _uiState.update { it.copy(waterfallQualityMode = m) } }
     fun setWaterfallPercent(p: Int) = io { settingsManager.setWaterfallPercent(p); _uiState.update { it.copy(waterfallPercent = p) } }
     fun setWaterfallMaxWidth(w: Int) = io { settingsManager.setWaterfallMaxWidth(w); _uiState.update { it.copy(waterfallMaxWidth = w) } }
+    fun setWaterfallWidthBucket(bucket: Int) = io {
+        settingsManager.setWaterfallWidthBucket(bucket)
+        _uiState.update { it.copy(waterfallWidthBucket = settingsManager.getWaterfallWidthBucket()) }
+        eventChannel.send(SettingsEvent.ResultChanged)
+    }
+    fun setGlideMemoryCacheScreens(screens: Int) = io {
+        settingsManager.setGlideMemoryCacheScreens(screens)
+        _uiState.update { it.copy(glideMemoryCacheScreens = settingsManager.getGlideMemoryCacheScreens()) }
+        eventChannel.send(SettingsEvent.ShowMessage(R.string.restart_to_apply))
+    }
     fun setReaderMaxZoomPercent(p: Int) = io { settingsManager.setReaderMaxZoomPercent(p); _uiState.update { it.copy(readerMaxZoomPercent = p) } }
     fun setDefaultReaderMode(m: String) = io { settingsManager.setDefaultReaderMode(m); _uiState.update { it.copy(defaultReaderMode = settingsManager.getDefaultReaderMode()) } }
     fun setVideoExternalPlayerMode(m: String) = io { settingsManager.setVideoExternalPlayerMode(m); _uiState.update { it.copy(videoExternalPlayerMode = settingsManager.getVideoExternalPlayerMode()) } }

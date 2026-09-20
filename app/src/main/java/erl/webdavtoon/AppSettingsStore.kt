@@ -39,6 +39,8 @@ class AppSettingsStore(context: Context) {
         val LANGUAGE = stringPreferencesKey("language")
         val WATERFALL_QUALITY_MODE = stringPreferencesKey("waterfall_quality_mode")
         val WATERFALL_PERCENT = intPreferencesKey("waterfall_percent")
+        val WATERFALL_WIDTH_BUCKET = intPreferencesKey("waterfall_width_bucket")
+        val GLIDE_MEMORY_CACHE_SCREENS = intPreferencesKey("glide_memory_cache_screens")
         val WATERFALL_MAX_WIDTH = intPreferencesKey("waterfall_max_width")
         val WATERFALL_SHOW_FILENAMES = booleanPreferencesKey("waterfall_show_filenames")
         val DRAWER_EDGE_WIDTH_PERCENT = intPreferencesKey("drawer_edge_width_percent")

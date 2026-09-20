@@ -117,6 +117,15 @@ private fun SettingsContent(
         DropdownItem(stringResource(R.string.thumbnail_quality_percent_mode)),
         DropdownItem(stringResource(R.string.thumbnail_quality_max_width_mode)),
     )
+    val bucketValues = SettingsDefaults.WATERFALL_WIDTH_BUCKET_VALUES
+    val bucketItems = bucketValues.map { bucket ->
+        DropdownItem(
+            if (bucket <= 0) stringResource(R.string.waterfall_width_bucket_off)
+            else stringResource(R.string.px_suffix, bucket)
+        )
+    }
+    val memoryCacheValues = SettingsDefaults.GLIDE_MEMORY_CACHE_SCREEN_VALUES
+    val memoryCacheItems = memoryCacheValues.map { DropdownItem(stringResource(R.string.screens_suffix, it)) }
 
     Column(
         modifier = Modifier
@@ -243,6 +252,23 @@ private fun SettingsContent(
                     steps = 89,
                 )
             }
+        }
+
+        SettingsGroup(stringResource(R.string.performance)) {
+            OverlaySpinnerPreference(
+                items = bucketItems,
+                selectedIndex = bucketValues.indexOf(uiState.waterfallWidthBucket).coerceAtLeast(0),
+                title = stringResource(R.string.waterfall_width_bucket),
+                summary = stringResource(R.string.waterfall_width_bucket_summary),
+                onSelectedIndexChange = { actions.onSetWaterfallWidthBucket(bucketValues[it]) },
+            )
+            OverlaySpinnerPreference(
+                items = memoryCacheItems,
+                selectedIndex = memoryCacheValues.indexOf(uiState.glideMemoryCacheScreens).coerceAtLeast(0),
+                title = stringResource(R.string.glide_memory_cache),
+                summary = stringResource(R.string.glide_memory_cache_summary),
+                onSelectedIndexChange = { actions.onSetGlideMemoryCacheScreens(memoryCacheValues[it]) },
+            )
         }
 
         SettingsGroup(stringResource(R.string.reader_video_editing)) {

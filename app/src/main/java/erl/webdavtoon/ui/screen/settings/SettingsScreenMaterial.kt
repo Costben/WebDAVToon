@@ -121,6 +121,13 @@ private fun SettingsMaterialContent(
         stringResource(R.string.thumbnail_quality_percent_mode),
         stringResource(R.string.thumbnail_quality_max_width_mode),
     )
+    val bucketValues = SettingsDefaults.WATERFALL_WIDTH_BUCKET_VALUES
+    val bucketLabels = bucketValues.map { bucket ->
+        if (bucket <= 0) stringResource(R.string.waterfall_width_bucket_off)
+        else stringResource(R.string.px_suffix, bucket)
+    }
+    val memoryCacheValues = SettingsDefaults.GLIDE_MEMORY_CACHE_SCREEN_VALUES
+    val memoryCacheLabels = memoryCacheValues.map { stringResource(R.string.screens_suffix, it) }
 
     Column(
         modifier = Modifier
@@ -253,6 +260,27 @@ private fun SettingsMaterialContent(
                     onFinished = { actions.onSetWaterfallPercent(it.toInt()) },
                 )
             }
+        }
+
+        MaterialSettingsGroup(stringResource(R.string.performance)) {
+            MaterialSelectionRow(
+                title = stringResource(R.string.waterfall_width_bucket),
+                summary = bucketLabels[bucketValues.indexOf(uiState.waterfallWidthBucket).coerceAtLeast(0)] +
+                    " · " + stringResource(R.string.waterfall_width_bucket_summary),
+                labels = bucketLabels,
+                selectedIndex = bucketValues.indexOf(uiState.waterfallWidthBucket).coerceAtLeast(0),
+                onSelected = { actions.onSetWaterfallWidthBucket(bucketValues[it]) },
+                divider = true,
+            )
+            MaterialSelectionRow(
+                title = stringResource(R.string.glide_memory_cache),
+                summary = memoryCacheLabels[memoryCacheValues.indexOf(uiState.glideMemoryCacheScreens).coerceAtLeast(0)] +
+                    " · " + stringResource(R.string.glide_memory_cache_summary),
+                labels = memoryCacheLabels,
+                selectedIndex = memoryCacheValues.indexOf(uiState.glideMemoryCacheScreens).coerceAtLeast(0),
+                onSelected = { actions.onSetGlideMemoryCacheScreens(memoryCacheValues[it]) },
+                divider = false,
+            )
         }
 
         MaterialSettingsGroup(stringResource(R.string.reader_video_editing)) {

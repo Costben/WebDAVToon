@@ -54,6 +54,15 @@ class SettingsManager(context: Context) {
 
         const val WATERFALL_MODE_PERCENT = "percent"
         const val WATERFALL_MODE_MAX_WIDTH = "max_width"
+
+        /** Decode-width steps offered in settings; 0 = no rounding (see getWaterfallWidthBucket). */
+        val WATERFALL_WIDTH_BUCKET_VALUES = intArrayOf(0, 32, 64, 128)
+        val DEFAULT_WATERFALL_WIDTH_BUCKET = WaterfallThumbnailSizeResolver.TARGET_WIDTH_BUCKET
+
+        /** Glide memory cache sizes offered in settings, in screenfuls. */
+        val GLIDE_MEMORY_CACHE_SCREEN_VALUES = intArrayOf(2, 4, 6)
+        const val DEFAULT_GLIDE_MEMORY_CACHE_SCREENS = 4
+
         const val DEFAULT_DRAWER_EDGE_WIDTH_PERCENT = 33
         const val DEFAULT_READER_MODE_WEBTOON = "webtoon"
         const val DEFAULT_READER_MODE_CARD = "card"
@@ -130,6 +139,25 @@ class SettingsManager(context: Context) {
 
     fun setWaterfallQualityMode(mode: String) =
         appSettings.putString(AppSettingsStore.WATERFALL_QUALITY_MODE, mode)
+
+    /**
+     * Waterfall decode widths are rounded up to this shared step so that pinching and
+     * column-count changes reuse one Glide cache entry; 0 disables the rounding.
+     */
+    fun getWaterfallWidthBucket(): Int =
+        appSettings.getOrDefaultInt(AppSettingsStore.WATERFALL_WIDTH_BUCKET, DEFAULT_WATERFALL_WIDTH_BUCKET)
+            .takeIf { it in WATERFALL_WIDTH_BUCKET_VALUES } ?: DEFAULT_WATERFALL_WIDTH_BUCKET
+
+    fun setWaterfallWidthBucket(bucket: Int) =
+        appSettings.putInt(AppSettingsStore.WATERFALL_WIDTH_BUCKET, bucket)
+
+    /** Screenfuls of decoded bitmaps Glide keeps resident; read when Glide initialises. */
+    fun getGlideMemoryCacheScreens(): Int =
+        appSettings.getOrDefaultInt(AppSettingsStore.GLIDE_MEMORY_CACHE_SCREENS, DEFAULT_GLIDE_MEMORY_CACHE_SCREENS)
+            .takeIf { it in GLIDE_MEMORY_CACHE_SCREEN_VALUES } ?: DEFAULT_GLIDE_MEMORY_CACHE_SCREENS
+
+    fun setGlideMemoryCacheScreens(screens: Int) =
+        appSettings.putInt(AppSettingsStore.GLIDE_MEMORY_CACHE_SCREENS, screens)
 
     fun getWaterfallPercent(): Int = appSettings.getOrDefaultInt(AppSettingsStore.WATERFALL_PERCENT, 70)
     fun setWaterfallPercent(percent: Int) = appSettings.putInt(AppSettingsStore.WATERFALL_PERCENT, percent)
