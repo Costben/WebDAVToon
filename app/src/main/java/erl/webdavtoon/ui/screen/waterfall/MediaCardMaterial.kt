@@ -57,7 +57,10 @@ fun MediaCardMaterial(
     onLongClick: () -> Unit,
     onDimensionsResolved: ((photoId: String, width: Int, height: Int) -> Unit)? = null,
     onFolderVisibilityChanged: ((folder: Folder, visible: Boolean) -> Unit)? = null,
+    targetWidthPx: Int = 0,
+    targetHeightPx: Int = 0,
     modifier: Modifier = Modifier,
+    fillHeight: Boolean = false,
 ) {
     when (item) {
         is MixedWaterfallItemUi.MediaItem -> {
@@ -68,7 +71,10 @@ fun MediaCardMaterial(
                 onClick = onClick,
                 onLongClick = onLongClick,
                 onDimensionsResolved = onDimensionsResolved,
+                targetWidthPx = targetWidthPx,
+                targetHeightPx = targetHeightPx,
                 modifier = modifier,
+                fillHeight = fillHeight,
             )
         }
         is MixedWaterfallItemUi.FolderItem -> {
@@ -80,6 +86,7 @@ fun MediaCardMaterial(
                 onLongClick = onLongClick,
                 onVisibilityChanged = onFolderVisibilityChanged,
                 modifier = modifier,
+                fillHeight = fillHeight,
             )
         }
     }
@@ -94,6 +101,7 @@ fun WaterfallFolderCardMaterial(
     onLongClick: () -> Unit,
     onVisibilityChanged: ((folder: Folder, visible: Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier,
+    fillHeight: Boolean = false,
 ) {
     if (item is MixedWaterfallItemUi.FolderItem) {
         WaterfallFolderCardMaterial(
@@ -104,6 +112,7 @@ fun WaterfallFolderCardMaterial(
             onLongClick = onLongClick,
             onVisibilityChanged = onVisibilityChanged,
             modifier = modifier,
+            fillHeight = fillHeight,
         )
     }
 }
@@ -117,6 +126,7 @@ fun WaterfallFolderCardMaterial(
     onLongClick: () -> Unit,
     onVisibilityChanged: ((folder: Folder, visible: Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier,
+    fillHeight: Boolean = false,
 ) {
     DisposableEffect(item.key, onVisibilityChanged) {
         onVisibilityChanged?.invoke(item.folder, true)
@@ -127,15 +137,16 @@ fun WaterfallFolderCardMaterial(
     val innerShape = if (showFilename) RoundedCornerShape(12.dp) else RoundedCornerShape(16.dp)
     val innerPadding = if (showFilename) 8.dp else 0.dp
 
-    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+    BoxWithConstraints(
+        modifier = if (fillHeight) modifier.fillMaxSize() else modifier.fillMaxWidth(),
+    ) {
         // Round the lane width to a whole dp so both grid lanes produce exactly the same
         // preview height. With a sub-pixel lane width the two columns end up 1px different
         // per row, which the staggered grid accumulates until it misplaces the last folder.
         val previewSide = Dp(ceil(maxWidth.value)) - innerPadding * 2
 
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
+            modifier = (if (fillHeight) Modifier.fillMaxSize() else Modifier.fillMaxWidth())
                 .pointerInput(item.key, isSelectionMode) {
                     detectTapGestures(
                         onTap = { onClick() },
@@ -155,7 +166,7 @@ fun WaterfallFolderCardMaterial(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(previewSide)
+                        .then(if (fillHeight) Modifier.weight(1f) else Modifier.height(previewSide))
                         .clip(innerShape)
                         .background(MaterialTheme.colorScheme.surfaceVariant),
                 ) {
@@ -239,15 +250,17 @@ private fun WaterfallMediaCardMaterial(
     onClick: () -> Unit,
     onLongClick: () -> Unit,
     onDimensionsResolved: ((photoId: String, width: Int, height: Int) -> Unit)?,
+    targetWidthPx: Int = 0,
+    targetHeightPx: Int = 0,
     modifier: Modifier = Modifier,
+    fillHeight: Boolean = false,
 ) {
     val cardShape = RoundedCornerShape(16.dp)
     val innerShape = if (showFilename) RoundedCornerShape(12.dp) else RoundedCornerShape(16.dp)
     val clampedAspectRatio = item.aspectRatio.coerceIn(0.2f, 5.0f)
 
     Card(
-        modifier = modifier
-            .fillMaxWidth()
+        modifier = (if (fillHeight) modifier.fillMaxSize() else modifier.fillMaxWidth())
             .pointerInput(item.key, isSelectionMode) {
                 detectTapGestures(
                     onTap = { onClick() },
@@ -267,7 +280,7 @@ private fun WaterfallMediaCardMaterial(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(clampedAspectRatio)
+                    .then(if (fillHeight) Modifier.weight(1f) else Modifier.aspectRatio(clampedAspectRatio))
                     .clip(innerShape)
                     .background(MaterialTheme.colorScheme.surfaceVariant),
             ) {
@@ -275,7 +288,11 @@ private fun WaterfallMediaCardMaterial(
                     modifier = Modifier.fillMaxSize(),
                     factory = { context ->
                         ImageView(context).apply {
-                            scaleType = ImageView.ScaleType.CENTER_CROP
+                            // Glide derives its downsample strategy from this scale type: with
+                            // CENTER_CROP it decodes (and crops) to the exact request box, so the
+                            // image's real aspect ratio would be lost. FIT_CENTER keeps the aspect
+                            // ratio, which the waterfall layout needs to size each cell.
+                            scaleType = ImageView.ScaleType.FIT_CENTER
                         }
                     },
                     update = { imageView ->
@@ -301,12 +318,16 @@ private fun WaterfallMediaCardMaterial(
                             val dimensionsCallback: ((Int, Int) -> Unit)? = onDimensionsResolved?.let { callback ->
                                 { width, height -> callback(item.id, width, height) }
                             }
+                            val targetWidth = targetWidthPx.takeIf { it > 0 }
+                            val targetHeight = targetHeightPx.takeIf { it > 0 }
                             if (item.isLocal) {
                                 WebDavImageLoader.loadLocalImage(
                                     context = imageView.context,
                                     imageUri = item.uri,
                                     imageView = imageView,
                                     isWaterfall = true,
+                                    width = targetWidth,
+                                    height = targetHeight,
                                     onDimensionsReady = dimensionsCallback,
                                     preserveCurrentDrawable = true,
                                 )
@@ -316,6 +337,8 @@ private fun WaterfallMediaCardMaterial(
                                     imageUri = item.uri,
                                     imageView = imageView,
                                     isWaterfall = true,
+                                    width = targetWidth,
+                                    height = targetHeight,
                                     onDimensionsReady = dimensionsCallback,
                                     preserveCurrentDrawable = true,
                                 )

@@ -7,7 +7,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -16,10 +15,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
-import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
-import androidx.compose.foundation.lazy.staggeredgrid.items
-import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.material3.CircularProgressIndicator as M3CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -57,10 +52,11 @@ import erl.webdavtoon.ui.component.AppAdaptiveNavigationScaffold
 import erl.webdavtoon.ui.component.NavigationDrawerActions
 import erl.webdavtoon.ui.screen.waterfall.MediaCardMaterial
 import erl.webdavtoon.ui.screen.waterfall.MediaCardMiuix
+import erl.webdavtoon.ui.screen.waterfall.MediaCardExtraHeight
+import erl.webdavtoon.ui.screen.waterfall.FollowZoomWaterfallLayout
 import erl.webdavtoon.ui.screen.waterfall.SelectionBottomBarMaterial
 import erl.webdavtoon.ui.screen.waterfall.SelectionBottomBarMiuix
-import erl.webdavtoon.ui.screen.waterfall.followZoom
-import erl.webdavtoon.ui.screen.waterfall.rememberFollowZoomState
+import erl.webdavtoon.ui.screen.waterfall.rememberFollowZoomGridState
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator as MiuixCircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.DropdownEntry
@@ -144,22 +140,24 @@ fun MediaWaterfallScreen(
         if (uiState.isSelectionMode) actions.onExitSelectionMode() else actions.onBackClick()
     }
 
-    val zoomState = rememberFollowZoomState(
-        currentColumns = uiState.columns,
+    val visibleItems = uiState.visibleItems
+    val zoomState = rememberFollowZoomGridState(
+        columns = uiState.columns,
         minColumns = 1,
         maxColumns = 4,
         onColumnsChanged = actions.onColumnsChange,
     )
-    val effectiveColumns = if (zoomState.isZooming) zoomState.previewColumns else uiState.columns.coerceIn(1, 4)
+    val aspectRatios = remember(visibleItems) { visibleItems.map { it.aspectRatio } }
+    val extraHeights = remember(visibleItems, uiState.showFilenames) {
+        if (!uiState.showFilenames) List(visibleItems.size) { 0.dp }
+        else List(visibleItems.size) { MediaCardExtraHeight }
+    }
     val topAppBarScrollBehavior = MiuixScrollBehavior(rememberTopAppBarState())
-    val gridState = rememberLazyStaggeredGridState()
 
-    LaunchedEffect(gridState) {
-        snapshotFlow {
-            val last = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
-            last to gridState.layoutInfo.totalItemsCount
-        }.collect { (last, total) ->
-            if (total > 0 && last >= total - 24) actions.onLoadMore()
+    LaunchedEffect(zoomState, visibleItems.size) {
+        snapshotFlow { zoomState.scrollOffset }.collect {
+            val total = visibleItems.size
+            if (total > 0 && zoomState.lastVisibleIndex >= total - 24) actions.onLoadMore()
         }
     }
 
@@ -229,12 +227,20 @@ fun MediaWaterfallScreen(
                                 )
                             }
                         }
-                        else -> LazyVerticalStaggeredGrid(
-                            columns = StaggeredGridCells.Fixed(effectiveColumns),
-                            state = gridState,
+                        else -> FollowZoomWaterfallLayout(
+                            itemCount = visibleItems.size,
+                            aspectRatios = aspectRatios,
+                            columns = uiState.columns,
+                            minColumns = 1,
+                            maxColumns = 4,
+                            onColumnsChanged = actions.onColumnsChange,
+                            spacing = 8.dp,
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                            state = zoomState,
+                            itemExtraHeights = extraHeights,
+                            itemHorizontalPadding = 8.dp,
                             modifier = Modifier
                                 .fillMaxSize()
-                                .followZoom(zoomState)
                                 .then(
                                     if (uiState.uiMode == UiMode.Miuix) {
                                         Modifier.nestedScroll(topAppBarScrollBehavior.nestedScrollConnection)
@@ -242,30 +248,32 @@ fun MediaWaterfallScreen(
                                         Modifier
                                     }
                                 ),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
-                            verticalItemSpacing = 8.dp,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            items(uiState.visibleItems, key = { it.key }) { item ->
-                                if (uiState.uiMode == UiMode.Miuix) {
-                                    MediaCardMiuix(
-                                        item = item,
-                                        showFilename = uiState.showFilenames,
-                                        isSelectionMode = uiState.isSelectionMode,
-                                        onClick = { actions.onItemClick(item) },
-                                        onLongClick = { actions.onItemLongClick(item) },
-                                        onDimensionsResolved = actions.onDimensionsResolved,
-                                    )
-                                } else {
-                                    MediaCardMaterial(
-                                        item = item,
-                                        showFilename = uiState.showFilenames,
-                                        isSelectionMode = uiState.isSelectionMode,
-                                        onClick = { actions.onItemClick(item) },
-                                        onLongClick = { actions.onItemLongClick(item) },
-                                        onDimensionsResolved = actions.onDimensionsResolved,
-                                    )
-                                }
+                        ) { index, widthPx, heightPx ->
+                            val item = visibleItems[index]
+                            if (uiState.uiMode == UiMode.Miuix) {
+                                MediaCardMiuix(
+                                    item = item,
+                                    showFilename = uiState.showFilenames,
+                                    isSelectionMode = uiState.isSelectionMode,
+                                    onClick = { actions.onItemClick(item) },
+                                    onLongClick = { actions.onItemLongClick(item) },
+                                    onDimensionsResolved = actions.onDimensionsResolved,
+                                    targetWidthPx = widthPx,
+                                    targetHeightPx = heightPx,
+                                    fillHeight = true,
+                                )
+                            } else {
+                                MediaCardMaterial(
+                                    item = item,
+                                    showFilename = uiState.showFilenames,
+                                    isSelectionMode = uiState.isSelectionMode,
+                                    onClick = { actions.onItemClick(item) },
+                                    onLongClick = { actions.onItemLongClick(item) },
+                                    onDimensionsResolved = actions.onDimensionsResolved,
+                                    targetWidthPx = widthPx,
+                                    targetHeightPx = heightPx,
+                                    fillHeight = true,
+                                )
                             }
                         }
                     }

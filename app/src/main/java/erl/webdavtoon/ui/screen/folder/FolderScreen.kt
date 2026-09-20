@@ -2,7 +2,6 @@ package erl.webdavtoon.ui.screen.folder
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -11,9 +10,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -23,6 +19,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,8 +29,9 @@ import androidx.compose.ui.unit.dp
 import erl.webdavtoon.ui.UiMode
 import erl.webdavtoon.ui.component.AppAdaptiveNavigationScaffold
 import erl.webdavtoon.ui.component.NavigationDrawerActions
-import erl.webdavtoon.ui.screen.waterfall.rememberFollowZoomState
-import erl.webdavtoon.ui.screen.waterfall.followZoom
+import erl.webdavtoon.ui.screen.waterfall.FolderCardExtraHeight
+import erl.webdavtoon.ui.screen.waterfall.FollowZoomWaterfallLayout
+import erl.webdavtoon.ui.screen.waterfall.rememberFollowZoomGridState
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.rememberTopAppBarState
@@ -165,17 +163,15 @@ private fun FolderGrid(
     scrollBehavior: ScrollBehavior? = null,
     modifier: Modifier = Modifier,
 ) {
-    val zoomState = rememberFollowZoomState(
-        currentColumns = uiState.gridColumns,
+    val folders = uiState.folders
+    val zoomState = rememberFollowZoomGridState(
+        columns = uiState.gridColumns,
         minColumns = 1,
         maxColumns = 4,
         onColumnsChanged = actions.onSetGridColumns,
     )
-    val effectiveColumns = if (zoomState.isZooming) {
-        zoomState.previewColumns
-    } else {
-        uiState.gridColumns.coerceIn(1, 4)
-    }
+    val aspectRatios = remember(folders) { List(folders.size) { 1f } }
+    val extraHeights = remember(folders) { List(folders.size) { FolderCardExtraHeight } }
     when {
         uiState.loading -> Box(modifier, contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
@@ -188,11 +184,20 @@ private fun FolderGrid(
             text = "No folders found",
             modifier = modifier,
         )
-        else -> LazyVerticalGrid(
-            columns = GridCells.Fixed(effectiveColumns),
+        else -> FollowZoomWaterfallLayout(
+            itemCount = folders.size,
+            aspectRatios = aspectRatios,
+            columns = uiState.gridColumns,
+            minColumns = 1,
+            maxColumns = 4,
+            onColumnsChanged = actions.onSetGridColumns,
+            spacing = 10.dp,
+            contentPadding = PaddingValues(12.dp),
+            state = zoomState,
+            itemExtraHeights = extraHeights,
+            itemHorizontalPadding = 8.dp,
             modifier = modifier
                 .navigationBarsPadding()
-                .followZoom(zoomState)
                 .then(
                     if (uiState.uiMode == UiMode.Miuix && scrollBehavior != null) {
                         Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
@@ -200,32 +205,30 @@ private fun FolderGrid(
                         Modifier
                     }
                 ),
-            contentPadding = PaddingValues(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            items(uiState.folders, key = { it.path }) { folder ->
-                val onClick = {
-                    if (uiState.isSelectionMode) actions.onToggleSelection(folder.path)
-                    else actions.onFolderClick(folder)
-                }
-                val onLongClick = { actions.onToggleSelection(folder.path) }
-                when (uiState.uiMode) {
-                    UiMode.Miuix -> FolderCardMiuix(
-                        folder = folder,
-                        isSelectionMode = uiState.isSelectionMode,
-                        onClick = onClick,
-                        onLongClick = onLongClick,
-                        onVisibilityChanged = actions.onPreviewVisibilityChanged,
-                    )
-                    UiMode.Material -> FolderCardMaterial(
-                        folder = folder,
-                        isSelectionMode = uiState.isSelectionMode,
-                        onClick = onClick,
-                        onLongClick = onLongClick,
-                        onVisibilityChanged = actions.onPreviewVisibilityChanged,
-                    )
-                }
+        ) { index, _, _ ->
+            val folder = folders[index]
+            val onClick = {
+                if (uiState.isSelectionMode) actions.onToggleSelection(folder.path)
+                else actions.onFolderClick(folder)
+            }
+            val onLongClick = { actions.onToggleSelection(folder.path) }
+            when (uiState.uiMode) {
+                UiMode.Miuix -> FolderCardMiuix(
+                    folder = folder,
+                    isSelectionMode = uiState.isSelectionMode,
+                    onClick = onClick,
+                    onLongClick = onLongClick,
+                    onVisibilityChanged = actions.onPreviewVisibilityChanged,
+                    fillHeight = true,
+                )
+                UiMode.Material -> FolderCardMaterial(
+                    folder = folder,
+                    isSelectionMode = uiState.isSelectionMode,
+                    onClick = onClick,
+                    onLongClick = onLongClick,
+                    onVisibilityChanged = actions.onPreviewVisibilityChanged,
+                    fillHeight = true,
+                )
             }
         }
     }

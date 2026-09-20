@@ -48,6 +48,7 @@ fun FolderCardMaterial(
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
     onVisibilityChanged: ((path: String, visible: Boolean) -> Unit)? = null,
+    fillHeight: Boolean = false,
 ) {
     DisposableEffect(folder.path, onVisibilityChanged) {
         onVisibilityChanged?.invoke(folder.path, true)
@@ -55,8 +56,7 @@ fun FolderCardMaterial(
     }
 
     Card(
-        modifier = modifier
-            .fillMaxWidth()
+        modifier = (if (fillHeight) modifier.fillMaxSize() else modifier.fillMaxWidth())
             .pointerInput(folder.path, isSelectionMode) {
                 detectTapGestures(
                     onTap = { onClick() },
@@ -75,7 +75,8 @@ fun FolderCardMaterial(
             MaterialPreviewGrid(
                 folder = folder,
                 selected = folder.isSelected,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = if (fillHeight) Modifier.fillMaxWidth().weight(1f) else Modifier.fillMaxWidth(),
+                fillHeight = fillHeight,
             )
             Text(
                 text = folder.name.trimEnd('/'),
@@ -101,10 +102,11 @@ private fun MaterialPreviewGrid(
     folder: FolderItemUi,
     selected: Boolean,
     modifier: Modifier = Modifier,
+    fillHeight: Boolean = false,
 ) {
     Box(
         modifier = modifier
-            .aspectRatio(1f)
+            .then(if (fillHeight) Modifier else Modifier.aspectRatio(1f))
             .clip(MaterialTheme.shapes.medium)
             .background(MaterialTheme.colorScheme.surfaceVariant),
     ) {

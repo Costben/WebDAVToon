@@ -7,7 +7,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -17,9 +16,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
-import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
-import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.material3.CircularProgressIndicator as M3CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -107,17 +103,22 @@ fun MixedWaterfallScreen(
         actions.onExitSelectionMode()
     }
 
-    val zoomState = rememberFollowZoomState(
-        currentColumns = uiState.columns,
+    val visibleItems = uiState.visibleItems
+    val zoomState = rememberFollowZoomGridState(
+        columns = uiState.columns,
         minColumns = 1,
         maxColumns = 5,
         onColumnsChanged = actions.onColumnsChange,
     )
-
-    val effectiveColumns = if (zoomState.isZooming) {
-        zoomState.previewColumns
-    } else {
-        uiState.columns.coerceIn(1, 5)
+    val aspectRatios = remember(visibleItems) { visibleItems.map { it.aspectRatio } }
+    val extraHeights = remember(visibleItems, uiState.showFilenames) {
+        if (!uiState.showFilenames) {
+            List(visibleItems.size) { 0.dp }
+        } else {
+            visibleItems.map { item ->
+                if (item is MixedWaterfallItemUi.FolderItem) FolderCardExtraHeight else MediaCardExtraHeight
+            }
+        }
     }
 
     val topAppBarScrollBehavior = MiuixScrollBehavior(rememberTopAppBarState())
@@ -181,14 +182,22 @@ fun MixedWaterfallScreen(
                     }
                 }
                 else -> {
-                    // A single staggered grid keeps the image waterfall hugging the folders (no
-                    // holes). Folders stay in strict 1,2,3,4,5 order because every folder card has
-                    // an identical fixed height, so the greedy lane packing always alternates.
-                    LazyVerticalStaggeredGrid(
-                        columns = StaggeredGridCells.Fixed(effectiveColumns),
+                    // The custom layout keeps folders and media in strict index order while
+                    // continuously reflowing the visible window as the pinch column count changes.
+                    FollowZoomWaterfallLayout(
+                        itemCount = visibleItems.size,
+                        aspectRatios = aspectRatios,
+                        columns = uiState.columns,
+                        minColumns = 1,
+                        maxColumns = 5,
+                        onColumnsChanged = actions.onColumnsChange,
+                        spacing = 8.dp,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                        state = zoomState,
+                        itemExtraHeights = extraHeights,
+                        itemHorizontalPadding = 8.dp,
                         modifier = Modifier
                             .fillMaxSize()
-                            .followZoom(zoomState)
                             .then(
                                 if (uiState.uiMode == UiMode.Miuix) {
                                     Modifier.nestedScroll(topAppBarScrollBehavior.nestedScrollConnection)
@@ -196,13 +205,15 @@ fun MixedWaterfallScreen(
                                     Modifier
                                 }
                             ),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
-                        verticalItemSpacing = 8.dp,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        items(uiState.visibleItems, key = { it.key }) { item ->
-                            MixedWaterfallCard(item, uiState, actions)
-                        }
+                    ) { index, widthPx, heightPx ->
+                        MixedWaterfallCard(
+                            visibleItems[index],
+                            uiState,
+                            actions,
+                            fillHeight = true,
+                            targetWidthPx = widthPx,
+                            targetHeightPx = heightPx,
+                        )
                     }
                 }
             }
@@ -257,6 +268,9 @@ private fun MixedWaterfallCard(
     uiState: MixedWaterfallUiState,
     actions: MixedWaterfallActions,
     modifier: Modifier = Modifier,
+    fillHeight: Boolean = false,
+    targetWidthPx: Int = 0,
+    targetHeightPx: Int = 0,
 ) {
     val onFolderVisibilityChanged: (Folder, Boolean) -> Unit = { folder, visible ->
         actions.onFolderVisibilityChanged(folder, visible)
@@ -271,7 +285,10 @@ private fun MixedWaterfallCard(
             onLongClick = { actions.onItemLongClick(item) },
             onDimensionsResolved = actions.onDimensionsResolved,
             onFolderVisibilityChanged = onFolderVisibilityChanged,
+            targetWidthPx = targetWidthPx,
+            targetHeightPx = targetHeightPx,
             modifier = modifier,
+            fillHeight = fillHeight,
         )
     } else {
         MediaCardMaterial(
@@ -282,7 +299,10 @@ private fun MixedWaterfallCard(
             onLongClick = { actions.onItemLongClick(item) },
             onDimensionsResolved = actions.onDimensionsResolved,
             onFolderVisibilityChanged = onFolderVisibilityChanged,
+            targetWidthPx = targetWidthPx,
+            targetHeightPx = targetHeightPx,
             modifier = modifier,
+            fillHeight = fillHeight,
         )
     }
 }

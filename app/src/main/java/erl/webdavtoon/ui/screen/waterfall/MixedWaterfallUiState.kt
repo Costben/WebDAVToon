@@ -8,6 +8,7 @@ import erl.webdavtoon.ui.UiMode
 sealed interface MixedWaterfallItemUi {
     val key: String
     val isSelected: Boolean
+    val aspectRatio: Float
 
     data class FolderItem(
         val folder: Folder,
@@ -17,7 +18,7 @@ sealed interface MixedWaterfallItemUi {
         val isLocal: Boolean,
         val photoCount: Int,
         val previewUris: List<String>,
-        val aspectRatio: Float = 1.0f,
+        override val aspectRatio: Float = 1.0f,
         override val isSelected: Boolean = false
     ) : MixedWaterfallItemUi
 
@@ -30,7 +31,7 @@ sealed interface MixedWaterfallItemUi {
         val isLocal: Boolean,
         val isVideo: Boolean,
         val durationText: String,
-        val aspectRatio: Float,
+        override val aspectRatio: Float,
         val isFavorite: Boolean,
         override val isSelected: Boolean = false
     ) : MixedWaterfallItemUi

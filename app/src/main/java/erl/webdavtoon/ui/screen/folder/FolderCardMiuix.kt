@@ -49,6 +49,7 @@ fun FolderCardMiuix(
     onLongClick: () -> Unit,
     modifier: Modifier = Modifier,
     onVisibilityChanged: ((path: String, visible: Boolean) -> Unit)? = null,
+    fillHeight: Boolean = false,
 ) {
     DisposableEffect(folder.path, onVisibilityChanged) {
         onVisibilityChanged?.invoke(folder.path, true)
@@ -56,8 +57,7 @@ fun FolderCardMiuix(
     }
 
     Card(
-        modifier = modifier
-            .fillMaxWidth()
+        modifier = (if (fillHeight) modifier.fillMaxSize() else modifier.fillMaxWidth())
             .pointerInput(folder.path, isSelectionMode) {
                 detectTapGestures(
                     onTap = { onClick() },
@@ -69,7 +69,8 @@ fun FolderCardMiuix(
             MiuixPreviewGrid(
                 folder = folder,
                 selected = folder.isSelected,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = if (fillHeight) Modifier.fillMaxWidth().weight(1f) else Modifier.fillMaxWidth(),
+                fillHeight = fillHeight,
             )
             Text(
                 text = folder.name.trimEnd('/'),
@@ -96,10 +97,11 @@ private fun MiuixPreviewGrid(
     folder: FolderItemUi,
     selected: Boolean,
     modifier: Modifier = Modifier,
+    fillHeight: Boolean = false,
 ) {
     Box(
         modifier = modifier
-            .aspectRatio(1f)
+            .then(if (fillHeight) Modifier else Modifier.aspectRatio(1f))
             .clip(RoundedCornerShape(16.dp))
             .background(MiuixTheme.colorScheme.surfaceVariant),
     ) {

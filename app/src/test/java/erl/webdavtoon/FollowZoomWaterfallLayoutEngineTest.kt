@@ -96,6 +96,50 @@ class FollowZoomWaterfallLayoutEngineTest {
     }
 
     @Test
+    fun `five column layout is supported and uses row major placement`() {
+        val layout = FollowZoomWaterfallLayoutEngine.computeLayout(
+            aspectRatios = List(10) { 1f },
+            containerWidth = 572,
+            spacing = 8,
+            virtualColumns = 5f
+        )
+
+        assertEquals(10, layout.frames.size)
+        assertEquals(0, layout.frames[0].left)
+        assertEquals(0, layout.frames[4].top)
+        assertEquals(layout.frames[0].width, layout.frames[4].width)
+        assertEquals(108, layout.frames[0].width)
+    }
+
+    @Test
+    fun `fractional interpolation between four and five columns is monotonic`() {
+        val ratios = floatArrayOf(0.5f, 1f, 2f, 0.75f, 1.2f, 0.8f, 1.4f, 0.65f, 1f, 1f)
+        val four = FollowZoomWaterfallLayoutEngine.computeDiscreteLayout(
+            aspectRatios = ratios,
+            containerWidth = 508,
+            spacing = 8,
+            columns = 4
+        )
+        val five = FollowZoomWaterfallLayoutEngine.computeDiscreteLayout(
+            aspectRatios = ratios,
+            containerWidth = 508,
+            spacing = 8,
+            columns = 5
+        )
+        val cached = FollowZoomWaterfallLayoutEngine.interpolateLayout(four, five, 0.5f)
+        val direct = FollowZoomWaterfallLayoutEngine.computeLayout(
+            aspectRatios = ratios,
+            containerWidth = 508,
+            spacing = 8,
+            virtualColumns = 4.5f
+        )
+
+        assertEquals(direct.frames, cached.frames)
+        assertEquals(direct.contentHeight, cached.contentHeight)
+        assertTrue(cached.frames[0].width in five.frames[0].width..four.frames[0].width)
+    }
+
+    @Test
     fun `visible window clipping returns only intersecting items`() {
         val layout = FollowZoomWaterfallLayoutEngine.computeLayout(
             aspectRatios = List(12) { 1f },

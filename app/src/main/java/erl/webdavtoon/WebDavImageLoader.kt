@@ -37,6 +37,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.roundToInt
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 object WebDavImageLoader {
@@ -47,7 +48,9 @@ object WebDavImageLoader {
     private const val DEFAULT_REMOTE_VIDEO_SOURCE_CACHE_BYTES = 64L * 1024L * 1024L
     private const val AVI_REMOTE_VIDEO_SOURCE_CACHE_BYTES = 8L * 1024L * 1024L
     private const val LOCAL_IMAGE_PREVIEW_SAMPLE_MAX_PX = 96
-    private const val WATERFALL_MAX_TARGET_PIXELS = 900_000
+
+    /** Quality percentage that means "decode at the cell's own size". */
+    private const val WATERFALL_PERCENT_BASELINE = 70f
     private const val VIDEO_BITMAP_CACHE_VERSION = 6
     private val remoteVideoThumbCache = object : LruCache<String, Bitmap>(24) {}
     private val localVideoThumbCache = object : LruCache<String, Bitmap>(24) {}
@@ -978,7 +981,10 @@ object WebDavImageLoader {
         height: Int? = null
     ): RequestOptions {
         var requestOptions = RequestOptions()
-            .diskCacheStrategy(DiskCacheStrategy.ALL)
+            // Cache only the original bytes. `ALL` also stores the decoded/transformed
+            // bitmap, which makes Glide re-encode every image to JPEG on the disk cache
+            // write path (profiled as encode_mcu_gather/huff_encode during scrolling).
+            .diskCacheStrategy(DiskCacheStrategy.DATA)
             .skipMemoryCache(false)
             .priority(Priority.HIGH)
             .error(R.drawable.ic_ior_warning_circle)
@@ -1004,23 +1010,30 @@ object WebDavImageLoader {
             requestOptions = requestOptions
                 .placeholder(R.drawable.ic_ior_media_image)
                 .dontAnimate()
+            val settings = getSettingsManager(context)
             val targetWidth = width?.takeIf { it > 0 }
-            val targetHeight = height?.takeIf { it > 0 }
-            requestOptions = if (targetWidth != null && targetHeight != null) {
-                val settings = SettingsManager(context)
-                val targetSize = WaterfallThumbnailSizeResolver.resolve(
-                    displayWidth = targetWidth,
-                    displayHeight = targetHeight,
-                    qualityMode = settings.getWaterfallQualityMode(),
-                    percent = settings.getWaterfallPercent(),
-                    maxWidth = settings.getWaterfallMaxWidth(),
-                    maxTargetPixels = WATERFALL_MAX_TARGET_PIXELS
-                )
+            if (targetWidth != null) {
+                // Bound the decode by the cell WIDTH only and let the height follow the
+                // image's own aspect ratio. The waterfall derives each cell's aspect ratio
+                // from the dimensions reported by this loader, so a target height derived
+                // from the current cell ratio feeds the layout's own output back into
+                // itself; the ratio then settles on a value that only depends on the cell
+                // padding instead of the picture, and every cell ends up far too tall.
+                val boundedWidth = when (settings.getWaterfallQualityMode()) {
+                    SettingsManager.WATERFALL_MODE_MAX_WIDTH ->
+                        minOf(targetWidth, settings.getWaterfallMaxWidth().coerceAtLeast(1))
+
+                    else -> {
+                        val percent = settings.getWaterfallPercent().coerceIn(10, 100)
+                        (targetWidth * percent / WATERFALL_PERCENT_BASELINE)
+                            .roundToInt()
+                            .coerceAtLeast(1)
+                    }
+                }
                 requestOptions
-                    .override(targetSize.width, targetSize.height)
+                    .override(boundedWidth, Target.SIZE_ORIGINAL)
                     .downsample(DownsampleStrategy.AT_MOST)
             } else {
-                val settings = SettingsManager(context)
                 when (settings.getWaterfallQualityMode()) {
                     SettingsManager.WATERFALL_MODE_MAX_WIDTH -> {
                         val maxWidth = settings.getWaterfallMaxWidth()

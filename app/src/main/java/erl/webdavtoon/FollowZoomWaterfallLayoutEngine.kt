@@ -22,7 +22,7 @@ data class WaterfallLayoutResult(
 object FollowZoomWaterfallLayoutEngine {
 
     private const val MIN_COLUMNS = 1
-    private const val MAX_COLUMNS = 4
+    private const val MAX_COLUMNS = 5
     private const val DEFAULT_ASPECT_RATIO = 1f
 
     fun computeLayout(
@@ -31,7 +31,8 @@ object FollowZoomWaterfallLayoutEngine {
         spacing: Int,
         virtualColumns: Float,
         itemExtraHeight: Int = 0,
-        itemHorizontalPadding: Int = 0
+        itemHorizontalPadding: Int = 0,
+        itemExtraHeights: IntArray? = null
     ): WaterfallLayoutResult {
         return computeLayout(
             aspectRatios = aspectRatios.toFloatArray(),
@@ -39,7 +40,8 @@ object FollowZoomWaterfallLayoutEngine {
             spacing = spacing,
             virtualColumns = virtualColumns,
             itemExtraHeight = itemExtraHeight,
-            itemHorizontalPadding = itemHorizontalPadding
+            itemHorizontalPadding = itemHorizontalPadding,
+            itemExtraHeights = itemExtraHeights
         )
     }
 
@@ -49,7 +51,8 @@ object FollowZoomWaterfallLayoutEngine {
         spacing: Int,
         virtualColumns: Float,
         itemExtraHeight: Int = 0,
-        itemHorizontalPadding: Int = 0
+        itemHorizontalPadding: Int = 0,
+        itemExtraHeights: IntArray? = null
     ): WaterfallLayoutResult {
         if (aspectRatios.isEmpty() || containerWidth <= 0) {
             return WaterfallLayoutResult(emptyList(), 0)
@@ -62,18 +65,18 @@ object FollowZoomWaterfallLayoutEngine {
         if (lowerColumns == upperColumns) {
             return computeDiscreteLayout(
                 aspectRatios, containerWidth, spacing, lowerColumns,
-                itemExtraHeight, itemHorizontalPadding
+                itemExtraHeight, itemHorizontalPadding, itemExtraHeights
             )
         }
 
         val progress = clampedColumns - lowerColumns
         val lower = computeDiscreteLayout(
             aspectRatios, containerWidth, spacing, lowerColumns,
-            itemExtraHeight, itemHorizontalPadding
+            itemExtraHeight, itemHorizontalPadding, itemExtraHeights
         )
         val upper = computeDiscreteLayout(
             aspectRatios, containerWidth, spacing, upperColumns,
-            itemExtraHeight, itemHorizontalPadding
+            itemExtraHeight, itemHorizontalPadding, itemExtraHeights
         )
         return interpolateLayout(lower, upper, progress)
     }
@@ -84,11 +87,12 @@ object FollowZoomWaterfallLayoutEngine {
         spacing: Int,
         columns: Int,
         itemExtraHeight: Int = 0,
-        itemHorizontalPadding: Int = 0
+        itemHorizontalPadding: Int = 0,
+        itemExtraHeights: IntArray? = null
     ): WaterfallLayoutResult {
         return buildDiscreteLayout(
             aspectRatios, containerWidth, spacing, columns,
-            itemExtraHeight, itemHorizontalPadding
+            itemExtraHeight, itemHorizontalPadding, itemExtraHeights
         )
     }
 
@@ -176,7 +180,8 @@ object FollowZoomWaterfallLayoutEngine {
         spacing: Int,
         columns: Int,
         itemExtraHeight: Int = 0,
-        itemHorizontalPadding: Int = 0
+        itemHorizontalPadding: Int = 0,
+        itemExtraHeights: IntArray? = null
     ): WaterfallLayoutResult {
         val columnCount = columns.coerceIn(MIN_COLUMNS, MAX_COLUMNS)
         val safeSpacing = spacing.coerceAtLeast(0)
@@ -189,7 +194,8 @@ object FollowZoomWaterfallLayoutEngine {
             val ratio = aspectRatios[index].takeIf { it > 0f } ?: DEFAULT_ASPECT_RATIO
             val left = column * (columnWidth + safeSpacing)
             val top = columnHeights[column]
-            val height = max((innerWidth / ratio).roundToInt() + itemExtraHeight, 1)
+            val extra = itemExtraHeights?.getOrNull(index) ?: itemExtraHeight
+            val height = max((innerWidth / ratio).roundToInt() + extra, 1)
             columnHeights[column] = top + height + safeSpacing
             WaterfallItemFrame(
                 index = index,
