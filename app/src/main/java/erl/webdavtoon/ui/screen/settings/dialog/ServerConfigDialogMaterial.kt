@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
@@ -28,7 +29,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import erl.webdavtoon.R
@@ -95,7 +95,7 @@ private fun ServerConfigDialogMaterialContent(
     val passwordTransformation = if (state.showPassword) {
         VisualTransformation.None
     } else {
-        PasswordVisualTransformation()
+        MaskVisualTransformation()
     }
 
     Column(
@@ -197,6 +197,7 @@ private fun ServerConfigDialogMaterialContent(
             label = { Text(stringResource(R.string.password_hint)) },
             singleLine = true,
             visualTransformation = passwordTransformation,
+            keyboardOptions = KeyboardOptions(autoCorrectEnabled = false),
         )
 
         LabeledCheckbox(

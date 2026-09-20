@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -24,7 +25,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.state.ToggleableState
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import erl.webdavtoon.R
@@ -84,7 +84,7 @@ private fun ServerConfigDialogMiuixContent(
     val passwordTransformation = if (state.showPassword) {
         VisualTransformation.None
     } else {
-        PasswordVisualTransformation()
+        MaskVisualTransformation()
     }
 
     Column(
@@ -187,6 +187,7 @@ private fun ServerConfigDialogMiuixContent(
             label = stringResource(R.string.password_hint),
             singleLine = true,
             visualTransformation = passwordTransformation,
+            keyboardOptions = KeyboardOptions(autoCorrectEnabled = false),
         )
 
         // The password hint doubles as the reveal-label here: values/ has no
