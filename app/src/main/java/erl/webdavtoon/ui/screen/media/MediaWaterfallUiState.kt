@@ -19,7 +19,6 @@ data class MediaWaterfallUiState(
     val searchKeyword: String = "",
     val isSearching: Boolean = false,
     val sortOrder: Int = SettingsManager.SORT_DATE_DESC,
-    val randomizePhotos: Boolean = false,
     val rotationLocked: Boolean = false,
     val loading: Boolean = true,
     val isRefreshing: Boolean = false,

@@ -74,7 +74,20 @@ class SettingsManager(context: Context) {
         const val SORT_DATE_DESC = 2
         const val SORT_DATE_ASC = 3
         const val SORT_RANDOM_FOLDERS = 4
-        const val SORT_RANDOM_PHOTOS = 5
+
+        /** Random photos that stay inside their folder groups: folders keep their order, only the items shuffle. */
+        const val SORT_RANDOM_PHOTOS_GROUPED = 5
+
+        /** Random photos that ignore folder groups entirely: every item is shuffled across all folders. */
+        const val SORT_RANDOM_PHOTOS = 6
+
+        /** True for every random-photo sort, whether folder grouped or fully shuffled. */
+        fun isRandomPhotoSort(order: Int): Boolean =
+            order == SORT_RANDOM_PHOTOS || order == SORT_RANDOM_PHOTOS_GROUPED
+
+        /** True when photos must be shuffled across folder groups instead of within them. */
+        fun isFullyShuffledPhotoSort(order: Int): Boolean = order == SORT_RANDOM_PHOTOS
+
 
         const val RECURSIVE_IMAGE_ARRANGEMENT_GROUPED = 0
         const val RECURSIVE_IMAGE_ARRANGEMENT_GLOBAL_DATE_DESC = 1

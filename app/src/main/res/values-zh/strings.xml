@@ -51,6 +51,7 @@
     <string name="sort_date_asc">日期 (最早在前)</string>
     <string name="sort_random_folders">文件夹随机</string>
     <string name="sort_random_photos">图片随机</string>
+    <string name="sort_random_photos_grouped">图片随机（文件夹分组）</string>
     <string name="browse_all">浏览全部</string>
     <string name="recursive_image_arrangement">递归图片排列</string>
     <string name="recursive_image_arrangement_grouped">按文件夹聚合（默认）</string>

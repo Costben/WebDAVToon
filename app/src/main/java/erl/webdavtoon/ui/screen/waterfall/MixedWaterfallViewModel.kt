@@ -432,7 +432,7 @@ class MixedWaterfallViewModel(app: Application) : AndroidViewModel(app) {
         if (order == SettingsManager.SORT_RANDOM_FOLDERS) {
             folderShuffleSeed = Random.nextLong()
         }
-        if (order == SettingsManager.SORT_RANDOM_PHOTOS) {
+        if (SettingsManager.isRandomPhotoSort(order)) {
             photoShuffleSeed = Random.nextLong()
         }
         _uiState.update { it.copy(sortOrder = order) }
@@ -679,7 +679,7 @@ class MixedWaterfallViewModel(app: Application) : AndroidViewModel(app) {
         if (order == SettingsManager.SORT_RANDOM_FOLDERS) {
             folderShuffleSeed = Random.nextLong()
         }
-        if (order == SettingsManager.SORT_RANDOM_PHOTOS) {
+        if (SettingsManager.isRandomPhotoSort(order)) {
             photoShuffleSeed = Random.nextLong()
         }
     }
@@ -687,7 +687,7 @@ class MixedWaterfallViewModel(app: Application) : AndroidViewModel(app) {
     /** Date-ordered media, shuffled when the "random photos" sort is active. */
     private fun sortMediaForDisplay(photos: List<Photo>, sortOrder: Int): List<Photo> {
         val sorted = FolderPreviewOrdering.sortPhotos(photos, sortOrder)
-        return if (sortOrder == SettingsManager.SORT_RANDOM_PHOTOS) {
+        return if (SettingsManager.isRandomPhotoSort(sortOrder)) {
             sorted.shuffled(Random(photoShuffleSeed))
         } else {
             sorted

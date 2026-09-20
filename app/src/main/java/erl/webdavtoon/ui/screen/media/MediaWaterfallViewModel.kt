@@ -50,6 +50,7 @@ class MediaWaterfallViewModel(app: Application) : AndroidViewModel(app) {
     private var orderedPhotos: List<Photo> = emptyList()
     private var clusterShuffleSeed = Random.nextLong()
     private var photoShuffleSeed = Random.nextLong()
+    private var previousSortOrder: Int = SettingsManager.SORT_DATE_DESC
     private var loadJob: Job? = null
 
     private val _uiState = MutableStateFlow(
@@ -156,7 +157,6 @@ class MediaWaterfallViewModel(app: Application) : AndroidViewModel(app) {
                     isRecursive = state.isRecursive,
                     recursiveImageArrangement = settingsManager.getRecursiveImageArrangement(),
                     clusterShuffleSeed = clusterShuffleSeed,
-                    randomizePhotos = state.randomizePhotos,
                     photoShuffleSeed = photoShuffleSeed,
                 )
                 orderedPhotos = ordered
@@ -247,17 +247,23 @@ class MediaWaterfallViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setSortOrder(order: Int) {
         settingsManager.setPhotoSortOrder(order)
+        if (order != SettingsManager.SORT_RANDOM_PHOTOS) previousSortOrder = order
         if (order == SettingsManager.SORT_RANDOM_FOLDERS) clusterShuffleSeed = Random.nextLong()
-        if (order == SettingsManager.SORT_RANDOM_PHOTOS) photoShuffleSeed = Random.nextLong()
+        if (SettingsManager.isRandomPhotoSort(order)) photoShuffleSeed = Random.nextLong()
         _uiState.update { it.copy(sortOrder = order) }
         load()
     }
 
+    /** The "randomize photos" switch is just a shortcut for the [SettingsManager.SORT_RANDOM_PHOTOS] sort. */
     fun toggleRandomizePhotos() {
-        val enabled = !_uiState.value.randomizePhotos
-        photoShuffleSeed = Random.nextLong()
-        _uiState.update { it.copy(randomizePhotos = enabled) }
-        load()
+        val current = _uiState.value.sortOrder
+        val next = if (current == SettingsManager.SORT_RANDOM_PHOTOS) {
+            previousSortOrder
+        } else {
+            previousSortOrder = current
+            SettingsManager.SORT_RANDOM_PHOTOS
+        }
+        setSortOrder(next)
     }
 
     fun setSearchKeyword(keyword: String) {

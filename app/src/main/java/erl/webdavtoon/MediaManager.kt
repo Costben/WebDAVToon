@@ -9,6 +9,13 @@ import kotlin.random.Random
  */
 object MediaManager {
 
+    /**
+     * Orders photos for the media waterfall.
+     *
+     * Random sorts come in two flavours: [SettingsManager.SORT_RANDOM_PHOTOS_GROUPED] keeps the
+     * folder order and only shuffles inside each folder, while [SettingsManager.SORT_RANDOM_PHOTOS]
+     * (and the randomize toggle) shuffle every photo across all folders.
+     */
     fun sortPhotos(
         photos: List<Photo>,
         sortOrder: Int,
@@ -17,44 +24,74 @@ object MediaManager {
         clusterShuffleSeed: Long = 0L,
         randomizePhotos: Boolean = false,
         photoShuffleSeed: Long = 0L
-    ): List<Photo> {
-        val baseSorted = sortMediaItems(photos, sortOrder)
+    ): List<Photo> = orderMedia(
+        items = photos,
+        sortOrder = sortOrder,
+        isRecursive = isRecursive,
+        recursiveImageArrangement = recursiveImageArrangement,
+        clusterShuffleSeed = clusterShuffleSeed,
+        randomizePhotos = randomizePhotos,
+        itemShuffleSeed = photoShuffleSeed,
+        title = { it.title },
+        folderPath = { it.folderPath },
+        dateModified = { it.dateModified }
+    )
+
+    /** Pure, [Photo]-free variant of [sortPhotos] so the ordering rules stay unit testable. */
+    internal fun <T> orderMedia(
+        items: List<T>,
+        sortOrder: Int,
+        isRecursive: Boolean,
+        recursiveImageArrangement: Int = SettingsManager.RECURSIVE_IMAGE_ARRANGEMENT_GROUPED,
+        clusterShuffleSeed: Long = 0L,
+        randomizePhotos: Boolean = false,
+        itemShuffleSeed: Long = 0L,
+        title: (T) -> String,
+        folderPath: (T) -> String,
+        dateModified: (T) -> Long
+    ): List<T> {
+        val baseSorted = sortMediaItems(items, sortOrder, title, dateModified)
         if (baseSorted.isEmpty()) return baseSorted
 
-        val shouldRandomizePhotos = randomizePhotos || sortOrder == SettingsManager.SORT_RANDOM_PHOTOS
-        val effectivePhotoSeed = if (photoShuffleSeed != 0L) photoShuffleSeed else Random.nextLong()
+        val effectiveItemSeed = if (itemShuffleSeed != 0L) itemShuffleSeed else Random.nextLong()
+        val shuffleWithinFolders = SettingsManager.isRandomPhotoSort(sortOrder)
+
+        if (randomizePhotos || SettingsManager.isFullyShuffledPhotoSort(sortOrder)) {
+            return baseSorted.shuffled(Random(effectiveItemSeed))
+        }
 
         if (!isRecursive) {
-            return if (shouldRandomizePhotos) baseSorted.shuffled(Random(effectivePhotoSeed)) else baseSorted
+            return if (shuffleWithinFolders) baseSorted.shuffled(Random(effectiveItemSeed)) else baseSorted
         }
 
         if (recursiveImageArrangement != SettingsManager.RECURSIVE_IMAGE_ARRANGEMENT_GROUPED) {
             return sortRecursivelyByGlobalDate(
-                photos = photos,
+                photos = items,
                 arrangement = recursiveImageArrangement,
-                dateModified = { it.dateModified }
+                dateModified = dateModified
             )
         }
 
-        val grouped = LinkedHashMap<String, List<Photo>>()
-        for (photo in baseSorted) {
-            grouped[photo.folderPath] = (grouped[photo.folderPath] ?: emptyList()) + photo
+        val grouped = LinkedHashMap<String, List<T>>()
+        for (item in baseSorted) {
+            val path = folderPath(item)
+            grouped[path] = (grouped[path] ?: emptyList()) + item
         }
 
         if (grouped.size <= 1) {
-            return if (shouldRandomizePhotos) baseSorted.shuffled(Random(effectivePhotoSeed)) else baseSorted
+            return if (shuffleWithinFolders) baseSorted.shuffled(Random(effectiveItemSeed)) else baseSorted
         }
 
         val sortedFolderPaths = sortFolderPaths(
             grouped = grouped,
             sortOrder = sortOrder,
             clusterShuffleSeed = clusterShuffleSeed,
-            newestDate = { folderPhotos -> folderPhotos.maxOfOrNull { it.dateModified } ?: 0L },
-            oldestDate = { folderPhotos -> folderPhotos.minOfOrNull { it.dateModified } ?: 0L }
+            newestDate = { folderItems -> folderItems.maxOfOrNull(dateModified) ?: 0L },
+            oldestDate = { folderItems -> folderItems.minOfOrNull(dateModified) ?: 0L }
         )
 
-        val result = ArrayList<Photo>(baseSorted.size)
-        result.addAll(flattenFolderGroups(grouped, sortedFolderPaths, shouldRandomizePhotos, effectivePhotoSeed))
+        val result = ArrayList<T>(baseSorted.size)
+        result.addAll(flattenFolderGroups(grouped, sortedFolderPaths, shuffleWithinFolders, effectiveItemSeed))
         return result
     }
 
@@ -72,14 +109,19 @@ object MediaManager {
         }
     }
 
-    private fun sortMediaItems(photos: List<Photo>, sortOrder: Int): List<Photo> {
+    private fun <T> sortMediaItems(
+        items: List<T>,
+        sortOrder: Int,
+        title: (T) -> String,
+        dateModified: (T) -> Long
+    ): List<T> {
         return when (sortOrder) {
-            SettingsManager.SORT_NAME_ASC -> photos.sortedBy { it.title.lowercase(Locale.ROOT) }
-            SettingsManager.SORT_NAME_DESC -> photos.sortedByDescending { it.title.lowercase(Locale.ROOT) }
-            SettingsManager.SORT_DATE_ASC -> photos.sortedBy { it.dateModified }
+            SettingsManager.SORT_NAME_ASC -> items.sortedBy { title(it).lowercase(Locale.ROOT) }
+            SettingsManager.SORT_NAME_DESC -> items.sortedByDescending { title(it).lowercase(Locale.ROOT) }
+            SettingsManager.SORT_DATE_ASC -> items.sortedBy(dateModified)
             SettingsManager.SORT_DATE_DESC,
-            SettingsManager.SORT_RANDOM_FOLDERS -> photos.sortedByDescending { it.dateModified }
-            else -> photos.sortedByDescending { it.dateModified }
+            SettingsManager.SORT_RANDOM_FOLDERS -> items.sortedByDescending(dateModified)
+            else -> items.sortedByDescending(dateModified)
         }
     }
 

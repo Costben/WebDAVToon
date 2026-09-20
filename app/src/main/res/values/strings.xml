@@ -51,6 +51,7 @@
     <string name="sort_date_asc">Date (Oldest First)</string>
     <string name="sort_random_folders">Random Folders</string>
     <string name="sort_random_photos">Random Photos</string>
+    <string name="sort_random_photos_grouped">Random Photos (folder grouped)</string>
     <string name="browse_all">Browse all</string>
     <string name="recursive_image_arrangement">Recursive image arrangement</string>
     <string name="recursive_image_arrangement_grouped">Group by folder (default)</string>

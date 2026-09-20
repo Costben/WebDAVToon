@@ -444,6 +444,7 @@ private fun mixedSortItems(): List<Pair<Int, String>> = listOf(
     SettingsManager.SORT_DATE_DESC to stringResource(R.string.sort_date_desc),
     SettingsManager.SORT_DATE_ASC to stringResource(R.string.sort_date_asc),
     SettingsManager.SORT_RANDOM_FOLDERS to stringResource(R.string.sort_random_folders),
+    SettingsManager.SORT_RANDOM_PHOTOS_GROUPED to stringResource(R.string.sort_random_photos_grouped),
     SettingsManager.SORT_RANDOM_PHOTOS to stringResource(R.string.sort_random_photos),
 )
 

@@ -166,6 +166,97 @@ class MediaManagerSortTest {
         assertTrue(hasDifferentOrder)
     }
 
+    @Test
+    fun groupedRandomPhotoSort_keepsFolderRunsContiguous() {
+        val stubs = sampleGroupedPhotos().values.flatten()
+
+        val ordered = orderStubs(stubs, sortOrder = SettingsManager.SORT_RANDOM_PHOTOS_GROUPED, itemShuffleSeed = 3L)
+
+        assertEquals(stubs.size, ordered.size)
+        assertEquals(stubs.map { it.id }.sorted(), ordered.map { it.id }.sorted())
+        assertEquals(4, folderRuns(ordered))
+    }
+
+    @Test
+    fun fullRandomPhotoSort_interleavesFolders() {
+        val stubs = sampleGroupedPhotos().values.flatten()
+
+        val ordered = orderStubs(stubs, sortOrder = SettingsManager.SORT_RANDOM_PHOTOS, itemShuffleSeed = 3L)
+
+        assertEquals(stubs.map { it.id }.sorted(), ordered.map { it.id }.sorted())
+        assertTrue(
+            "expected photos from different folders to interleave, got ${ordered.map { it.folderPath }}",
+            folderRuns(ordered) > 4
+        )
+    }
+
+    @Test
+    fun fullRandomPhotoSort_isStableForSameSeed() {
+        val stubs = sampleGroupedPhotos().values.flatten()
+
+        val first = orderStubs(stubs, sortOrder = SettingsManager.SORT_RANDOM_PHOTOS, itemShuffleSeed = 5L)
+        val second = orderStubs(stubs, sortOrder = SettingsManager.SORT_RANDOM_PHOTOS, itemShuffleSeed = 5L)
+
+        assertEquals(first.map { it.id }, second.map { it.id })
+    }
+
+    @Test
+    fun randomizeToggle_interleavesFoldersForDateSort() {
+        val stubs = sampleGroupedPhotos().values.flatten()
+
+        val ordered = orderStubs(
+            stubs,
+            sortOrder = SettingsManager.SORT_DATE_DESC,
+            randomizePhotos = true,
+            itemShuffleSeed = 11L
+        )
+
+        assertTrue(folderRuns(ordered) > 4)
+    }
+
+    @Test
+    fun globalDateArrangement_stillWinsForGroupedRandomPhotoSort() {
+        val stubs = sampleGroupedPhotos().values.flatten()
+
+        val ordered = orderStubs(
+            stubs,
+            sortOrder = SettingsManager.SORT_RANDOM_PHOTOS_GROUPED,
+            recursiveImageArrangement = SettingsManager.RECURSIVE_IMAGE_ARRANGEMENT_GLOBAL_DATE_DESC,
+            itemShuffleSeed = 3L
+        )
+
+        assertEquals(stubs.sortedByDescending { it.dateModified }.map { it.id }, ordered.map { it.id })
+    }
+
+    private fun orderStubs(
+        stubs: List<PhotoStub>,
+        sortOrder: Int,
+        recursiveImageArrangement: Int = SettingsManager.RECURSIVE_IMAGE_ARRANGEMENT_GROUPED,
+        randomizePhotos: Boolean = false,
+        itemShuffleSeed: Long = 0L
+    ): List<PhotoStub> = MediaManager.orderMedia(
+        items = stubs,
+        sortOrder = sortOrder,
+        isRecursive = true,
+        recursiveImageArrangement = recursiveImageArrangement,
+        clusterShuffleSeed = 1L,
+        randomizePhotos = randomizePhotos,
+        itemShuffleSeed = itemShuffleSeed,
+        title = { it.id },
+        folderPath = { it.folderPath },
+        dateModified = { it.dateModified }
+    )
+
+    private fun folderRuns(items: List<PhotoStub>): Int {
+        var runs = 0
+        var previous: String? = null
+        for (item in items) {
+            if (item.folderPath != previous) runs++
+            previous = item.folderPath
+        }
+        return runs
+    }
+
     private fun sampleGroupedPhotos(): Map<String, List<PhotoStub>> = linkedMapOf(
         "/a" to listOf(PhotoStub("/a", "a1", 100), PhotoStub("/a", "a2", 90), PhotoStub("/a", "a3", 80)),
         "/b" to listOf(PhotoStub("/b", "b1", 300), PhotoStub("/b", "b2", 280), PhotoStub("/b", "b3", 260)),

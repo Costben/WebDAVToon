@@ -318,6 +318,7 @@ private fun mediaSortItems(): List<Pair<Int, String>> = listOf(
     SettingsManager.SORT_DATE_DESC to stringResource(R.string.sort_date_desc),
     SettingsManager.SORT_DATE_ASC to stringResource(R.string.sort_date_asc),
     SettingsManager.SORT_RANDOM_FOLDERS to stringResource(R.string.sort_random_folders),
+    SettingsManager.SORT_RANDOM_PHOTOS_GROUPED to stringResource(R.string.sort_random_photos_grouped),
     SettingsManager.SORT_RANDOM_PHOTOS to stringResource(R.string.sort_random_photos),
 )
 
@@ -383,6 +384,7 @@ private fun MediaTopBarMiuix(
 
 @Composable
 private fun MediaMiuixMenuButton(uiState: MediaWaterfallUiState, actions: MediaWaterfallActions) {
+    val shuffleAllPhotos = uiState.sortOrder == SettingsManager.SORT_RANDOM_PHOTOS
     val sortItems = mediaSortItems().map { (order, label) ->
         DropdownItem(text = label, selected = uiState.sortOrder == order, onClick = { actions.onSetSortOrder(order) })
     }
@@ -410,7 +412,7 @@ private fun MediaMiuixMenuButton(uiState: MediaWaterfallUiState, actions: MediaW
                     ),
                     DropdownItem(
                         text = stringResource(R.string.randomize_photos),
-                        summary = if (uiState.randomizePhotos) "On" else "Off",
+                        summary = if (shuffleAllPhotos) "On" else "Off",
                         icon = { modifier -> MiuixIcon(MiuixIcons.Light.Sort, null, modifier) },
                         onClick = actions.onToggleRandomizePhotos,
                     ),
@@ -520,6 +522,7 @@ private fun MediaMaterialMenu(
 ) {
     val selectedTint = MaterialTheme.colorScheme.primary
     val idleTint = MaterialTheme.colorScheme.onSurfaceVariant
+    val shuffleAllPhotos = uiState.sortOrder == SettingsManager.SORT_RANDOM_PHOTOS
     var level by remember { mutableStateOf(MediaMaterialMenuLevel.Root) }
     if (!expanded && level != MediaMaterialMenuLevel.Root) level = MediaMaterialMenuLevel.Root
 
@@ -544,10 +547,10 @@ private fun MediaMaterialMenu(
                         M3Icon(
                             MiuixIcons.Light.Sort,
                             null,
-                            tint = if (uiState.randomizePhotos) selectedTint else idleTint,
+                            tint = if (shuffleAllPhotos) selectedTint else idleTint,
                         )
                     },
-                    trailingIcon = { M3Text(if (uiState.randomizePhotos) "On" else "Off") },
+                    trailingIcon = { M3Text(if (shuffleAllPhotos) "On" else "Off") },
                     onClick = { actions.onToggleRandomizePhotos(); onDismiss() },
                 )
                 DropdownMenuItem(
