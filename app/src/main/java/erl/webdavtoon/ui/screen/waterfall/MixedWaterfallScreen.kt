@@ -32,7 +32,6 @@ import erl.webdavtoon.Folder
 import erl.webdavtoon.R
 import erl.webdavtoon.SettingsManager
 import erl.webdavtoon.ui.component.AnimatedSearchField
-import erl.webdavtoon.ui.component.FunnelIcon
 import io.github.suqi8.coui.kmp.basic.CircularProgressIndicator as MiuixCircularProgressIndicator
 import io.github.suqi8.coui.kmp.basic.FloatingActionButton as MiuixFloatingActionButton
 import io.github.suqi8.coui.kmp.basic.Icon as MiuixIcon
@@ -52,11 +51,12 @@ import io.github.suqi8.coui.kmp.icon.extended.ChevronForward
 import io.github.suqi8.coui.kmp.icon.extended.Close
 import io.github.suqi8.coui.kmp.icon.extended.GridView
 import io.github.suqi8.coui.kmp.icon.extended.Lock
-import io.github.suqi8.coui.kmp.icon.extended.More
 import io.github.suqi8.coui.kmp.icon.extended.Refresh
 import io.github.suqi8.coui.kmp.icon.extended.Settings
 import io.github.suqi8.coui.kmp.icon.extended.Sort
 import erl.webdavtoon.ui.component.CouiCascadingMenu
+import erl.webdavtoon.ui.component.TopBarActionIcon
+import erl.webdavtoon.ui.component.TopBarIcons
 import io.github.suqi8.coui.kmp.theme.COUITheme
 
 data class MixedWaterfallActions(
@@ -290,8 +290,8 @@ private fun MixedWaterfallTopBarMiuix(
             actions = {
                 if (!uiState.isSelectionMode) {
                     MiuixIconButton(onClick = { searchExpanded = true }) {
-                        MiuixIcon(
-                            FunnelIcon,
+                        TopBarActionIcon(
+                            TopBarIcons.Filter,
                             contentDescription = stringResource(R.string.filter),
                         )
                     }
@@ -370,7 +370,7 @@ private fun MixedWaterfallMiuixMenuButton(
             ),
         ),
     ) {
-        MiuixIcon(COUIIcons.Light.More, contentDescription = stringResource(R.string.more))
+        TopBarActionIcon(TopBarIcons.More, contentDescription = stringResource(R.string.more))
     }
 }
 

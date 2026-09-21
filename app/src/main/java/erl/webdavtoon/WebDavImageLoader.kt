@@ -1,6 +1,7 @@
 package erl.webdavtoon
 
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.drawable.BitmapDrawable
@@ -14,6 +15,7 @@ import android.view.View
 import android.widget.ImageView
 import android.widget.ProgressBar
 import wseemann.media.FFmpegMediaMetadataRetriever
+import androidx.core.content.ContextCompat
 import com.bumptech.glide.Glide
 import com.bumptech.glide.Priority
 import com.bumptech.glide.load.DecodeFormat
@@ -168,7 +170,7 @@ object WebDavImageLoader {
         imageView.tag = cacheKey
         progressBar?.visibility = View.VISIBLE
         if (previousDrawable == null) {
-            showVideoPlaceholder(imageView, isFolderPreview)
+            showVideoPlaceholder(imageView)
         }
 
         remoteVideoThumbCache.get(cacheKey)?.let { cached ->
@@ -221,7 +223,7 @@ object WebDavImageLoader {
                     setBitmapWithCrossFade(imageView, bitmap, previousDrawable, crossFadeDurationMs)
                     android.util.Log.i("WebDavImageLoader", "WebDAV-Video thumbnail success: $cacheKeySource")
                 } else if (previousDrawable == null) {
-                    showVideoPlaceholder(imageView, isFolderPreview)
+                    showVideoPlaceholder(imageView)
                     android.util.Log.w("WebDavImageLoader", "WebDAV-Video thumbnail fallback placeholder: $cacheKeySource")
                 }
                 progressBar?.visibility = View.GONE
@@ -371,7 +373,7 @@ object WebDavImageLoader {
         imageView.tag = cacheKey
         progressBar?.visibility = View.VISIBLE
         if (previousDrawable == null) {
-            showVideoPlaceholder(imageView, isFolderPreview)
+            showVideoPlaceholder(imageView)
         }
 
         localVideoThumbCache.get(cacheKey)?.let { cached ->
@@ -404,7 +406,7 @@ object WebDavImageLoader {
                     applyVideoThumbnailDisplayMode(imageView, isFolderPreview)
                     setBitmapWithCrossFade(imageView, bitmap, previousDrawable, crossFadeDurationMs)
                 } else if (previousDrawable == null) {
-                    showVideoPlaceholder(imageView, isFolderPreview)
+                    showVideoPlaceholder(imageView)
                     android.util.Log.w("WebDavImageLoader", "Local-Video thumbnail fallback placeholder: $videoUri")
                 }
                 progressBar?.visibility = View.GONE
@@ -989,11 +991,11 @@ object WebDavImageLoader {
             .diskCacheStrategy(DiskCacheStrategy.DATA)
             .skipMemoryCache(false)
             .priority(Priority.HIGH)
-            .error(R.drawable.ic_ior_warning_circle)
+            .error(R.drawable.ic_coui_report)
 
         if (isFolderPreview) {
             requestOptions = requestOptions
-                .placeholder(R.drawable.ic_ior_media_image)
+                .placeholder(R.drawable.ic_coui_image)
                 .override(FOLDER_PREVIEW_SIZE_PX, FOLDER_PREVIEW_SIZE_PX)
                 .downsample(DownsampleStrategy.AT_MOST)
                 .format(DecodeFormat.PREFER_RGB_565)
@@ -1004,13 +1006,13 @@ object WebDavImageLoader {
             val targetWidth = displayMetrics.widthPixels.coerceAtLeast(1)
             val targetHeight = (displayMetrics.heightPixels * 2).coerceAtLeast(displayMetrics.heightPixels)
             requestOptions = requestOptions
-                .placeholder(R.drawable.ic_ior_media_image)
+                .placeholder(R.drawable.ic_coui_image)
                 .override(targetWidth, targetHeight)
                 .downsample(DownsampleStrategy.AT_MOST)
                 .dontAnimate()
         } else if (isWaterfall) {
             requestOptions = requestOptions
-                .placeholder(R.drawable.ic_ior_media_image)
+                .placeholder(R.drawable.ic_coui_image)
                 .dontAnimate()
             val settings = getSettingsManager(context)
             val targetWidth = width?.takeIf { it > 0 }
@@ -1065,7 +1067,7 @@ object WebDavImageLoader {
             }
         } else if (limitSize) {
             requestOptions = requestOptions
-                .placeholder(R.drawable.ic_ior_media_image)
+                .placeholder(R.drawable.ic_coui_image)
                 .override(320, 320)
                 .downsample(DownsampleStrategy.AT_MOST)
         } else {
@@ -1156,11 +1158,11 @@ object WebDavImageLoader {
     }
 
     private fun applyVideoThumbnailDisplayMode(imageView: ImageView, isFolderPreview: Boolean) {
-        imageView.scaleType = if (isFolderPreview) {
-            ImageView.ScaleType.CENTER_CROP
-        } else {
-            ImageView.ScaleType.FIT_CENTER
-        }
+        // Both destinations crop: a folder tile is a square and a video cell is a square
+        // placeholder (the listing has no video dimensions to size it from). FIT_CENTER used to
+        // letterbox the 16:9 frame inside the square, and because the box sits on the card
+        // surface that band read as a grey bar.
+        imageView.scaleType = ImageView.ScaleType.CENTER_CROP
     }
 
     private fun setBitmapWithCrossFade(
@@ -1253,14 +1255,29 @@ object WebDavImageLoader {
         }
     }
 
-    private fun showVideoPlaceholder(imageView: ImageView, isFolderPreview: Boolean) {
-        if (isFolderPreview) {
-            imageView.scaleType = ImageView.ScaleType.CENTER
-            imageView.setImageResource(R.drawable.ic_ior_play)
-        } else {
-            imageView.scaleType = ImageView.ScaleType.FIT_CENTER
-            imageView.setImageResource(R.drawable.bg_video_thumbnail_placeholder)
-        }
+    /**
+     * "Video, but no frame yet" state, shared by folder tiles and media cells: one COUI play
+     * glyph centred in the box.
+     *
+     * The old non-tile branch used a 320x180 layer-list that carried its own aspect ratio,
+     * corner radius and a #12000000 fill. Fitting that into a square cell produced grey
+     * letterbox bands and stacked a second background layer on top of the card surface, which
+     * is the "extra layer / grey edge" the design wanted gone.
+     */
+    private fun showVideoPlaceholder(imageView: ImageView) {
+        imageView.scaleType = ImageView.ScaleType.CENTER
+        val glyph = ContextCompat.getDrawable(imageView.context, R.drawable.ic_coui_play)?.mutate()
+        glyph?.setTint(videoPlaceholderTint(imageView.context))
+        imageView.setImageDrawable(glyph)
+    }
+
+    /**
+     * The glyph sits on an empty card surface rather than on a decoded frame, so it has to
+     * follow the theme instead of the asset's baked-in white.
+     */
+    private fun videoPlaceholderTint(context: Context): Int {
+        val nightMode = context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+        return if (nightMode == Configuration.UI_MODE_NIGHT_YES) 0x59FFFFFF else 0x59000000
     }
 
     private fun decodeLocalPreviewSample(context: Context, imageUri: Uri): Bitmap? {

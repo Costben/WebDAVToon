@@ -5,7 +5,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -33,19 +33,29 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import erl.webdavtoon.R
+import io.github.suqi8.coui.kmp.basic.FloatingToolbar
 import io.github.suqi8.coui.kmp.basic.Icon
 import io.github.suqi8.coui.kmp.basic.IconButton
 import io.github.suqi8.coui.kmp.basic.Slider
-import io.github.suqi8.coui.kmp.basic.Surface
 import io.github.suqi8.coui.kmp.basic.Text
 import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.extended.Back
+import io.github.suqi8.coui.kmp.icon.extended.Download
+import io.github.suqi8.coui.kmp.icon.extended.Favorites
+import io.github.suqi8.coui.kmp.icon.extended.FavoritesFill
+import io.github.suqi8.coui.kmp.icon.extended.Image
+import io.github.suqi8.coui.kmp.icon.extended.ListView
+import io.github.suqi8.coui.kmp.icon.extended.Lock
+import io.github.suqi8.coui.kmp.icon.extended.Pause
+import io.github.suqi8.coui.kmp.icon.extended.Play
+import io.github.suqi8.coui.kmp.icon.extended.RotateLeft
+import io.github.suqi8.coui.kmp.icon.extended.Share
 import io.github.suqi8.coui.kmp.theme.COUITheme
 import kotlin.math.roundToInt
 
@@ -105,14 +115,12 @@ fun ReaderOverlayMiuix(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp),
         ) {
-            Surface(
+            FloatingToolbar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 600.dp),
-                shape = RoundedCornerShape(24.dp),
-                color = COUITheme.colorScheme.surfaceContainer,
-                border = BorderStroke(1.dp, COUITheme.colorScheme.dividerLine),
-                shadowElevation = 4.dp,
+                outSidePadding = PaddingValues(0.dp),
+                shadowElevation = 0.dp,
             ) {
                 Row(
                     modifier = Modifier
@@ -152,9 +160,7 @@ fun ReaderOverlayMiuix(
 
                     IconButton(onClick = onToggleFavorite) {
                         Icon(
-                            painter = painterResource(
-                                if (isFavorite) R.drawable.ic_ior_star_solid else R.drawable.ic_ior_star
-                            ),
+                            imageVector = if (isFavorite) COUIIcons.Light.FavoritesFill else COUIIcons.Light.Favorites,
                             contentDescription = stringResource(R.string.favorite),
                             tint = if (isFavorite) Color(0xFFFFB300) else COUITheme.colorScheme.onSurface,
                             modifier = Modifier.size(22.dp),
@@ -163,7 +169,7 @@ fun ReaderOverlayMiuix(
 
                     IconButton(onClick = onShare) {
                         Icon(
-                            painter = painterResource(R.drawable.ic_ior_share),
+                            imageVector = COUIIcons.Light.Share,
                             contentDescription = stringResource(R.string.share),
                             tint = COUITheme.colorScheme.onSurface,
                             modifier = Modifier.size(22.dp),
@@ -183,14 +189,12 @@ fun ReaderOverlayMiuix(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 12.dp),
         ) {
-            Surface(
+            FloatingToolbar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 600.dp),
-                shape = RoundedCornerShape(24.dp),
-                color = COUITheme.colorScheme.surfaceContainer,
-                border = BorderStroke(1.dp, COUITheme.colorScheme.dividerLine),
-                shadowElevation = 4.dp,
+                outSidePadding = PaddingValues(0.dp),
+                shadowElevation = 0.dp,
             ) {
                 Column(
                     modifier = Modifier
@@ -238,7 +242,7 @@ fun ReaderOverlayMiuix(
                         // 1. Reading Mode Toggle
                         val isWebtoon = readingMode == ReadingMode.WEBTOON
                         MiuixBottomActionItem(
-                            iconRes = if (isWebtoon) R.drawable.ic_webtoon_mode_outlined else R.drawable.ic_card_mode_outlined,
+                            icon = if (isWebtoon) COUIIcons.Light.ListView else COUIIcons.Light.Image,
                             label = if (isWebtoon) stringResource(R.string.default_reader_mode_webtoon) else stringResource(R.string.default_reader_mode_card),
                             tint = COUITheme.colorScheme.onSurface,
                             onClick = onToggleMode,
@@ -246,15 +250,15 @@ fun ReaderOverlayMiuix(
 
                         // 2. Slideshow
                         MiuixBottomActionItem(
-                            iconRes = if (isSlideshowPlaying) R.drawable.ic_ior_pause_solid else R.drawable.ic_ior_play_solid,
-                            label = if (isSlideshowPlaying) "暂停" else stringResource(R.string.slideshow),
+                            icon = if (isSlideshowPlaying) COUIIcons.Light.Pause else COUIIcons.Light.Play,
+                            label = if (isSlideshowPlaying) "鏆傚仠" else stringResource(R.string.slideshow),
                             tint = if (isSlideshowPlaying) COUITheme.colorScheme.primary else COUITheme.colorScheme.onSurface,
                             onClick = onToggleSlideshow,
                         )
 
                         // 3. Orientation Lock
                         MiuixBottomActionItem(
-                            iconRes = if (isOrientationLocked) R.drawable.ic_lock else R.drawable.ic_screen_rotation,
+                            icon = if (isOrientationLocked) COUIIcons.Light.Lock else COUIIcons.Light.RotateLeft,
                             label = if (isOrientationLocked) "已锁定" else stringResource(R.string.rotation_lock),
                             tint = if (isOrientationLocked) COUITheme.colorScheme.primary else COUITheme.colorScheme.onSurface,
                             onClick = onToggleOrientationLock,
@@ -262,7 +266,7 @@ fun ReaderOverlayMiuix(
 
                         // 4. Save to Album
                         MiuixBottomActionItem(
-                            iconRes = R.drawable.ic_ior_download,
+                            icon = COUIIcons.Light.Download,
                             label = stringResource(R.string.save),
                             tint = COUITheme.colorScheme.onSurface,
                             onClick = onSaveImage,
@@ -276,7 +280,7 @@ fun ReaderOverlayMiuix(
 
 @Composable
 private fun RowScope.MiuixBottomActionItem(
-    iconRes: Int,
+    icon: ImageVector,
     label: String,
     tint: Color,
     onClick: () -> Unit,
@@ -291,7 +295,7 @@ private fun RowScope.MiuixBottomActionItem(
         verticalArrangement = Arrangement.Center,
     ) {
         Icon(
-            painter = painterResource(iconRes),
+            imageVector = icon,
             contentDescription = label,
             modifier = Modifier.size(22.dp),
             tint = tint,

@@ -18,7 +18,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import erl.webdavtoon.ui.component.AnimatedSearchField
 import erl.webdavtoon.ui.component.CouiCascadingMenu
-import erl.webdavtoon.ui.component.FunnelIcon
+import erl.webdavtoon.ui.component.TopBarActionIcon
+import erl.webdavtoon.ui.component.TopBarIcons
 import erl.webdavtoon.R
 import erl.webdavtoon.SettingsManager
 import io.github.suqi8.coui.kmp.basic.DropdownEntry
@@ -33,11 +34,9 @@ import io.github.suqi8.coui.kmp.icon.extended.Close
 import io.github.suqi8.coui.kmp.icon.extended.Delete
 import io.github.suqi8.coui.kmp.icon.extended.GridView
 import io.github.suqi8.coui.kmp.icon.extended.Lock
-import io.github.suqi8.coui.kmp.icon.extended.More
 import io.github.suqi8.coui.kmp.icon.extended.Refresh
 import io.github.suqi8.coui.kmp.icon.extended.SelectAll
 import io.github.suqi8.coui.kmp.icon.extended.Settings
-import io.github.suqi8.coui.kmp.icon.extended.Sidebar
 import io.github.suqi8.coui.kmp.icon.extended.Sort
 import io.github.suqi8.coui.kmp.theme.COUITheme
 
@@ -100,13 +99,13 @@ fun FolderTopBarMiuix(
                     // and puts every action in the top-right group (see the COUI example app's
                     // Home page). The server-panel switcher is an action, so it lives here.
                     IconButton(onClick = actions.onOpenDrawer) {
-                        Icon(COUIIcons.Light.Sidebar, contentDescription = stringResource(R.string.navigation_drawer_open))
+                        TopBarActionIcon(TopBarIcons.Panel, contentDescription = stringResource(R.string.navigation_drawer_open))
                     }
                     IconButton(onClick = {
                         searchExpanded = true
                         actions.onToggleSearch()
                     }) {
-                        Icon(FunnelIcon, contentDescription = stringResource(R.string.filter))
+                        TopBarActionIcon(TopBarIcons.Filter, contentDescription = stringResource(R.string.filter))
                     }
                     FolderMiuixMenuButton(uiState = uiState, actions = actions)
                 },
@@ -185,7 +184,7 @@ private fun FolderMiuixMenuButton(
             ),
         ),
     ) {
-        Icon(COUIIcons.Light.More, contentDescription = stringResource(R.string.more))
+        TopBarActionIcon(TopBarIcons.More, contentDescription = stringResource(R.string.more))
     }
 }
 

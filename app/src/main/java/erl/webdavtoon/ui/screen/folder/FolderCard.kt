@@ -23,7 +23,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.unit.dp
@@ -33,9 +32,14 @@ import erl.webdavtoon.MediaType
 import erl.webdavtoon.WebDavImageLoader
 import erl.webdavtoon.detectMediaTypeByUri
 import erl.webdavtoon.ui.component.FolderCardLabelHeight
+import erl.webdavtoon.ui.component.PreviewTileCornerRadius
+import erl.webdavtoon.ui.component.PreviewTilePlaceholder
 import io.github.suqi8.coui.kmp.basic.Card
 import io.github.suqi8.coui.kmp.basic.Icon
 import io.github.suqi8.coui.kmp.basic.Text
+import io.github.suqi8.coui.kmp.icon.COUIIcons
+import io.github.suqi8.coui.kmp.icon.extended.Folder
+import io.github.suqi8.coui.kmp.icon.extended.Ok
 import io.github.suqi8.coui.kmp.theme.COUITheme
 
 /**
@@ -102,12 +106,11 @@ private fun MiuixPreviewGrid(
     Box(
         modifier = modifier
             .then(if (fillHeight) Modifier else Modifier.aspectRatio(1f))
-            .clip(RoundedCornerShape(12.dp))
-            .background(COUITheme.colorScheme.surfaceContainer),
+            .clip(RoundedCornerShape(12.dp)),
     ) {
         if (folder.previewUris.isEmpty()) {
             Icon(
-                painter = painterResource(R.drawable.ic_ior_folder),
+                imageVector = COUIIcons.Light.Folder,
                 contentDescription = null,
                 modifier = Modifier
                     .align(Alignment.Center)
@@ -129,7 +132,7 @@ private fun MiuixPreviewGrid(
                     .background(Color(0x44000000)),
             )
             Icon(
-                painter = painterResource(R.drawable.ic_ior_check_circle),
+                imageVector = COUIIcons.Light.Ok,
                 contentDescription = null,
                 tint = COUITheme.colorScheme.primary,
                 modifier = Modifier
@@ -157,7 +160,12 @@ private fun ColumnScope.MiuixPreviewRow(folder: FolderItemUi, startIndex: Int) {
 @Composable
 private fun MiuixPreviewSlot(folder: FolderItemUi, index: Int, modifier: Modifier) {
     val uri = folder.previewUris.getOrNull(index)
-    Box(modifier = modifier.fillMaxSize().background(Color(0x10000000))) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .clip(RoundedCornerShape(PreviewTileCornerRadius))
+            .background(PreviewTilePlaceholder),
+    ) {
         if (uri != null) {
             FolderPreviewImage(uri = uri, isLocal = folder.isLocal, modifier = Modifier.fillMaxSize())
         }

@@ -18,6 +18,7 @@ import io.github.suqi8.coui.kmp.basic.IconButton as MiuixIconButton
 import io.github.suqi8.coui.kmp.basic.TextField as MiuixTextField
 import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.extended.Close
+import io.github.suqi8.coui.kmp.icon.extended.Filter
 
 private val SearchFieldCornerRadius = 18.dp
 
@@ -54,7 +55,7 @@ fun AnimatedSearchField(
             singleLine = true,
             leadingIcon = {
                 MiuixIcon(
-                    FunnelIcon,
+                    COUIIcons.Light.Filter,
                     contentDescription = null,
                     modifier = Modifier.padding(start = 8.dp, end = 6.dp),
                 )

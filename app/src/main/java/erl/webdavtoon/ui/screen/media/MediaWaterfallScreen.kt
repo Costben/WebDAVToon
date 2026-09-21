@@ -32,7 +32,6 @@ import androidx.compose.ui.unit.dp
 import erl.webdavtoon.R
 import erl.webdavtoon.SettingsManager
 import erl.webdavtoon.ui.component.AnimatedSearchField
-import erl.webdavtoon.ui.component.FunnelIcon
 import erl.webdavtoon.ui.component.AppAdaptiveNavigationScaffold
 import erl.webdavtoon.ui.component.ServerSheetActions
 import erl.webdavtoon.ui.screen.waterfall.MediaCardMiuix
@@ -59,12 +58,12 @@ import io.github.suqi8.coui.kmp.icon.extended.Edit
 import io.github.suqi8.coui.kmp.icon.extended.GridView
 import io.github.suqi8.coui.kmp.icon.extended.Info
 import io.github.suqi8.coui.kmp.icon.extended.Lock
-import io.github.suqi8.coui.kmp.icon.extended.More
 import io.github.suqi8.coui.kmp.icon.extended.Refresh
 import io.github.suqi8.coui.kmp.icon.extended.Settings
-import io.github.suqi8.coui.kmp.icon.extended.Sidebar
 import io.github.suqi8.coui.kmp.icon.extended.Sort
 import erl.webdavtoon.ui.component.CouiCascadingMenu
+import erl.webdavtoon.ui.component.TopBarActionIcon
+import erl.webdavtoon.ui.component.TopBarIcons
 import io.github.suqi8.coui.kmp.theme.COUITheme
 
 data class MediaWaterfallActions(
@@ -292,10 +291,10 @@ private fun MediaTopBarMiuix(
                     // COUI keeps the top-left slot for back/cancel only; root pages put every action
                     // in the top-right group (see the COUI example app's Home page).
                     MiuixIconButton(onClick = onOpenDrawer) {
-                        MiuixIcon(COUIIcons.Light.Sidebar, contentDescription = stringResource(R.string.navigation_drawer_open))
+                        TopBarActionIcon(TopBarIcons.Panel, contentDescription = stringResource(R.string.navigation_drawer_open))
                     }
                     MiuixIconButton(onClick = { searchExpanded = true }) {
-                        MiuixIcon(FunnelIcon, contentDescription = stringResource(R.string.filter))
+                        TopBarActionIcon(TopBarIcons.Filter, contentDescription = stringResource(R.string.filter))
                     }
                     MediaMiuixMenuButton(uiState = uiState, actions = actions)
                 }
@@ -368,6 +367,6 @@ private fun MediaMiuixMenuButton(uiState: MediaWaterfallUiState, actions: MediaW
             ),
         ),
     ) {
-        MiuixIcon(COUIIcons.Light.More, contentDescription = stringResource(R.string.more))
+        TopBarActionIcon(TopBarIcons.More, contentDescription = stringResource(R.string.more))
     }
 }

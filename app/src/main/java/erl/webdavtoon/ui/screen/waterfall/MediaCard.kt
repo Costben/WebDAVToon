@@ -26,7 +26,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -40,9 +39,16 @@ import erl.webdavtoon.R
 import erl.webdavtoon.WebDavImageLoader
 import erl.webdavtoon.detectMediaTypeByUri
 import erl.webdavtoon.ui.component.FolderCardLabelHeight
+import erl.webdavtoon.ui.component.PreviewTileCornerRadius
+import erl.webdavtoon.ui.component.PreviewTilePlaceholder
 import io.github.suqi8.coui.kmp.basic.Card
 import io.github.suqi8.coui.kmp.basic.Icon
 import io.github.suqi8.coui.kmp.basic.Text
+import io.github.suqi8.coui.kmp.icon.COUIIcons
+import io.github.suqi8.coui.kmp.icon.extended.FavoritesFill
+import io.github.suqi8.coui.kmp.icon.extended.Folder
+import io.github.suqi8.coui.kmp.icon.extended.Ok
+import io.github.suqi8.coui.kmp.icon.extended.Play
 import io.github.suqi8.coui.kmp.theme.COUITheme
 
 /**
@@ -160,12 +166,11 @@ fun WaterfallFolderCardMiuix(
                     modifier = Modifier
                         .fillMaxWidth()
                         .then(if (fillHeight) Modifier.weight(1f) else Modifier.height(previewSide))
-                        .clip(innerShape)
-                        .background(COUITheme.colorScheme.surfaceContainer),
+                        .clip(innerShape),
                 ) {
                     if (item.previewUris.isEmpty()) {
                         Icon(
-                            painter = painterResource(R.drawable.ic_ior_folder),
+                            imageVector = COUIIcons.Light.Folder,
                             contentDescription = null,
                             modifier = Modifier
                                 .align(Alignment.Center)
@@ -188,7 +193,7 @@ fun WaterfallFolderCardMiuix(
                                 .background(Color(0x44000000)),
                         )
                         Icon(
-                            painter = painterResource(R.drawable.ic_ior_check_circle),
+                            imageVector = COUIIcons.Light.Ok,
                             contentDescription = null,
                             tint = COUITheme.colorScheme.primary,
                             modifier = Modifier
@@ -250,7 +255,10 @@ private fun WaterfallMediaCardMiuix(
 ) {
     val cardShape = RoundedCornerShape(12.dp)
     val innerShape = RoundedCornerShape(12.dp)
-    val clampedAspectRatio = item.aspectRatio.coerceIn(0.2f, 5.0f)
+    // Must be the unmodified ratio: the waterfall engine sized this cell from the very same
+    // value, so clamping here would make the box a different shape than the image inside it
+    // and leave a letterbox band showing through.
+    val tileAspectRatio = item.aspectRatio.takeIf { it > 0f } ?: 1f
 
     Card(
         modifier = (if (fillHeight) modifier.fillMaxSize() else modifier.fillMaxWidth())
@@ -266,9 +274,8 @@ private fun WaterfallMediaCardMiuix(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .then(if (fillHeight) Modifier.weight(1f) else Modifier.aspectRatio(clampedAspectRatio))
-                    .clip(innerShape)
-                    .background(COUITheme.colorScheme.surfaceContainer),
+                    .then(if (fillHeight) Modifier.weight(1f) else Modifier.aspectRatio(tileAspectRatio))
+                    .clip(innerShape),
             ) {
                 AndroidView(
                     modifier = Modifier.fillMaxSize(),
@@ -347,7 +354,7 @@ private fun WaterfallMediaCardMiuix(
                         horizontalArrangement = Arrangement.spacedBy(3.dp),
                     ) {
                         Icon(
-                            painter = painterResource(R.drawable.ic_ior_play_solid),
+                            imageVector = COUIIcons.Light.Play,
                             contentDescription = null,
                             tint = Color.White,
                             modifier = Modifier.size(12.dp),
@@ -374,7 +381,7 @@ private fun WaterfallMediaCardMiuix(
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
-                            painter = painterResource(R.drawable.ic_heart_filled),
+                            imageVector = COUIIcons.Light.FavoritesFill,
                             contentDescription = null,
                             tint = Color(0xFFFF4D4F),
                             modifier = Modifier.size(14.dp),
@@ -390,7 +397,7 @@ private fun WaterfallMediaCardMiuix(
                             .background(Color(0x44000000)),
                     )
                     Icon(
-                        painter = painterResource(R.drawable.ic_ior_check_circle),
+                        imageVector = COUIIcons.Light.Ok,
                         contentDescription = null,
                         tint = COUITheme.colorScheme.primary,
                         modifier = Modifier
@@ -442,7 +449,8 @@ private fun MiuixFolderPreviewSlot(item: MixedWaterfallItemUi.FolderItem, index:
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0x10000000)),
+            .clip(RoundedCornerShape(PreviewTileCornerRadius))
+            .background(PreviewTilePlaceholder),
     ) {
         if (uri != null) {
             AndroidView(
