@@ -2,22 +2,49 @@ package erl.webdavtoon
 
 import android.content.Context
 import android.util.Log
-import android.widget.ArrayAdapter
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
+import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import erl.webdavtoon.databinding.DialogEditBinding
 import kotlinx.coroutines.launch
 
+/**
+ * ComfyUI edit flow.
+ *
+ * The dialogs are Compose/COUI now (the old `dialog_edit.xml` +
+ * `MaterialAlertDialogBuilder` path is gone), so this object only owns the
+ * asynchronous work - config fetch and batch submit - and reports state to the
+ * host Activity, which renders it with
+ * [erl.webdavtoon.ui.component.ComfyUiEditDialog].
+ */
 object EditDialogHelper {
     private const val TAG = "EditDialogHelper"
 
+    /** Rendered by `ComfyUiEditDialog`. */
+    sealed interface DialogState {
+        /** Fetching `/api/uploads/config`. */
+        data object Loading : DialogState
+
+        /** Config fetched; the form is shown. */
+        data class Form(
+            val config: EditConfig,
+            val service: EditService,
+            val photos: List<Photo>,
+        ) : DialogState
+
+        /** Config fetch failed. */
+        data class Failure(val baseUrl: String, val message: String) : DialogState
+    }
+
+    /**
+     * Starts the flow. Returns without emitting state (after an explanatory Toast)
+     * when there is nothing to edit or the AutoWorkflow URL is not configured.
+     */
     fun show(
-        activity: AppCompatActivity,
+        activity: ComponentActivity,
         selectedPhotos: List<Photo>,
         settingsManager: SettingsManager,
-        onSubmitted: () -> Unit
+        onStateChange: (DialogState?) -> Unit,
+        onSubmitted: () -> Unit,
     ) {
         val imagePhotos = selectedPhotos.filter { it.mediaType == MediaType.IMAGE }
         if (imagePhotos.isEmpty()) {
@@ -32,130 +59,71 @@ object EditDialogHelper {
             return
         }
 
-        Toast.makeText(activity, R.string.comfyui_loading_config, Toast.LENGTH_SHORT).show()
+        onStateChange(DialogState.Loading)
         val service = EditService(activity, baseUrl, settingsManager)
         activity.lifecycleScope.launch {
             val config = service.fetchConfig().getOrElse { error ->
                 Log.e(TAG, "fetchConfig failed", error)
-                showConnectionFailureDialog(activity, baseUrl, error)
+                onStateChange(DialogState.Failure(baseUrl, describe(error)))
                 return@launch
             }
             if (config.workflows.isEmpty()) {
                 Log.e(TAG, "fetchConfig returned no workflows")
-                showConnectionFailureDialog(
-                    activity,
-                    baseUrl,
-                    IllegalStateException("No workflow JSON files returned by /api/uploads/config")
+                onStateChange(
+                    DialogState.Failure(
+                        baseUrl,
+                        "No workflow JSON files returned by /api/uploads/config",
+                    )
                 )
                 return@launch
             }
             Log.d(TAG, "fetchConfig success workflows=${config.workflows.size} presets=${config.promptPresets.size}")
-            showConfigDialog(activity, imagePhotos, config, service, onSubmitted)
+            onStateChange(DialogState.Form(config, service, imagePhotos))
         }
     }
 
-    private fun showConfigDialog(
-        activity: AppCompatActivity,
-        photos: List<Photo>,
-        config: EditConfig,
-        service: EditService,
-        onSubmitted: () -> Unit
-    ) {
-        val binding = DialogEditBinding.inflate(activity.layoutInflater)
-        val workflowAdapter = ArrayAdapter(activity, android.R.layout.simple_dropdown_item_1line, config.workflows)
-        binding.workflowEdit.setAdapter(workflowAdapter)
-        binding.workflowEdit.setText(config.defaultWorkflow.ifBlank { config.workflows.first() }, false)
-
-        val presetLabels = listOf(activity.getString(R.string.comfyui_no_preset)) + config.promptPresets.map { it.name }
-        val presetAdapter = ArrayAdapter(activity, android.R.layout.simple_dropdown_item_1line, presetLabels)
-        binding.presetEdit.setAdapter(presetAdapter)
-        binding.presetEdit.setText(presetLabels.first(), false)
-        binding.presetEdit.setOnItemClickListener { _, _, position, _ ->
-            val preset = config.promptPresets.getOrNull(position - 1) ?: return@setOnItemClickListener
-            binding.promptEdit.setText(preset.content)
-            binding.promptEdit.setSelection(binding.promptEdit.text?.length ?: 0)
-            binding.promptLayout.error = null
-        }
-
-        val dialog = MaterialAlertDialogBuilder(activity)
-            .setTitle(R.string.comfyui_edit_title)
-            .setView(binding.root)
-            .setNegativeButton(R.string.cancel, null)
-            .setPositiveButton(R.string.comfyui_submit, null)
-            .create()
-
-        dialog.setOnShowListener {
-            dialog.getButton(android.content.DialogInterface.BUTTON_POSITIVE).setOnClickListener {
-                val workflow = binding.workflowEdit.text?.toString().orEmpty().trim()
-                val prompt = binding.promptEdit.text?.toString().orEmpty().trim()
-                if (prompt.isBlank()) {
-                    binding.promptLayout.error = activity.getString(R.string.comfyui_prompt_required)
-                    return@setOnClickListener
-                }
-                binding.promptLayout.error = null
-                dialog.dismiss()
-                submitPhotos(activity, photos, service, workflow, prompt, onSubmitted)
-            }
-        }
-
-        dialog.show()
-    }
-
-    private fun showConnectionFailureDialog(
-        activity: AppCompatActivity,
-        baseUrl: String,
-        error: Throwable
-    ) {
-        if (activity.isFinishing || activity.isDestroyed) return
-
-        val message = error.message
-            ?.takeIf { it.isNotBlank() }
-            ?: error.javaClass.simpleName
-        MaterialAlertDialogBuilder(activity)
-            .setTitle(R.string.comfyui_connect_failed)
-            .setMessage(activity.getString(R.string.comfyui_connect_failed_detail, baseUrl, message))
-            .setPositiveButton(R.string.ok, null)
-            .show()
-    }
-
-    private fun submitPhotos(
-        activity: AppCompatActivity,
-        photos: List<Photo>,
-        service: EditService,
+    /** Submits the edit for every photo in the selection, then reports a summary Toast. */
+    fun submit(
+        activity: ComponentActivity,
+        form: DialogState.Form,
         workflow: String,
         prompt: String,
-        onSubmitted: () -> Unit
+        onSubmitted: () -> Unit,
     ) {
         activity.lifecycleScope.launch {
             var successCount = 0
             var firstError: String? = null
-            photos.forEach { photo ->
-                val result = service.submitEdit(photo, workflow, prompt)
-                result.onSuccess { submitResult ->
-                    successCount += 1
-                    Log.d(TAG, "submitEdit accepted taskId=${submitResult.taskId} filename=${submitResult.filename}")
-                }.onFailure { error ->
-                    val message = error.message ?: error.javaClass.simpleName
-                    if (firstError == null) {
-                        firstError = message
+            form.photos.forEach { photo ->
+                form.service.submitEdit(photo, workflow, prompt)
+                    .onSuccess { submitResult ->
+                        successCount += 1
+                        Log.d(TAG, "submitEdit accepted taskId=${submitResult.taskId} filename=${submitResult.filename}")
                     }
-                    Log.e(TAG, "submitEdit failed photo=${photo.title}", error)
-                    if (!photo.isLocal) {
-                        Toast.makeText(
-                            activity,
-                            activity.getString(R.string.comfyui_download_failed, photo.title),
-                            Toast.LENGTH_SHORT
-                        ).show()
+                    .onFailure { error ->
+                        val message = describe(error)
+                        if (firstError == null) {
+                            firstError = message
+                        }
+                        Log.e(TAG, "submitEdit failed photo=${photo.title}", error)
+                        if (!photo.isLocal) {
+                            Toast.makeText(
+                                activity,
+                                activity.getString(R.string.comfyui_download_failed, photo.title),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
                     }
-                }
             }
 
-            showSubmitResult(activity, successCount, photos.size, firstError)
+            showSubmitResult(activity, successCount, form.photos.size, firstError)
             if (successCount > 0) {
                 onSubmitted()
             }
         }
     }
+
+    private fun describe(error: Throwable): String =
+        error.message?.takeIf { it.isNotBlank() } ?: error.javaClass.simpleName
 
     private fun showSubmitResult(context: Context, successCount: Int, total: Int, firstError: String?) {
         val message = when {

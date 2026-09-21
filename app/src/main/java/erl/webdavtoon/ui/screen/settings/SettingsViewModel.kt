@@ -8,7 +8,6 @@ import erl.webdavtoon.PrivacyModeState
 import erl.webdavtoon.R
 import erl.webdavtoon.SettingsManager
 import erl.webdavtoon.WebDavImageLoader
-import erl.webdavtoon.ui.UiMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,8 +39,8 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun observeStore() {
-        observe(appSettings.observeUiMode()) { copy(uiMode = it) }
         observe(appSettings.observeInt(AppSettingsStore.THEME_ID, 0)) { copy(themeId = it) }
+        observe(appSettings.observeBoolean(AppSettingsStore.USE_COUI_DEFAULT_COLORS, false)) { copy(useCouiDefaultColors = it) }
         observe(appSettings.observeString(AppSettingsStore.LANGUAGE, "default")) { copy(language = it) }
         observe(appSettings.observeInt(AppSettingsStore.GRID_COLUMNS, 2)) { copy(gridColumns = it) }
         observe(appSettings.observeInt(AppSettingsStore.DRAWER_EDGE_WIDTH_PERCENT, SettingsManager.DEFAULT_DRAWER_EDGE_WIDTH_PERCENT)) { copy(drawerEdgeWidthPercent = it.coerceIn(0, 100)) }
@@ -95,9 +94,9 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
             SettingsUiState(
                 loading = loading,
                 slots = slots,
-                currentSlot = currentSlot,
-                uiMode = settingsManager.getUiMode(),
-                themeId = settingsManager.getThemeId(),
+                    currentSlot = currentSlot,
+                    themeId = settingsManager.getThemeId(),
+                useCouiDefaultColors = settingsManager.useCouiDefaultColors(),
                 language = settingsManager.getLanguage(),
                 gridColumns = settingsManager.getGridColumns(),
                 drawerEdgeWidthPercent = settingsManager.getDrawerEdgeWidthPercent(),
@@ -146,8 +145,12 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         return (settingsManager.getAllSlotsUnfiltered().maxOrNull() ?: -1) + 1
     }
 
-    fun setUiMode(mode: UiMode) = io { settingsManager.setUiMode(mode); _uiState.update { it.copy(uiMode = mode) } }
     fun setThemeId(id: Int) = io { settingsManager.setThemeId(id); _uiState.update { it.copy(themeId = id) }; eventChannel.send(SettingsEvent.RequestRecreate) }
+    fun setUseCouiDefaultColors(enabled: Boolean) = io {
+        settingsManager.setUseCouiDefaultColors(enabled)
+        _uiState.update { it.copy(useCouiDefaultColors = enabled) }
+        eventChannel.send(SettingsEvent.RequestRecreate)
+    }
     fun setLanguage(tag: String) = io { settingsManager.setLanguage(tag); _uiState.update { it.copy(language = tag) }; eventChannel.send(SettingsEvent.RequestRecreate) }
     fun setGridColumns(n: Int) = io { settingsManager.setGridColumns(n); _uiState.update { it.copy(gridColumns = n) } }
     fun setDrawerEdgeWidthPercent(p: Int) = io { settingsManager.setDrawerEdgeWidthPercent(p); _uiState.update { it.copy(drawerEdgeWidthPercent = p.coerceIn(0, 100)) } }

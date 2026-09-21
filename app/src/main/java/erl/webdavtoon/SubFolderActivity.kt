@@ -11,10 +11,7 @@ import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.appcompat.app.AppCompatActivity
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.activity.ComponentActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -25,15 +22,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
-import erl.webdavtoon.ui.UiMode
 import erl.webdavtoon.ui.screen.waterfall.MixedWaterfallActions
 import erl.webdavtoon.ui.screen.waterfall.MixedWaterfallItemUi
 import erl.webdavtoon.ui.screen.waterfall.MixedWaterfallScreen
 import erl.webdavtoon.ui.screen.waterfall.MixedWaterfallViewModel
+import erl.webdavtoon.ui.component.DeleteConfirmDialog
 import erl.webdavtoon.ui.theme.WebDAVToonTheme
 import kotlinx.coroutines.launch
 
-class SubFolderActivity : AppCompatActivity() {
+class SubFolderActivity : ComponentActivity() {
 
     private lateinit var settingsManager: SettingsManager
     private val viewModel: MixedWaterfallViewModel by viewModels()
@@ -234,8 +231,8 @@ class SubFolderActivity : AppCompatActivity() {
                 }
 
                 WebDAVToonTheme(
-                    uiMode = uiState.uiMode,
                     themeId = settingsManager.getThemeId(),
+                    useCouiDefaultColors = settingsManager.useCouiDefaultColors(),
                 ) {
                     MixedWaterfallScreen(
                         uiState = uiState,
@@ -244,7 +241,7 @@ class SubFolderActivity : AppCompatActivity() {
 
                     if (showDeleteConfirmDialog) {
                         DeleteConfirmDialog(
-                            count = uiState.selectedCount,
+                            message = stringResource(R.string.delete_folders_message, uiState.selectedCount),
                             onConfirm = {
                                 showDeleteConfirmDialog = false
                                 confirmDeleteItems(uiState.selectedPhotos, uiState.selectedFolders)
@@ -253,9 +250,7 @@ class SubFolderActivity : AppCompatActivity() {
                         )
                     }
 
-                    if (uiState.uiMode == UiMode.Miuix) {
-                        top.yukonga.miuix.kmp.utils.MiuixPopupUtils.MiuixPopupHost()
-                    }
+                    io.github.suqi8.coui.kmp.utils.COUIPopupUtils.COUIPopupHost()
                 }
             }
         }
@@ -342,21 +337,3 @@ class SubFolderActivity : AppCompatActivity() {
     }
 }
 
-@Composable
-private fun DeleteConfirmDialog(count: Int, onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.confirm_delete)) },
-        text = { Text(stringResource(R.string.delete_folders_message, count)) },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(stringResource(R.string.delete))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
-            }
-        }
-    )
-}

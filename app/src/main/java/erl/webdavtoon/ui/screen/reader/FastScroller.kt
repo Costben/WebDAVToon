@@ -18,9 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -38,6 +35,8 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import io.github.suqi8.coui.kmp.basic.Text as MiuixText
+import io.github.suqi8.coui.kmp.theme.COUITheme
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
@@ -109,15 +108,16 @@ fun FastScroller(
                     bubbleHeightPx = size.height.toFloat()
                 }
         ) {
-            Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = Color(0xCC1E1E1E),
-                shadowElevation = 4.dp
+            Box(
+                modifier = Modifier.background(
+                    color = Color(0xCC1E1E1E),
+                    shape = RoundedCornerShape(16.dp),
+                )
             ) {
-                Text(
+                MiuixText(
                     text = "${(currentIndex + 1).coerceIn(1, totalCount)} / $totalCount",
                     color = Color.White,
-                    style = MaterialTheme.typography.labelMedium,
+                    style = COUITheme.textStyles.footnote2,
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                 )
             }

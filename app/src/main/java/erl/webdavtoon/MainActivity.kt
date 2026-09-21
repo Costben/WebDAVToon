@@ -12,23 +12,23 @@ import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.appcompat.app.AppCompatActivity
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
-import erl.webdavtoon.ui.UiMode
 import erl.webdavtoon.ui.screen.media.MediaWaterfallActions
 import erl.webdavtoon.ui.screen.media.MediaWaterfallItemUi
 import erl.webdavtoon.ui.screen.media.MediaWaterfallScreen
@@ -37,14 +37,20 @@ import erl.webdavtoon.ui.screen.settings.dialog.ServerConfigAction
 import erl.webdavtoon.ui.screen.settings.dialog.ServerConfigDialog
 import erl.webdavtoon.ui.screen.settings.dialog.ServerConfigEvent
 import erl.webdavtoon.ui.screen.settings.dialog.ServerConfigViewModel
+import erl.webdavtoon.ui.component.ComfyUiEditDialog
+import erl.webdavtoon.ui.component.DeleteConfirmDialog
 import erl.webdavtoon.ui.theme.WebDAVToonTheme
+import io.github.suqi8.coui.kmp.basic.TextButton
+import io.github.suqi8.coui.kmp.overlay.OverlayDialog
 import kotlinx.coroutines.launch
 
 /**
  * Media-only waterfall page. The page is fully Compose-driven; this Activity
  * only hosts navigation, permissions, biometrics, and Activity results.
+ *
+ * Extends [FragmentActivity] (not appcompat) because `BiometricPrompt` requires it.
  */
-class MainActivity : AppCompatActivity() {
+class MainActivity : FragmentActivity() {
 
     private lateinit var settingsManager: SettingsManager
     private val viewModel: MediaWaterfallViewModel by viewModels()
@@ -52,6 +58,11 @@ class MainActivity : AppCompatActivity() {
 
     private var showDeleteConfirmDialog by mutableStateOf(false)
     private var serverConfigSlot by mutableStateOf<Int?>(null)
+    private var comfyUiDialogState by mutableStateOf<EditDialogHelper.DialogState?>(null)
+
+    private data class InfoDialog(val title: String, val message: String)
+
+    private var infoDialog by mutableStateOf<InfoDialog?>(null)
 
     private var folderPath: String = ""
     private var isRemote: Boolean = false
@@ -191,8 +202,8 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 WebDAVToonTheme(
-                    uiMode = uiState.uiMode,
                     themeId = uiState.themeId,
+                    useCouiDefaultColors = uiState.useCouiDefaultColors,
                 ) {
                     MediaWaterfallScreen(
                         uiState = uiState,
@@ -201,7 +212,7 @@ class MainActivity : AppCompatActivity() {
 
                     if (showDeleteConfirmDialog) {
                         DeleteConfirmDialog(
-                            count = uiState.selectedCount,
+                            message = stringResource(R.string.delete_items_message, uiState.selectedCount),
                             onConfirm = {
                                 showDeleteConfirmDialog = false
                                 confirmDeleteSelected()
@@ -219,9 +230,47 @@ class MainActivity : AppCompatActivity() {
                         )
                     }
 
-                    if (uiState.uiMode == UiMode.Miuix) {
-                        top.yukonga.miuix.kmp.utils.MiuixPopupUtils.MiuixPopupHost()
+                    comfyUiDialogState?.let { dialogState ->
+                        ComfyUiEditDialog(
+                            state = dialogState,
+                            onSubmit = { workflow, prompt ->
+                                val form = dialogState as? EditDialogHelper.DialogState.Form
+                                comfyUiDialogState = null
+                                if (form != null) {
+                                    EditDialogHelper.submit(
+                                        activity = this@MainActivity,
+                                        form = form,
+                                        workflow = workflow,
+                                        prompt = prompt,
+                                        onSubmitted = { viewModel.exitSelectionMode() },
+                                    )
+                                }
+                            },
+                            onDismiss = { comfyUiDialogState = null },
+                        )
                     }
+
+                    infoDialog?.let { dialog ->
+                        OverlayDialog(
+                            show = true,
+                            title = dialog.title,
+                            summary = dialog.message,
+                            onDismissRequest = { infoDialog = null },
+                            content = {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End,
+                                ) {
+                                    TextButton(
+                                        text = stringResource(R.string.ok),
+                                        onClick = { infoDialog = null },
+                                    )
+                                }
+                            },
+                        )
+                    }
+
+                    io.github.suqi8.coui.kmp.utils.COUIPopupUtils.COUIPopupHost()
                 }
             }
         }
@@ -319,6 +368,7 @@ class MainActivity : AppCompatActivity() {
             activity = this,
             selectedPhotos = selectedPhotos,
             settingsManager = settingsManager,
+            onStateChange = { comfyUiDialogState = it },
             onSubmitted = { viewModel.exitSelectionMode() },
         )
     }
@@ -344,19 +394,17 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle(getString(R.string.photo_details_selected_title, selectedPhotos.size))
-            .setMessage(message)
-            .setPositiveButton(R.string.ok, null)
-            .show()
+        infoDialog = InfoDialog(
+            title = getString(R.string.photo_details_selected_title, selectedPhotos.size),
+            message = message,
+        )
     }
 
     private fun showPhotoDetailsDialog(photo: Photo) {
-        androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle(R.string.photo_details)
-            .setMessage(formatPhotoDetails(photo))
-            .setPositiveButton(R.string.ok, null)
-            .show()
+        infoDialog = InfoDialog(
+            title = getString(R.string.photo_details),
+            message = formatPhotoDetails(photo),
+        )
     }
 
     private fun formatPhotoDetails(photo: Photo): String {
@@ -503,17 +551,3 @@ object PhotoCache {
     }
 }
 
-@Composable
-private fun DeleteConfirmDialog(count: Int, onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.confirm_delete)) },
-        text = { Text(stringResource(R.string.delete_items_message, count)) },
-        confirmButton = {
-            TextButton(onClick = onConfirm) { Text(stringResource(R.string.delete)) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
-        },
-    )
-}

@@ -3,7 +3,6 @@ package erl.webdavtoon.ui.screen.media
 import erl.webdavtoon.FolderSearchMatcher
 import erl.webdavtoon.Photo
 import erl.webdavtoon.SettingsManager
-import erl.webdavtoon.ui.UiMode
 import erl.webdavtoon.ui.screen.settings.WebDavSlotUi
 import erl.webdavtoon.ui.screen.waterfall.MixedWaterfallItemUi
 
@@ -24,7 +23,6 @@ data class MediaWaterfallUiState(
     val isRefreshing: Boolean = false,
     val hasMore: Boolean = false,
     val error: String? = null,
-    val uiMode: UiMode = UiMode.Miuix,
     val columns: Int = 2,
     val showFilenames: Boolean = true,
     val isSelectionMode: Boolean = false,
@@ -35,6 +33,7 @@ data class MediaWaterfallUiState(
     val isPrivacyMode: Boolean = false,
     val drawerEdgeWidthPercent: Int = SettingsManager.DEFAULT_DRAWER_EDGE_WIDTH_PERCENT,
     val themeId: Int = erl.webdavtoon.ThemeHelper.THEME_FOLLOW_DEVICE,
+    val useCouiDefaultColors: Boolean = false,
     val storagePermissionGranted: Boolean = true,
 ) {
     /** [items] filtered by the current search keyword. */

@@ -1,45 +1,42 @@
 package erl.webdavtoon.ui.component
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationRail
-import androidx.compose.material3.NavigationRailItem
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringResource
+import erl.webdavtoon.R
 import erl.webdavtoon.ui.screen.settings.WebDavSlotUi
-import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Add
-import top.yukonga.miuix.kmp.icon.extended.Favorites
-import top.yukonga.miuix.kmp.icon.extended.Ok
-import top.yukonga.miuix.kmp.icon.extended.Settings
+import io.github.suqi8.coui.kmp.basic.NavigationRail
+import io.github.suqi8.coui.kmp.basic.NavigationRailItem
+import io.github.suqi8.coui.kmp.basic.Text as MiuixText
+import io.github.suqi8.coui.kmp.icon.COUIIcons
+import io.github.suqi8.coui.kmp.icon.extended.Add
+import io.github.suqi8.coui.kmp.icon.extended.Favorites
+import io.github.suqi8.coui.kmp.icon.extended.Folder
+import io.github.suqi8.coui.kmp.icon.extended.Settings
+import io.github.suqi8.coui.kmp.theme.COUITheme
 
 @Composable
 fun AppSideRail(
     slots: List<WebDavSlotUi>,
     isPrivacyMode: Boolean,
-    actions: NavigationDrawerActions,
+    actions: ServerSheetActions,
     modifier: Modifier = Modifier,
 ) {
     NavigationRail(
         modifier = modifier,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         header = {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("WebDAVToon", style = MaterialTheme.typography.labelSmall)
-                if (isPrivacyMode) Text("Private", style = MaterialTheme.typography.labelSmall)
+                MiuixText("WebDAVToon", style = COUITheme.textStyles.footnote2)
+                if (isPrivacyMode) {
+                    MiuixText("Private", style = COUITheme.textStyles.footnote2)
+                }
             }
         },
     ) {
@@ -47,62 +44,45 @@ fun AppSideRail(
             NavigationRailItem(
                 selected = slot.isCurrent,
                 onClick = { actions.onSelectSlot(slot.slot) },
-                icon = {
-                    if (slot.isCurrent) {
-                        Icon(
-                            imageVector = MiuixIcons.Light.Ok,
-                            contentDescription = null,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-                },
-                label = { Text(slot.alias.ifBlank { "${slot.slot}" }) },
+                icon = COUIIcons.Light.Folder,
+                label = slot.alias.ifBlank { "${slot.slot}" },
             )
         }
         NavigationRailItem(
             selected = false,
             onClick = actions.onAddSlot,
-            icon = {
-                Icon(
-                    imageVector = MiuixIcons.Light.Add,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                )
-            },
+            icon = COUIIcons.Light.Add,
+            label = stringResource(R.string.add_webdav_server),
         )
         NavigationRailItem(
             selected = false,
             onClick = actions.onOpenFavorites,
-            icon = {
-                Icon(
-                    imageVector = MiuixIcons.Light.Favorites,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                )
-            },
+            icon = COUIIcons.Light.Favorites,
+            label = stringResource(R.string.favorites),
         )
         NavigationRailItem(
             selected = false,
             onClick = actions.onOpenSettings,
-            icon = {
-                Icon(
-                    imageVector = MiuixIcons.Light.Settings,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                )
-            },
+            icon = COUIIcons.Light.Settings,
+            label = stringResource(R.string.settings),
         )
     }
 }
 
+/**
+ * Wide screens get the persistent COUI navigation rail; narrow screens get the COUI
+ * server bottom sheet (openable from the top bar or a left-edge swipe).
+ */
 @Composable
 fun AppAdaptiveNavigationScaffold(
-    drawerState: androidx.compose.material3.DrawerState,
+    showServerSheet: Boolean,
+    onOpenServerSheet: () -> Unit,
+    onDismissServerSheet: () -> Unit,
     slots: List<WebDavSlotUi>,
     isPrivacyMode: Boolean,
-    actions: NavigationDrawerActions,
+    actions: ServerSheetActions,
     modifier: Modifier = Modifier,
-    drawerEdgeWidthPercent: Int = 33,
+    serverSheetEdgeWidthPercent: Int = 33,
     content: @Composable () -> Unit,
 ) {
     val wide = LocalConfiguration.current.screenWidthDp >= 600
@@ -112,14 +92,19 @@ fun AppAdaptiveNavigationScaffold(
             Box(Modifier.weight(1f).fillMaxHeight()) { content() }
         }
     } else {
-        AppNavigationDrawer(
-            drawerState = drawerState,
-            slots = slots,
-            isPrivacyMode = isPrivacyMode,
-            actions = actions,
-            modifier = modifier,
-            drawerEdgeWidthPercent = drawerEdgeWidthPercent,
-            content = content,
-        )
+        ServerSheetEdgeSwipe(
+            onOpen = onOpenServerSheet,
+            edgeWidthPercent = serverSheetEdgeWidthPercent,
+            modifier = modifier.fillMaxSize(),
+        ) {
+            Box(Modifier.fillMaxSize()) { content() }
+            AppServerSheet(
+                show = showServerSheet,
+                slots = slots,
+                isPrivacyMode = isPrivacyMode,
+                actions = actions,
+                onDismiss = onDismissServerSheet,
+            )
+        }
     }
 }

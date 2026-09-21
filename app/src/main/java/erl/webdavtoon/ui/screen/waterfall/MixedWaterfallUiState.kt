@@ -3,7 +3,6 @@ package erl.webdavtoon.ui.screen.waterfall
 import android.net.Uri
 import erl.webdavtoon.Folder
 import erl.webdavtoon.Photo
-import erl.webdavtoon.ui.UiMode
 
 sealed interface MixedWaterfallItemUi {
     val key: String
@@ -52,7 +51,6 @@ data class MixedWaterfallUiState(
     val loading: Boolean = true,
     val isRefreshing: Boolean = false,
     val error: String? = null,
-    val uiMode: UiMode = UiMode.Miuix,
     val columns: Int = 2,
     val virtualColumns: Float = 2f,
     val isZooming: Boolean = false,

@@ -11,13 +11,10 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.appcompat.app.AppCompatActivity
+import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -27,7 +24,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
-import erl.webdavtoon.ui.UiMode
 import erl.webdavtoon.ui.screen.folder.FolderItemUi
 import erl.webdavtoon.ui.screen.folder.FolderScreen
 import erl.webdavtoon.ui.screen.folder.FolderScreenActions
@@ -36,10 +32,11 @@ import erl.webdavtoon.ui.screen.settings.dialog.ServerConfigAction
 import erl.webdavtoon.ui.screen.settings.dialog.ServerConfigDialog
 import erl.webdavtoon.ui.screen.settings.dialog.ServerConfigEvent
 import erl.webdavtoon.ui.screen.settings.dialog.ServerConfigViewModel
+import erl.webdavtoon.ui.component.DeleteConfirmDialog
 import erl.webdavtoon.ui.theme.WebDAVToonTheme
 import kotlinx.coroutines.launch
 
-class FolderViewActivity : AppCompatActivity() {
+class FolderViewActivity : FragmentActivity() {
 
     private lateinit var settingsManager: SettingsManager
     private val viewModel: FolderViewModel by viewModels()
@@ -93,8 +90,8 @@ class FolderViewActivity : AppCompatActivity() {
                 val cfgState by serverConfigViewModel.state.collectAsState()
 
                 WebDAVToonTheme(
-                    uiMode = uiState.uiMode,
                     themeId = uiState.themeId,
+                    useCouiDefaultColors = uiState.useCouiDefaultColors,
                 ) {
                     FolderScreen(
                         uiState = uiState,
@@ -103,7 +100,7 @@ class FolderViewActivity : AppCompatActivity() {
 
                     if (showDeleteConfirmDialog) {
                         DeleteConfirmDialog(
-                            count = uiState.selectedCount,
+                            message = stringResource(R.string.delete_folders_message, uiState.selectedCount),
                             onConfirm = {
                                 showDeleteConfirmDialog = false
                                 viewModel.deleteSelected { deletedCount ->
@@ -127,9 +124,7 @@ class FolderViewActivity : AppCompatActivity() {
                         )
                     }
 
-                    if (uiState.uiMode == UiMode.Miuix) {
-                        top.yukonga.miuix.kmp.utils.MiuixPopupUtils.MiuixPopupHost()
-                    }
+                    io.github.suqi8.coui.kmp.utils.COUIPopupUtils.COUIPopupHost()
                 }
             }
         }
@@ -433,21 +428,3 @@ class FolderViewActivity : AppCompatActivity() {
     }
 }
 
-@Composable
-private fun DeleteConfirmDialog(count: Int, onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.confirm_delete)) },
-        text = { Text(stringResource(R.string.delete_folders_message, count)) },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(stringResource(R.string.delete))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
-            }
-        }
-    )
-}

@@ -10,32 +10,32 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.Text
-import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import erl.webdavtoon.ui.UiMode
 import erl.webdavtoon.ui.component.AppAdaptiveNavigationScaffold
-import erl.webdavtoon.ui.component.NavigationDrawerActions
+import erl.webdavtoon.ui.component.ServerSheetActions
 import erl.webdavtoon.ui.screen.waterfall.FolderCardExtraHeight
 import erl.webdavtoon.ui.screen.waterfall.FollowZoomWaterfallLayout
 import erl.webdavtoon.ui.screen.waterfall.rememberFollowZoomGridState
-import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
-import top.yukonga.miuix.kmp.basic.ScrollBehavior
-import top.yukonga.miuix.kmp.basic.rememberTopAppBarState
-import kotlinx.coroutines.launch
+import io.github.suqi8.coui.kmp.basic.COUIScrollBehavior
+import io.github.suqi8.coui.kmp.basic.CircularProgressIndicator as MiuixCircularProgressIndicator
+import io.github.suqi8.coui.kmp.basic.FloatingActionButton as MiuixFloatingActionButton
+import io.github.suqi8.coui.kmp.basic.Icon as MiuixIcon
+import io.github.suqi8.coui.kmp.basic.PullToRefresh
+import io.github.suqi8.coui.kmp.basic.ScrollBehavior
+import io.github.suqi8.coui.kmp.basic.Text as MiuixText
+import io.github.suqi8.coui.kmp.basic.rememberTopAppBarState
+import io.github.suqi8.coui.kmp.icon.COUIIcons
+import io.github.suqi8.coui.kmp.icon.extended.Add
+import io.github.suqi8.coui.kmp.theme.COUITheme
 
 /**
  * Activity-independent Compose aggregation for the folder landing page.
@@ -69,16 +69,14 @@ data class FolderScreenActions(
     val onBack: () -> Unit,
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FolderScreen(
     uiState: FolderUiState,
     actions: FolderScreenActions,
     modifier: Modifier = Modifier,
 ) {
-    val drawerState = rememberDrawerState(DrawerValue.Closed)
-    val scope = rememberCoroutineScope()
-    val drawerActions = NavigationDrawerActions(
+    var showServerSheet by remember { mutableStateOf(false) }
+    val serverSheetActions = ServerSheetActions(
         onSelectSlot = actions.onSelectSlot,
         onEditSlot = actions.onEditSlot,
         onDuplicateSlot = actions.onDuplicateSlot,
@@ -89,7 +87,7 @@ fun FolderScreen(
         onOpenSettings = actions.onOpenSettings,
     )
     val topBarActions = FolderTopBarActions(
-        onOpenDrawer = { scope.launch { drawerState.open() } },
+        onOpenDrawer = { showServerSheet = true },
         onSearchQueryChange = actions.onSearchQueryChange,
         onClearSearch = actions.onClearSearch,
         onToggleSearch = actions.onToggleSearch,
@@ -107,30 +105,29 @@ fun FolderScreen(
         if (uiState.isSelectionMode) actions.onClearSelection() else actions.onBack()
     }
 
-    val topAppBarScrollBehavior = MiuixScrollBehavior(rememberTopAppBarState())
+    val topAppBarScrollBehavior = COUIScrollBehavior(rememberTopAppBarState())
 
     AppAdaptiveNavigationScaffold(
-        drawerState = drawerState,
+        showServerSheet = showServerSheet,
+        onOpenServerSheet = { showServerSheet = true },
+        onDismissServerSheet = { showServerSheet = false },
         slots = uiState.slots,
         isPrivacyMode = uiState.isPrivacyMode,
-        drawerEdgeWidthPercent = uiState.drawerEdgeWidthPercent,
-        actions = drawerActions,
+        serverSheetEdgeWidthPercent = uiState.drawerEdgeWidthPercent,
+        actions = serverSheetActions,
         modifier = modifier,
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.fillMaxSize()) {
-                when (uiState.uiMode) {
-                    UiMode.Miuix -> FolderTopBarMiuix(
-                        uiState = uiState,
-                        actions = topBarActions,
-                        scrollBehavior = topAppBarScrollBehavior,
-                    )
-                    UiMode.Material -> FolderTopBarMaterial(uiState = uiState, actions = topBarActions)
-                }
+                FolderTopBarMiuix(
+                    uiState = uiState,
+                    actions = topBarActions,
+                    scrollBehavior = topAppBarScrollBehavior,
+                )
                 uiState.remoteError?.let { message ->
                     RemoteErrorBanner(message = message)
                 }
-                PullToRefreshBox(
+                PullToRefresh(
                     isRefreshing = uiState.isRefreshing,
                     onRefresh = actions.onRefresh,
                     modifier = Modifier.weight(1f),
@@ -143,14 +140,14 @@ fun FolderScreen(
                     )
                 }
             }
-            FloatingActionButton(
+            MiuixFloatingActionButton(
                 onClick = actions.onOpenRecursiveBrowser,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .navigationBarsPadding()
                     .padding(20.dp),
             ) {
-                Text("+")
+                MiuixIcon(COUIIcons.Light.Add, contentDescription = null)
             }
         }
     }
@@ -174,7 +171,7 @@ private fun FolderGrid(
     val extraHeights = remember(folders) { List(folders.size) { FolderCardExtraHeight } }
     when {
         uiState.loading -> Box(modifier, contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
+            MiuixCircularProgressIndicator()
         }
         uiState.error != null -> FolderMessage(
             text = uiState.error,
@@ -199,7 +196,7 @@ private fun FolderGrid(
             modifier = modifier
                 .navigationBarsPadding()
                 .then(
-                    if (uiState.uiMode == UiMode.Miuix && scrollBehavior != null) {
+                    if (scrollBehavior != null) {
                         Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
                     } else {
                         Modifier
@@ -214,24 +211,14 @@ private fun FolderGrid(
                 else actions.onFolderClick(folder)
             }
             val onLongClick = { actions.onToggleSelection(folder.path) }
-            when (uiState.uiMode) {
-                UiMode.Miuix -> FolderCardMiuix(
-                    folder = folder,
-                    isSelectionMode = uiState.isSelectionMode,
-                    onClick = onClick,
-                    onLongClick = onLongClick,
-                    onVisibilityChanged = actions.onPreviewVisibilityChanged,
-                    fillHeight = true,
-                )
-                UiMode.Material -> FolderCardMaterial(
-                    folder = folder,
-                    isSelectionMode = uiState.isSelectionMode,
-                    onClick = onClick,
-                    onLongClick = onLongClick,
-                    onVisibilityChanged = actions.onPreviewVisibilityChanged,
-                    fillHeight = true,
-                )
-            }
+            FolderCardMiuix(
+                folder = folder,
+                isSelectionMode = uiState.isSelectionMode,
+                onClick = onClick,
+                onLongClick = onLongClick,
+                onVisibilityChanged = actions.onPreviewVisibilityChanged,
+                fillHeight = true,
+            )
         }
     }
 }
@@ -249,15 +236,15 @@ private fun RemoteErrorBanner(message: String, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.errorContainer)
+            .background(COUITheme.colorScheme.errorContainer)
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
+        MiuixText(
             text = summary,
             modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onErrorContainer,
+            style = COUITheme.textStyles.footnote1,
+            color = COUITheme.colorScheme.onErrorContainer,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
@@ -267,6 +254,6 @@ private fun RemoteErrorBanner(message: String, modifier: Modifier = Modifier) {
 @Composable
 private fun FolderMessage(text: String, modifier: Modifier = Modifier) {
     Box(modifier = modifier.padding(24.dp), contentAlignment = Alignment.Center) {
-        Text(text = text, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        MiuixText(text = text, color = COUITheme.colorScheme.onSurfaceVariantSummary)
     }
 }

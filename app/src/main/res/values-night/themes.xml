@@ -1,7 +1,9 @@
-<resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
-    <style name="Base.Theme.WebDAVToon" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="actionOverflowMenuStyle">@style/RoundedOverflowMenu</item>
-        <item name="popupMenuStyle">@style/RoundedPopupMenu</item>
+<resources>
+    <style name="Base.Theme.WebDAVToon" parent="android:Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowBackground">@color/surface</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
     </style>
 </resources>

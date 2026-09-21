@@ -4,7 +4,6 @@ import android.content.Context
 import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.JsonParser
-import erl.webdavtoon.ui.UiMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.runBlocking
 
@@ -37,7 +36,6 @@ class SettingsManager(context: Context) {
         const val KEY_PHOTO_SORT_ORDER = "photo_sort_order"
         const val KEY_RECURSIVE_IMAGE_ARRANGEMENT = "recursive_image_arrangement"
         const val KEY_FAVORITE_PHOTOS = "favorite_photos"
-        const val KEY_UI_MODE = "ui_mode"
         const val KEY_THEME_ID = "theme_id"
         const val KEY_LANGUAGE = "language"
 
@@ -137,12 +135,18 @@ class SettingsManager(context: Context) {
     fun getLogLevel(): Int = appSettings.getOrDefaultInt(AppSettingsStore.LOG_LEVEL, Log.INFO)
     fun setLogLevel(level: Int) = appSettings.putInt(AppSettingsStore.LOG_LEVEL, level)
 
-    fun getUiMode(): UiMode = appSettings.getUiMode()
-    fun setUiMode(mode: UiMode) = appSettings.setUiMode(mode)
-    fun observeUiMode(): Flow<UiMode> = appSettings.observeUiMode()
-
     fun getThemeId(): Int = appSettings.getOrDefaultInt(AppSettingsStore.THEME_ID, 0)
     fun setThemeId(id: Int) = appSettings.putInt(AppSettingsStore.THEME_ID, id)
+
+    /**
+     * When true the Compose layer ignores every Material-derived color (Monet wallpaper
+     * extraction and the built-in theme palettes) and uses COUI's own default scheme.
+     */
+    fun useCouiDefaultColors(): Boolean =
+        appSettings.getOrDefaultBoolean(AppSettingsStore.USE_COUI_DEFAULT_COLORS, false)
+
+    fun setUseCouiDefaultColors(enabled: Boolean) =
+        appSettings.putBoolean(AppSettingsStore.USE_COUI_DEFAULT_COLORS, enabled)
 
     fun getLanguage(): String = appSettings.getOrDefaultString(AppSettingsStore.LANGUAGE, "default")
     fun setLanguage(lang: String) = appSettings.putString(AppSettingsStore.LANGUAGE, lang)

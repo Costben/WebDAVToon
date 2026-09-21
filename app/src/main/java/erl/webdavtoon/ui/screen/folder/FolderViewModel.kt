@@ -14,7 +14,6 @@ import erl.webdavtoon.RustWebDavPhotoRepository
 import erl.webdavtoon.SettingsManager
 import erl.webdavtoon.VisibleRemotePreviewScheduler
 import erl.webdavtoon.PhotoRepository
-import erl.webdavtoon.ui.UiMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -42,7 +41,6 @@ class FolderViewModel @JvmOverloads constructor(app: Application) : AndroidViewM
     }
 
     private fun observeSettings() {
-        observe(appSettings.observeUiMode()) { copy(uiMode = it) }
         observe(appSettings.observeInt(AppSettingsStore.GRID_COLUMNS, 2)) { copy(gridColumns = it) }
         observe(appSettings.observeInt(AppSettingsStore.SORT_ORDER, SettingsManager.SORT_DATE_DESC)) {
             copy(sortOrder = it)
@@ -53,6 +51,9 @@ class FolderViewModel @JvmOverloads constructor(app: Application) : AndroidViewM
         }
         observe(appSettings.observeInt(AppSettingsStore.THEME_ID, erl.webdavtoon.ThemeHelper.THEME_FOLLOW_DEVICE)) {
             copy(themeId = it)
+        }
+        observe(appSettings.observeBoolean(AppSettingsStore.USE_COUI_DEFAULT_COLORS, false)) {
+            copy(useCouiDefaultColors = it)
         }
     }
 
@@ -286,10 +287,10 @@ class FolderViewModel @JvmOverloads constructor(app: Application) : AndroidViewM
         sortOrder = settingsManager.getSortOrder(),
         gridColumns = settingsManager.getGridColumns(),
         rotationLocked = settingsManager.isRotationLocked(),
-        uiMode = settingsManager.getUiMode(),
         isPrivacyMode = PrivacyModeState.isPrivacyMode,
         isWebDavEnabled = settingsManager.isWebDavEnabled(),
         drawerEdgeWidthPercent = settingsManager.getDrawerEdgeWidthPercent(),
         themeId = settingsManager.getThemeId(),
+        useCouiDefaultColors = settingsManager.useCouiDefaultColors(),
     )
 }

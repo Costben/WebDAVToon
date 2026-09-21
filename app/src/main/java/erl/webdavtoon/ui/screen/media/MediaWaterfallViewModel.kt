@@ -23,7 +23,6 @@ import erl.webdavtoon.WebDavImageLoader
 import erl.webdavtoon.detectMediaTypeByName
 import erl.webdavtoon.detectMediaTypeByUri
 import erl.webdavtoon.formatVideoDuration
-import erl.webdavtoon.ui.UiMode
 import erl.webdavtoon.ui.screen.settings.WebDavSlotUi
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.random.Random
@@ -54,15 +53,15 @@ class MediaWaterfallViewModel(app: Application) : AndroidViewModel(app) {
     private var loadJob: Job? = null
 
     private val _uiState = MutableStateFlow(
-        MediaWaterfallUiState(
-            uiMode = appSettings.getUiMode(),
-            columns = settingsManager.getGridColumns().coerceIn(1, 4),
+            MediaWaterfallUiState(
+                columns = settingsManager.getGridColumns().coerceIn(1, 4),
             sortOrder = settingsManager.getPhotoSortOrder(),
             rotationLocked = settingsManager.isRotationLocked(),
             showFilenames = settingsManager.shouldShowWaterfallFilenames(),
             isPrivacyMode = PrivacyModeState.isPrivacyMode,
             drawerEdgeWidthPercent = settingsManager.getDrawerEdgeWidthPercent(),
             themeId = settingsManager.getThemeId(),
+            useCouiDefaultColors = settingsManager.useCouiDefaultColors(),
         )
     )
     val uiState = _uiState.asStateFlow()
@@ -73,9 +72,6 @@ class MediaWaterfallViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun observeSettings() {
-        viewModelScope.launch {
-            appSettings.observeUiMode().collect { mode -> _uiState.update { it.copy(uiMode = mode) } }
-        }
         viewModelScope.launch {
             appSettings.observeInt(AppSettingsStore.GRID_COLUMNS, 2).collect { cols ->
                 val clamped = cols.coerceIn(1, 4)
@@ -104,6 +100,10 @@ class MediaWaterfallViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             appSettings.observeInt(AppSettingsStore.THEME_ID, erl.webdavtoon.ThemeHelper.THEME_FOLLOW_DEVICE)
                 .collect { themeId -> _uiState.update { it.copy(themeId = themeId) } }
+        }
+        viewModelScope.launch {
+            appSettings.observeBoolean(AppSettingsStore.USE_COUI_DEFAULT_COLORS, false)
+                .collect { enabled -> _uiState.update { it.copy(useCouiDefaultColors = enabled) } }
         }
     }
 

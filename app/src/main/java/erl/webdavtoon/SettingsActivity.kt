@@ -7,20 +7,18 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -45,6 +43,11 @@ import erl.webdavtoon.ui.screen.settings.dialog.ServerConfigDialog
 import erl.webdavtoon.ui.screen.settings.dialog.ServerConfigEvent
 import erl.webdavtoon.ui.screen.settings.dialog.ServerConfigViewModel
 import erl.webdavtoon.ui.theme.WebDAVToonTheme
+import io.github.suqi8.coui.kmp.basic.RadioButton
+import io.github.suqi8.coui.kmp.basic.Text
+import io.github.suqi8.coui.kmp.basic.TextButton
+import io.github.suqi8.coui.kmp.basic.TextField
+import io.github.suqi8.coui.kmp.overlay.OverlayDialog
 import kotlinx.coroutines.launch
 
 /**
@@ -80,7 +83,7 @@ class SettingsActivity : ComponentActivity() {
     private var serverConfigSlot by mutableStateOf<Int?>(null)
 
     /**
-     * Slot requested before `setContent` exists — `EXTRA_SHOW_ADD_SERVER` arrives in `onCreate`
+     * Slot requested before `setContent` exists �?`EXTRA_SHOW_ADD_SERVER` arrives in `onCreate`
      * while `ServerConfigViewModel.load()` would be thrown away by the first recomposition.
      * The Compose side consumes it once.
      */
@@ -118,8 +121,8 @@ class SettingsActivity : ComponentActivity() {
                 val uiState by viewModel.uiState.collectAsState()
                 val cfgState by serverConfigViewModel.state.collectAsState()
                 WebDAVToonTheme(
-                    uiMode = uiState.uiMode,
                     themeId = uiState.themeId,
+                    useCouiDefaultColors = uiState.useCouiDefaultColors,
                 ) {
                     SettingsScreen(uiState = uiState, actions = settingsActions())
                     if (showClearCacheConfirm) {
@@ -192,9 +195,7 @@ class SettingsActivity : ComponentActivity() {
                             onDismiss = { showPrivacyExitPolicyPicker = false },
                         )
                     }
-                    if (uiState.uiMode == erl.webdavtoon.ui.UiMode.Miuix) {
-                        top.yukonga.miuix.kmp.utils.MiuixPopupUtils.MiuixPopupHost()
-                    }
+                    io.github.suqi8.coui.kmp.utils.COUIPopupUtils.COUIPopupHost()
                 }
             }
         }
@@ -276,15 +277,14 @@ class SettingsActivity : ComponentActivity() {
         onDeleteSlot = { viewModel.deleteSlot(it) },
         onEditSlot = { slot -> openServerConfig(slot) },
         onRefreshSlots = { viewModel.refreshSlots() },
-        onSetUiMode = { viewModel.setUiMode(it) },
         onPickTheme = { showThemePicker = true },
+        onSetUseCouiDefaultColors = { viewModel.setUseCouiDefaultColors(it) },
         onPickLanguage = { showLanguagePicker = true },
         onSetGridColumns = { viewModel.setGridColumns(it) },
         onSetDrawerEdgeWidth = { percent ->
+            // The Compose screens read the percent from their UiState, so the new trigger
+            // area applies on the next recomposition without any process-wide state.
             viewModel.setDrawerEdgeWidthPercent(percent)
-            // Process-wide and immediate: without this the new trigger area only applies
-            // after the host Activity is recreated.
-            ExpandedEdgeDrawerLayout.setWidthPercent(percent.coerceIn(0, 100))
         },
         onSetSortOrder = { newOrder ->
             val previousOrder = settingsManager.getSortOrder()
@@ -333,18 +333,26 @@ class SettingsActivity : ComponentActivity() {
 
 @Composable
 private fun ClearCacheConfirmDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
+    OverlayDialog(
+        show = true,
+        title = stringResource(R.string.clear_cache),
+        summary = stringResource(R.string.clear_cache_message),
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.clear_cache)) },
-        text = { Text(stringResource(R.string.clear_cache_message)) },
-        confirmButton = {
-            TextButton(onClick = onConfirm) {
-                Text(stringResource(R.string.delete))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
+        content = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                TextButton(
+                    text = stringResource(R.string.cancel),
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(
+                    text = stringResource(R.string.delete),
+                    onClick = onConfirm,
+                    modifier = Modifier.weight(1f),
+                )
             }
         },
     )
@@ -464,11 +472,16 @@ private fun <T> SingleChoiceDialog(
     onItemSelected: (T) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    AlertDialog(
+    OverlayDialog(
+        show = true,
+        title = title,
         onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            LazyColumn(modifier = Modifier.fillMaxWidth()) {
+        content = {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 360.dp),
+            ) {
                 items(items) { (value, label) ->
                     Row(
                         modifier = Modifier
@@ -489,18 +502,9 @@ private fun <T> SingleChoiceDialog(
                             onClick = null,
                         )
                         Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
+                        Text(text = label)
                     }
                 }
-            }
-        },
-        confirmButton = {},
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
             }
         },
     )
@@ -515,29 +519,39 @@ private fun InputDialog(
     onDismiss: () -> Unit,
 ) {
     var text by remember { mutableStateOf(initialValue) }
-    AlertDialog(
+    OverlayDialog(
+        show = true,
+        title = title,
         onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            OutlinedTextField(
-                value = text,
-                onValueChange = { text = it },
-                placeholder = { Text(hint) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                onConfirm(text.trim())
-                onDismiss()
-            }) {
-                Text(stringResource(R.string.save))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
+        content = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                TextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = hint,
+                    useLabelAsPlaceholder = true,
+                    singleLine = true,
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    TextButton(
+                        text = stringResource(R.string.cancel),
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(
+                        text = stringResource(R.string.save),
+                        onClick = {
+                            onConfirm(text.trim())
+                            onDismiss()
+                        },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
         },
     )

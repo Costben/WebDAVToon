@@ -27,9 +27,8 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     private val favoriteStore = FavoritePhotoStore.getInstance(context)
 
     private val _uiState = MutableStateFlow(
-        ReaderUiState(
-            uiMode = appSettings.getUiMode(),
-            isOrientationLocked = settingsManager.isRotationLocked(),
+            ReaderUiState(
+                isOrientationLocked = settingsManager.isRotationLocked(),
             readingMode = resolveDefaultReadingMode()
         )
     )
@@ -45,11 +44,6 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun observeSettings() {
-        viewModelScope.launch {
-            appSettings.observeUiMode().collect { mode ->
-                _uiState.update { it.copy(uiMode = mode) }
-            }
-        }
         viewModelScope.launch {
             appSettings.observeBoolean(AppSettingsStore.ROTATION_LOCKED, false).collect { locked ->
                 _uiState.update { it.copy(isOrientationLocked = locked) }
@@ -373,7 +367,6 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         stopSlideshow()
         explicitModeSet = false
         _uiState.value = ReaderUiState(
-            uiMode = appSettings.getUiMode(),
             isOrientationLocked = settingsManager.isRotationLocked(),
             readingMode = resolveDefaultReadingMode()
         )

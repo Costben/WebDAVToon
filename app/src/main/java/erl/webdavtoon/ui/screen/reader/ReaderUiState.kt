@@ -1,7 +1,6 @@
 package erl.webdavtoon.ui.screen.reader
 
 import erl.webdavtoon.Photo
-import erl.webdavtoon.ui.UiMode
 
 enum class ReadingMode {
     CARD,
@@ -17,7 +16,6 @@ data class ReaderUiState(
     val slideshowIntervalMs: Long = 3000L,
     val isOrientationLocked: Boolean = false,
     val isFavorite: Boolean = false,
-    val uiMode: UiMode = UiMode.Miuix,
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val sessionId: String? = null

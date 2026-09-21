@@ -18,10 +18,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import io.github.suqi8.coui.kmp.basic.CircularProgressIndicator as MiuixCircularProgressIndicator
+import io.github.suqi8.coui.kmp.basic.Text as MiuixText
+import io.github.suqi8.coui.kmp.basic.TextButton as MiuixTextButton
+import io.github.suqi8.coui.kmp.theme.COUITheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -310,10 +310,7 @@ fun ZoomableImage(
                     .background(Color.Black.copy(alpha = 0.5f)),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator(
-                    color = Color.White,
-                    strokeWidth = 3.dp
-                )
+                MiuixCircularProgressIndicator()
             }
         }
 
@@ -328,17 +325,16 @@ fun ZoomableImage(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.padding(16.dp)
                 ) {
-                    Text(
+                    MiuixText(
                         text = "Failed to load image",
                         color = Color.White,
-                        style = MaterialTheme.typography.bodyMedium
+                        style = COUITheme.textStyles.body1
                     )
                     Spacer(modifier = Modifier.height(12.dp))
-                    TextButton(
-                        onClick = { retryTrigger++ }
-                    ) {
-                        Text(text = "Retry", color = MaterialTheme.colorScheme.primary)
-                    }
+                    MiuixTextButton(
+                        text = "Retry",
+                        onClick = { retryTrigger++ },
+                    )
                 }
             }
         }

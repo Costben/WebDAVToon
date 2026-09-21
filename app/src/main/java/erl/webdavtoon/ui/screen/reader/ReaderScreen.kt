@@ -23,7 +23,6 @@ import erl.webdavtoon.FileUtils
 import erl.webdavtoon.MediaShareHelper
 import erl.webdavtoon.R
 import erl.webdavtoon.SettingsManager
-import erl.webdavtoon.ui.UiMode
 import kotlinx.coroutines.launch
 
 /**
@@ -119,48 +118,24 @@ fun ReaderScreen(
 
         val visible = !uiState.isImmersive
 
-        when (uiState.uiMode) {
-            UiMode.Miuix -> {
-                ReaderOverlayMiuix(
-                    visible = visible,
-                    title = currentPhotoTitle,
-                    currentIndex = uiState.currentIndex,
-                    totalCount = uiState.totalCount,
-                    readingMode = uiState.readingMode,
-                    isSlideshowPlaying = uiState.isSlideshowPlaying,
-                    isOrientationLocked = uiState.isOrientationLocked,
-                    isFavorite = uiState.isFavorite,
-                    onBack = onBack,
-                    onSeek = { viewModel.updateCurrentIndex(it) },
-                    onToggleMode = { viewModel.toggleReadingMode() },
-                    onToggleSlideshow = { viewModel.toggleSlideshow() },
-                    onToggleOrientationLock = { viewModel.toggleOrientationLock() },
-                    onToggleFavorite = { viewModel.toggleFavorite() },
-                    onSaveImage = onSaveImage,
-                    onShare = onShare,
-                )
-            }
-            UiMode.Material -> {
-                ReaderOverlayMaterial(
-                    visible = visible,
-                    title = currentPhotoTitle,
-                    currentIndex = uiState.currentIndex,
-                    totalCount = uiState.totalCount,
-                    readingMode = uiState.readingMode,
-                    isSlideshowPlaying = uiState.isSlideshowPlaying,
-                    isOrientationLocked = uiState.isOrientationLocked,
-                    isFavorite = uiState.isFavorite,
-                    onBack = onBack,
-                    onSeek = { viewModel.updateCurrentIndex(it) },
-                    onToggleMode = { viewModel.toggleReadingMode() },
-                    onToggleSlideshow = { viewModel.toggleSlideshow() },
-                    onToggleOrientationLock = { viewModel.toggleOrientationLock() },
-                    onToggleFavorite = { viewModel.toggleFavorite() },
-                    onSaveImage = onSaveImage,
-                    onShare = onShare,
-                )
-            }
-        }
+        ReaderOverlayMiuix(
+            visible = visible,
+            title = currentPhotoTitle,
+            currentIndex = uiState.currentIndex,
+            totalCount = uiState.totalCount,
+            readingMode = uiState.readingMode,
+            isSlideshowPlaying = uiState.isSlideshowPlaying,
+            isOrientationLocked = uiState.isOrientationLocked,
+            isFavorite = uiState.isFavorite,
+            onBack = onBack,
+            onSeek = { viewModel.updateCurrentIndex(it) },
+            onToggleMode = { viewModel.toggleReadingMode() },
+            onToggleSlideshow = { viewModel.toggleSlideshow() },
+            onToggleOrientationLock = { viewModel.toggleOrientationLock() },
+            onToggleFavorite = { viewModel.toggleFavorite() },
+            onSaveImage = onSaveImage,
+            onShare = onShare,
+        )
     }
 }
 

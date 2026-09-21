@@ -26,7 +26,6 @@ import erl.webdavtoon.WebDavImageLoader
 import erl.webdavtoon.detectMediaTypeByName
 import erl.webdavtoon.detectMediaTypeByUri
 import erl.webdavtoon.formatVideoDuration
-import erl.webdavtoon.ui.UiMode
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -53,9 +52,8 @@ class MixedWaterfallViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private val _uiState = MutableStateFlow(
-        MixedWaterfallUiState(
-            uiMode = appSettings.getUiMode(),
-            columns = appSettings.getOrDefaultInt(AppSettingsStore.GRID_COLUMNS, 2).coerceIn(1, 4),
+            MixedWaterfallUiState(
+                columns = appSettings.getOrDefaultInt(AppSettingsStore.GRID_COLUMNS, 2).coerceIn(1, 4),
             virtualColumns = appSettings.getOrDefaultInt(AppSettingsStore.GRID_COLUMNS, 2).coerceIn(1, 4).toFloat(),
             sortOrder = settingsManager.getPhotoSortOrder(),
             rotationLocked = settingsManager.isRotationLocked(),
@@ -69,11 +67,6 @@ class MixedWaterfallViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun observeSettings() {
-        viewModelScope.launch {
-            appSettings.observeUiMode().collect { mode ->
-                _uiState.update { it.copy(uiMode = mode) }
-            }
-        }
         viewModelScope.launch {
             appSettings.observeInt(AppSettingsStore.GRID_COLUMNS, 2).collect { cols ->
                 val clamped = cols.coerceIn(1, 4)

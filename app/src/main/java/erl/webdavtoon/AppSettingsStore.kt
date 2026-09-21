@@ -9,7 +9,6 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import erl.webdavtoon.ui.UiMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -34,8 +33,8 @@ class AppSettingsStore(context: Context) {
         val LOG_LEVEL = intPreferencesKey("log_level")
         val CURRENT_SLOT = intPreferencesKey("current_slot")
         val WEBDAV_SLOTS_JSON = stringPreferencesKey("webdav_slots_json")
-        val UI_MODE = intPreferencesKey("ui_mode")
         val THEME_ID = intPreferencesKey("theme_id")
+        val USE_COUI_DEFAULT_COLORS = booleanPreferencesKey("use_coui_default_colors")
         val LANGUAGE = stringPreferencesKey("language")
         val WATERFALL_QUALITY_MODE = stringPreferencesKey("waterfall_quality_mode")
         val WATERFALL_PERCENT = intPreferencesKey("waterfall_percent")
@@ -116,22 +115,6 @@ class AppSettingsStore(context: Context) {
 
     fun getOrDefaultInt(key: Preferences.Key<Int>, defaultValue: Int): Int {
         return readCached(key, defaultValue)
-    }
-
-    fun getUiMode(): UiMode {
-        return UiMode.fromCode(getOrDefaultInt(UI_MODE, UiMode.Miuix.code))
-    }
-
-    fun setUiMode(mode: UiMode) {
-        putInt(UI_MODE, mode.code)
-    }
-
-    suspend fun setUiModeSync(mode: UiMode) {
-        putIntSync(UI_MODE, mode.code)
-    }
-
-    fun observeUiMode(): Flow<UiMode> {
-        return observeInt(UI_MODE, UiMode.Miuix.code).map { UiMode.fromCode(it) }
     }
 
     fun putInt(key: Preferences.Key<Int>, value: Int) {

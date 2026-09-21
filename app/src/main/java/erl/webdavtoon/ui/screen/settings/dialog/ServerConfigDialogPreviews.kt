@@ -4,15 +4,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import erl.webdavtoon.DiscoveredHost
 import erl.webdavtoon.ServerConfigDialogHelper
-import erl.webdavtoon.ui.UiMode
 import erl.webdavtoon.ui.theme.WebDAVToonTheme
 
 /**
- * Static, backend-free proof that both dialog tracks render under both themes.
+ * Static, backend-free proof that the dialogs render.
  *
  * [ServerConfigDialogState] is pure data, so a filled-in form needs no ViewModel, no
- * `SettingsManager` and no Rust bridge. `WebDAVToonTheme` supplies `LocalUiMode` for the
- * track, so the previews never hand-roll a `CompositionLocalProvider`.
+ * `SettingsManager` and no Rust bridge. `WebDAVToonTheme` supplies the COUI theme, so the
+ * previews never hand-roll a `CompositionLocalProvider`.
  */
 private fun previewServerConfigState() = ServerConfigDialogState(
     slot = 1,
@@ -43,10 +42,10 @@ private val previewDiscoveredHosts = listOf(
     DiscoveredHost(protocol = "webdav", displayName = "NAS", host = "192.168.1.10", port = 5005),
 )
 
-@Preview(name = "ServerConfig · Miuix", showBackground = true, widthDp = 400, heightDp = 720)
+@Preview(name = "ServerConfig", showBackground = true, widthDp = 400, heightDp = 720)
 @Composable
-private fun ServerConfigDialogMiuixPreview() {
-    WebDAVToonTheme(uiMode = UiMode.Miuix) {
+private fun ServerConfigDialogPreview() {
+    WebDAVToonTheme {
         ServerConfigDialog(
             state = previewServerConfigState(),
             visible = true,
@@ -56,37 +55,10 @@ private fun ServerConfigDialogMiuixPreview() {
     }
 }
 
-@Preview(name = "ServerConfig · Material", showBackground = true, widthDp = 400, heightDp = 720)
+@Preview(name = "HostDiscovery", showBackground = true, widthDp = 400, heightDp = 720)
 @Composable
-private fun ServerConfigDialogMaterialPreview() {
-    WebDAVToonTheme(uiMode = UiMode.Material) {
-        ServerConfigDialog(
-            state = previewServerConfigState(),
-            visible = true,
-            onAction = {},
-            onDismiss = {},
-        )
-    }
-}
-
-@Preview(name = "HostDiscovery · Miuix", showBackground = true, widthDp = 400, heightDp = 720)
-@Composable
-private fun HostDiscoveryDialogMiuixPreview() {
-    WebDAVToonTheme(uiMode = UiMode.Miuix) {
-        HostDiscoveryDialog(
-            hosts = previewDiscoveredHosts,
-            searching = false,
-            visible = true,
-            onSelect = {},
-            onDismiss = {},
-        )
-    }
-}
-
-@Preview(name = "HostDiscovery · Material", showBackground = true, widthDp = 400, heightDp = 720)
-@Composable
-private fun HostDiscoveryDialogMaterialPreview() {
-    WebDAVToonTheme(uiMode = UiMode.Material) {
+private fun HostDiscoveryDialogPreview() {
+    WebDAVToonTheme {
         HostDiscoveryDialog(
             hosts = previewDiscoveredHosts,
             searching = false,

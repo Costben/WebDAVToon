@@ -2,7 +2,7 @@ package erl.webdavtoon.ui.screen.settings
 
 import erl.webdavtoon.PrivacyModeState
 import erl.webdavtoon.SettingsManager
-import erl.webdavtoon.ui.UiMode
+
 
 data class WebDavSlotUi(
     val slot: Int,
@@ -23,8 +23,8 @@ data class SettingsUiState(
     val loading: Boolean = true,
     val slots: List<WebDavSlotUi> = emptyList(),
     val currentSlot: Int = 0,
-    val uiMode: UiMode = UiMode.Miuix,
     val themeId: Int = 0,
+    val useCouiDefaultColors: Boolean = false,
     val language: String = "default",
     val gridColumns: Int = 2,
     val drawerEdgeWidthPercent: Int = SettingsManager.DEFAULT_DRAWER_EDGE_WIDTH_PERCENT,

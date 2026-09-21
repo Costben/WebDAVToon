@@ -2,7 +2,6 @@ package erl.webdavtoon.ui.screen.folder
 
 import erl.webdavtoon.Folder
 import erl.webdavtoon.SettingsManager
-import erl.webdavtoon.ui.UiMode
 import erl.webdavtoon.ui.screen.settings.WebDavSlotUi
 
 data class FolderItemUi(
@@ -39,11 +38,11 @@ data class FolderUiState(
     val selectedCount: Int = 0,
     val storagePermissionGranted: Boolean = true,
     val rotationLocked: Boolean = false,
-    val uiMode: UiMode = UiMode.Miuix,
     val currentSlot: Int = 0,
     val slots: List<WebDavSlotUi> = emptyList(),
     val isWebDavEnabled: Boolean = true,
     val isPrivacyMode: Boolean = false,
     val drawerEdgeWidthPercent: Int = SettingsManager.DEFAULT_DRAWER_EDGE_WIDTH_PERCENT,
     val themeId: Int = erl.webdavtoon.ThemeHelper.THEME_FOLLOW_DEVICE,
+    val useCouiDefaultColors: Boolean = false,
 )

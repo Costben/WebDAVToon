@@ -1,0 +1,5 @@
+<resources>
+    <!-- Only the window background needs a dark variant: all other colors are resolved by
+         the Compose/COUI layer at runtime. -->
+    <color name="surface">#1C1B1F</color>
+</resources>

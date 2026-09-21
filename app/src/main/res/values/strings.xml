@@ -6,6 +6,8 @@
     <string name="language">Language</string>
     <string name="language_summary">Current language: English</string>
     <string name="theme">App Theme</string>
+    <string name="use_coui_default_colors">Use COUI default colors</string>
+    <string name="use_coui_default_colors_summary">Ignore Material color extraction and the app themes; use COUI\'s built-in palette</string>
     <string name="grid_columns">Grid Columns</string>
     <string name="sort_order">Sort Order</string>
     <string name="clear_cache">Clear Cache</string>
