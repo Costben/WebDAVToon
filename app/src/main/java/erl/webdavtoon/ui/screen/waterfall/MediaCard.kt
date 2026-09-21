@@ -270,7 +270,7 @@ private fun WaterfallMediaCardMiuix(
                 )
             },
     ) {
-        Column(modifier = Modifier.padding(if (showFilename) 6.dp else 0.dp)) {
+        Column {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -420,7 +420,10 @@ private fun WaterfallMediaCardMiuix(
             if (showFilename) {
                 Text(
                     text = item.title,
-                    modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 6.dp, bottom = 2.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 8.dp, end = 8.dp, top = 6.dp, bottom = 2.dp)
+                        .height(MediaCardLabelHeight),
                     style = COUITheme.textStyles.footnote1,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

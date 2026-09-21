@@ -43,8 +43,17 @@ import kotlinx.coroutines.launch
 /** Rough label-block height of the folder card (name + count rows), used to estimate frames. */
 val FolderCardExtraHeight = 68.dp
 
-/** Rough caption height of the media card when filenames are shown. */
-val MediaCardExtraHeight = 36.dp
+/** Fixed height reserved for the media card's single-line filename label. */
+val MediaCardLabelHeight = 18.dp
+
+/**
+ * Vertical space the media card's caption adds below the image: the label's 6dp top and 2dp bottom
+ * padding plus [MediaCardLabelHeight]. It must match the card's real caption block exactly, because
+ * the image box takes the leftover cell height. Any mismatch makes the box taller than the image's
+ * own ratio, so FIT_CENTER leaves letterbox bands and the card's rounded corners stop clipping the
+ * image's corners.
+ */
+val MediaCardExtraHeight = 6.dp + MediaCardLabelHeight + 2.dp
 
 /**
  * State for [FollowZoomWaterfallLayout].
