@@ -36,6 +36,7 @@ import erl.webdavtoon.ui.component.AppAdaptiveNavigationScaffold
 import erl.webdavtoon.ui.component.ServerSheetActions
 import erl.webdavtoon.ui.screen.waterfall.MediaCardMiuix
 import erl.webdavtoon.ui.screen.waterfall.MediaCardExtraHeight
+import erl.webdavtoon.ui.screen.waterfall.MediaCardImageMargin
 import erl.webdavtoon.ui.screen.waterfall.FollowZoomWaterfallLayout
 import erl.webdavtoon.ui.screen.waterfall.SelectionBottomBarMiuix
 import erl.webdavtoon.ui.screen.waterfall.rememberFollowZoomGridState
@@ -127,7 +128,7 @@ fun MediaWaterfallScreen(
     )
     val aspectRatios = remember(visibleItems) { visibleItems.map { it.aspectRatio } }
     val extraHeights = remember(visibleItems, uiState.showFilenames) {
-        if (!uiState.showFilenames) List(visibleItems.size) { 0.dp }
+        if (!uiState.showFilenames) List(visibleItems.size) { MediaCardImageMargin * 2 }
         else List(visibleItems.size) { MediaCardExtraHeight }
     }
     val topAppBarScrollBehavior = COUIScrollBehavior(rememberTopAppBarState())
@@ -197,7 +198,7 @@ fun MediaWaterfallScreen(
                             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                             state = zoomState,
                             itemExtraHeights = extraHeights,
-                            itemHorizontalPadding = 0.dp,
+                            itemHorizontalPadding = MediaCardImageMargin,
                             modifier = Modifier
                                 .fillMaxSize()
                                 .nestedScroll(topAppBarScrollBehavior.nestedScrollConnection),

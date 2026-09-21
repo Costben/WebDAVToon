@@ -24,6 +24,7 @@ import erl.webdavtoon.ui.component.AppAdaptiveNavigationScaffold
 import erl.webdavtoon.ui.component.ServerSheetActions
 import erl.webdavtoon.ui.screen.waterfall.FolderCardExtraHeight
 import erl.webdavtoon.ui.screen.waterfall.FollowZoomWaterfallLayout
+import erl.webdavtoon.ui.screen.waterfall.MediaCardImageMargin
 import erl.webdavtoon.ui.screen.waterfall.rememberFollowZoomGridState
 import io.github.suqi8.coui.kmp.basic.COUIScrollBehavior
 import io.github.suqi8.coui.kmp.basic.CircularProgressIndicator as MiuixCircularProgressIndicator
@@ -190,7 +191,7 @@ private fun FolderGrid(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
             state = zoomState,
             itemExtraHeights = extraHeights,
-            itemHorizontalPadding = 0.dp,
+            itemHorizontalPadding = MediaCardImageMargin,
             modifier = modifier
                 .navigationBarsPadding()
                 .then(

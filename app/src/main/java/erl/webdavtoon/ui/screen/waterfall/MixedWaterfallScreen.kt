@@ -100,11 +100,11 @@ fun MixedWaterfallScreen(
     )
     val aspectRatios = remember(visibleItems) { visibleItems.map { it.aspectRatio } }
     val extraHeights = remember(visibleItems, uiState.showFilenames) {
-        if (!uiState.showFilenames) {
-            List(visibleItems.size) { 0.dp }
-        } else {
-            visibleItems.map { item ->
-                if (item is MixedWaterfallItemUi.FolderItem) FolderCardExtraHeight else MediaCardExtraHeight
+        visibleItems.map { item ->
+            val isFolder = item is MixedWaterfallItemUi.FolderItem
+            when {
+                isFolder -> if (uiState.showFilenames) FolderCardExtraHeight else FolderCardExtraHeightBare
+                else -> if (uiState.showFilenames) MediaCardExtraHeight else MediaCardImageMargin * 2
             }
         }
     }
@@ -164,7 +164,7 @@ fun MixedWaterfallScreen(
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                         state = zoomState,
                         itemExtraHeights = extraHeights,
-                        itemHorizontalPadding = 0.dp,
+                        itemHorizontalPadding = MediaCardImageMargin,
                         modifier = Modifier
                             .fillMaxSize()
                             .nestedScroll(topAppBarScrollBehavior.nestedScrollConnection),

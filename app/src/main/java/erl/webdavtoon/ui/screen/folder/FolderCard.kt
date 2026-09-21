@@ -34,6 +34,7 @@ import erl.webdavtoon.detectMediaTypeByUri
 import erl.webdavtoon.ui.component.FolderCardLabelHeight
 import erl.webdavtoon.ui.component.PreviewTileCornerRadius
 import erl.webdavtoon.ui.component.PreviewTilePlaceholder
+import erl.webdavtoon.ui.screen.waterfall.MediaCardImageMargin
 import io.github.suqi8.coui.kmp.basic.Card
 import io.github.suqi8.coui.kmp.basic.Icon
 import io.github.suqi8.coui.kmp.basic.Text
@@ -69,12 +70,11 @@ fun FolderCardMiuix(
                 )
             },
     ) {
-        Column(modifier = Modifier.padding(8.dp)) {
+        Column(modifier = Modifier.padding(MediaCardImageMargin)) {
             MiuixPreviewGrid(
                 folder = folder,
                 selected = folder.isSelected,
-                modifier = if (fillHeight) Modifier.fillMaxWidth().weight(1f) else Modifier.fillMaxWidth(),
-                fillHeight = fillHeight,
+                modifier = Modifier.fillMaxWidth(),
             )
             Text(
                 text = folder.name.trimEnd('/'),
@@ -101,11 +101,10 @@ private fun MiuixPreviewGrid(
     folder: FolderItemUi,
     selected: Boolean,
     modifier: Modifier = Modifier,
-    fillHeight: Boolean = false,
 ) {
     Box(
         modifier = modifier
-            .then(if (fillHeight) Modifier else Modifier.aspectRatio(1f))
+            .aspectRatio(1f)
             .clip(RoundedCornerShape(12.dp)),
     ) {
         if (folder.previewUris.isEmpty()) {

@@ -7,7 +7,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -28,11 +27,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import kotlin.math.ceil
 import erl.webdavtoon.Folder
 import erl.webdavtoon.MediaType
 import erl.webdavtoon.R
@@ -141,16 +138,11 @@ fun WaterfallFolderCardMiuix(
 
     val cardShape = RoundedCornerShape(12.dp)
     val innerShape = RoundedCornerShape(12.dp)
-    val innerPadding = if (showFilename) 8.dp else 0.dp
+    val innerPadding = if (showFilename) MediaCardImageMargin else 0.dp
 
-    BoxWithConstraints(
+    Box(
         modifier = if (fillHeight) modifier.fillMaxSize() else modifier.fillMaxWidth(),
     ) {
-        // Round the lane width to a whole dp so both grid lanes produce exactly the same
-        // preview height. With a sub-pixel lane width the two columns end up 1px different
-        // per row, which the staggered grid accumulates until it misplaces the last folder.
-        val previewSide = Dp(ceil(maxWidth.value)) - innerPadding * 2
-
         Card(
             modifier = (if (fillHeight) Modifier.fillMaxSize() else Modifier.fillMaxWidth())
                 .clip(cardShape)
@@ -165,7 +157,7 @@ fun WaterfallFolderCardMiuix(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .then(if (fillHeight) Modifier.weight(1f) else Modifier.height(previewSide))
+                        .aspectRatio(1f)
                         .clip(innerShape),
                 ) {
                     if (item.previewUris.isEmpty()) {
@@ -270,7 +262,7 @@ private fun WaterfallMediaCardMiuix(
                 )
             },
     ) {
-        Column {
+        Column(modifier = Modifier.padding(MediaCardImageMargin)) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -422,7 +414,7 @@ private fun WaterfallMediaCardMiuix(
                     text = item.title,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 8.dp, end = 8.dp, top = 6.dp, bottom = 2.dp)
+                        .padding(start = 4.dp, end = 4.dp, top = 6.dp)
                         .height(MediaCardLabelHeight),
                     style = COUITheme.textStyles.footnote1,
                     maxLines = 1,

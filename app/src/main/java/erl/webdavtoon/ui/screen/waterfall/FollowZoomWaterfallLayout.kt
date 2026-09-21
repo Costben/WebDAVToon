@@ -40,20 +40,46 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
-/** Rough label-block height of the folder card (name + count rows), used to estimate frames. */
-val FolderCardExtraHeight = 68.dp
+/**
+ * Uniform margin between a card's content and its edge, matching the folder card's inner padding so
+ * a single image sits in the card exactly like a folder's preview mosaic does.
+ * It is passed to [FollowZoomWaterfallLayout] as `itemHorizontalPadding`, so the engine sizes the
+ * content height from `laneWidth - 2 * margin` while the frame keeps the full lane width. The image
+ * then fills a container of exactly its own ratio and the rounded clip trims all four corners.
+ */
+val MediaCardImageMargin = 8.dp
 
 /** Fixed height reserved for the media card's single-line filename label. */
 val MediaCardLabelHeight = 18.dp
 
+/** The caption block below the image: the 6dp gap above the label plus the label height. */
+val MediaCardLabelBlock = 6.dp + MediaCardLabelHeight
+
 /**
- * Vertical space the media card's caption adds below the image: the label's 6dp top and 2dp bottom
- * padding plus [MediaCardLabelHeight]. It must match the card's real caption block exactly, because
- * the image box takes the leftover cell height. Any mismatch makes the box taller than the image's
- * own ratio, so FIT_CENTER leaves letterbox bands and the card's rounded corners stop clipping the
- * image's corners.
+ * Extra cell height for a media card: the image's top and bottom margins plus the caption block.
+ * The engine computes the image height as `(laneWidth - 2 * [MediaCardImageMargin]) / ratio`, so
+ * image + margins + caption fills the cell exactly and no letterbox band is left inside the
+ * rounded image container.
  */
-val MediaCardExtraHeight = 6.dp + MediaCardLabelHeight + 2.dp
+val MediaCardExtraHeight = MediaCardImageMargin * 2 + MediaCardLabelBlock
+
+/**
+ * The folder card's label block: the name row (6dp top padding + a 20dp line) plus the count row
+ * (2dp + one footnote line + 2dp). Measured on device at the default font scale, so the square
+ * mosaic plus this block fills the cell exactly.
+ */
+val FolderCardLabelBlock = 49.dp
+
+/**
+ * Extra cell height for a folder card, chosen so its 2x2 preview mosaic comes out exactly square.
+ * The card pads its content by [MediaCardImageMargin] on every side, and the engine reserves the
+ * same margin horizontally, so the frame height is `(laneWidth - 2 * margin) + extra`; with
+ * `extra = margin * 2 + labelBlock` the square mosaic and the label block fill the cell exactly.
+ */
+val FolderCardExtraHeight = MediaCardImageMargin * 2 + FolderCardLabelBlock
+
+/** Extra cell height for a folder card that hides its labels: only its two image margins. */
+val FolderCardExtraHeightBare = MediaCardImageMargin * 2
 
 /**
  * State for [FollowZoomWaterfallLayout].
