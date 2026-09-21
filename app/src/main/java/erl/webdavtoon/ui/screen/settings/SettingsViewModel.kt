@@ -43,7 +43,6 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         observe(appSettings.observeBoolean(AppSettingsStore.USE_COUI_DEFAULT_COLORS, false)) { copy(useCouiDefaultColors = it) }
         observe(appSettings.observeString(AppSettingsStore.LANGUAGE, "default")) { copy(language = it) }
         observe(appSettings.observeInt(AppSettingsStore.GRID_COLUMNS, 2)) { copy(gridColumns = it) }
-        observe(appSettings.observeInt(AppSettingsStore.DRAWER_EDGE_WIDTH_PERCENT, SettingsManager.DEFAULT_DRAWER_EDGE_WIDTH_PERCENT)) { copy(drawerEdgeWidthPercent = it.coerceIn(0, 100)) }
         observe(appSettings.observeInt(AppSettingsStore.SORT_ORDER, 2)) { copy(sortOrder = it) }
         observe(appSettings.observeInt(AppSettingsStore.RECURSIVE_IMAGE_ARRANGEMENT, SettingsManager.RECURSIVE_IMAGE_ARRANGEMENT_GROUPED)) { copy(recursiveImageArrangement = it) }
         observe(appSettings.observeBoolean(AppSettingsStore.WATERFALL_SHOW_FILENAMES, true)) { copy(waterfallShowFilenames = it) }
@@ -99,7 +98,6 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
                 useCouiDefaultColors = settingsManager.useCouiDefaultColors(),
                 language = settingsManager.getLanguage(),
                 gridColumns = settingsManager.getGridColumns(),
-                drawerEdgeWidthPercent = settingsManager.getDrawerEdgeWidthPercent(),
                 sortOrder = settingsManager.getSortOrder(),
                 recursiveImageArrangement = settingsManager.getRecursiveImageArrangement(),
                 waterfallShowFilenames = settingsManager.shouldShowWaterfallFilenames(),
@@ -153,7 +151,6 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     }
     fun setLanguage(tag: String) = io { settingsManager.setLanguage(tag); _uiState.update { it.copy(language = tag) }; eventChannel.send(SettingsEvent.RequestRecreate) }
     fun setGridColumns(n: Int) = io { settingsManager.setGridColumns(n); _uiState.update { it.copy(gridColumns = n) } }
-    fun setDrawerEdgeWidthPercent(p: Int) = io { settingsManager.setDrawerEdgeWidthPercent(p); _uiState.update { it.copy(drawerEdgeWidthPercent = p.coerceIn(0, 100)) } }
     fun setSortOrder(n: Int) = io { settingsManager.setSortOrder(n); _uiState.update { it.copy(sortOrder = n) } }
     fun setRecursiveImageArrangement(n: Int) = io { settingsManager.setRecursiveImageArrangement(n); _uiState.update { it.copy(recursiveImageArrangement = settingsManager.getRecursiveImageArrangement()) }; eventChannel.send(SettingsEvent.ResultChanged) }
     fun setWaterfallShowFilenames(b: Boolean) = io { settingsManager.setShowWaterfallFilenames(b); _uiState.update { it.copy(waterfallShowFilenames = b) }; eventChannel.send(SettingsEvent.ResultChanged) }

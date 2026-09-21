@@ -46,9 +46,6 @@ class FolderViewModel @JvmOverloads constructor(app: Application) : AndroidViewM
             copy(sortOrder = it)
         }
         observe(appSettings.observeBoolean(AppSettingsStore.ROTATION_LOCKED, false)) { copy(rotationLocked = it) }
-        observe(appSettings.observeInt(AppSettingsStore.DRAWER_EDGE_WIDTH_PERCENT, SettingsManager.DEFAULT_DRAWER_EDGE_WIDTH_PERCENT)) {
-            copy(drawerEdgeWidthPercent = it)
-        }
         observe(appSettings.observeInt(AppSettingsStore.THEME_ID, erl.webdavtoon.ThemeHelper.THEME_FOLLOW_DEVICE)) {
             copy(themeId = it)
         }
@@ -289,7 +286,6 @@ class FolderViewModel @JvmOverloads constructor(app: Application) : AndroidViewM
         rotationLocked = settingsManager.isRotationLocked(),
         isPrivacyMode = PrivacyModeState.isPrivacyMode,
         isWebDavEnabled = settingsManager.isWebDavEnabled(),
-        drawerEdgeWidthPercent = settingsManager.getDrawerEdgeWidthPercent(),
         themeId = settingsManager.getThemeId(),
         useCouiDefaultColors = settingsManager.useCouiDefaultColors(),
     )

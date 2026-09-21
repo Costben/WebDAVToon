@@ -71,18 +71,16 @@ fun AppSideRail(
 
 /**
  * Wide screens get the persistent COUI navigation rail; narrow screens get the COUI
- * server bottom sheet (openable from the top bar or a left-edge swipe).
+ * server bottom sheet, which opens from the top bar button only.
  */
 @Composable
 fun AppAdaptiveNavigationScaffold(
     showServerSheet: Boolean,
-    onOpenServerSheet: () -> Unit,
     onDismissServerSheet: () -> Unit,
     slots: List<WebDavSlotUi>,
     isPrivacyMode: Boolean,
     actions: ServerSheetActions,
     modifier: Modifier = Modifier,
-    serverSheetEdgeWidthPercent: Int = 33,
     content: @Composable () -> Unit,
 ) {
     val wide = LocalConfiguration.current.screenWidthDp >= 600
@@ -92,11 +90,7 @@ fun AppAdaptiveNavigationScaffold(
             Box(Modifier.weight(1f).fillMaxHeight()) { content() }
         }
     } else {
-        ServerSheetEdgeSwipe(
-            onOpen = onOpenServerSheet,
-            edgeWidthPercent = serverSheetEdgeWidthPercent,
-            modifier = modifier.fillMaxSize(),
-        ) {
+        Box(modifier.fillMaxSize()) {
             Box(Modifier.fillMaxSize()) { content() }
             AppServerSheet(
                 show = showServerSheet,

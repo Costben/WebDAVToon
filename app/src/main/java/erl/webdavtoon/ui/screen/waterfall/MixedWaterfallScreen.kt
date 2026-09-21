@@ -160,11 +160,11 @@ fun MixedWaterfallScreen(
                         minColumns = 1,
                         maxColumns = 4,
                         onColumnsChanged = actions.onColumnsChange,
-                        spacing = 8.dp,
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                        spacing = 12.dp,
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                         state = zoomState,
                         itemExtraHeights = extraHeights,
-                        itemHorizontalPadding = 8.dp,
+                        itemHorizontalPadding = 0.dp,
                         modifier = Modifier
                             .fillMaxSize()
                             .nestedScroll(topAppBarScrollBehavior.nestedScrollConnection),

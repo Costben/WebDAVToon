@@ -109,10 +109,10 @@ fun ReaderOverlayMiuix(
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 600.dp),
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(24.dp),
                 color = COUITheme.colorScheme.surfaceContainer,
                 border = BorderStroke(1.dp, COUITheme.colorScheme.dividerLine),
-                shadowElevation = 8.dp,
+                shadowElevation = 4.dp,
             ) {
                 Row(
                     modifier = Modifier
@@ -190,7 +190,7 @@ fun ReaderOverlayMiuix(
                 shape = RoundedCornerShape(24.dp),
                 color = COUITheme.colorScheme.surfaceContainer,
                 border = BorderStroke(1.dp, COUITheme.colorScheme.dividerLine),
-                shadowElevation = 8.dp,
+                shadowElevation = 4.dp,
             ) {
                 Column(
                     modifier = Modifier

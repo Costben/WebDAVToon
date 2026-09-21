@@ -42,7 +42,6 @@ data class FolderUiState(
     val slots: List<WebDavSlotUi> = emptyList(),
     val isWebDavEnabled: Boolean = true,
     val isPrivacyMode: Boolean = false,
-    val drawerEdgeWidthPercent: Int = SettingsManager.DEFAULT_DRAWER_EDGE_WIDTH_PERCENT,
     val themeId: Int = erl.webdavtoon.ThemeHelper.THEME_FOLLOW_DEVICE,
     val useCouiDefaultColors: Boolean = false,
 )

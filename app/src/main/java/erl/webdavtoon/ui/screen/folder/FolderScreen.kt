@@ -109,11 +109,9 @@ fun FolderScreen(
 
     AppAdaptiveNavigationScaffold(
         showServerSheet = showServerSheet,
-        onOpenServerSheet = { showServerSheet = true },
         onDismissServerSheet = { showServerSheet = false },
         slots = uiState.slots,
         isPrivacyMode = uiState.isPrivacyMode,
-        serverSheetEdgeWidthPercent = uiState.drawerEdgeWidthPercent,
         actions = serverSheetActions,
         modifier = modifier,
     ) {
@@ -188,11 +186,11 @@ private fun FolderGrid(
             minColumns = 1,
             maxColumns = 4,
             onColumnsChanged = actions.onSetGridColumns,
-            spacing = 10.dp,
-            contentPadding = PaddingValues(12.dp),
+            spacing = 12.dp,
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
             state = zoomState,
             itemExtraHeights = extraHeights,
-            itemHorizontalPadding = 8.dp,
+            itemHorizontalPadding = 0.dp,
             modifier = modifier
                 .navigationBarsPadding()
                 .then(

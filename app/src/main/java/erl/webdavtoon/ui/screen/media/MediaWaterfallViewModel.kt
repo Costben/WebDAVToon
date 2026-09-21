@@ -59,7 +59,6 @@ class MediaWaterfallViewModel(app: Application) : AndroidViewModel(app) {
             rotationLocked = settingsManager.isRotationLocked(),
             showFilenames = settingsManager.shouldShowWaterfallFilenames(),
             isPrivacyMode = PrivacyModeState.isPrivacyMode,
-            drawerEdgeWidthPercent = settingsManager.getDrawerEdgeWidthPercent(),
             themeId = settingsManager.getThemeId(),
             useCouiDefaultColors = settingsManager.useCouiDefaultColors(),
         )
@@ -92,10 +91,6 @@ class MediaWaterfallViewModel(app: Application) : AndroidViewModel(app) {
             appSettings.observeBoolean(AppSettingsStore.ROTATION_LOCKED, false).collect { locked ->
                 _uiState.update { it.copy(rotationLocked = locked) }
             }
-        }
-        viewModelScope.launch {
-            appSettings.observeInt(AppSettingsStore.DRAWER_EDGE_WIDTH_PERCENT, SettingsManager.DEFAULT_DRAWER_EDGE_WIDTH_PERCENT)
-                .collect { percent -> _uiState.update { it.copy(drawerEdgeWidthPercent = percent) } }
         }
         viewModelScope.launch {
             appSettings.observeInt(AppSettingsStore.THEME_ID, erl.webdavtoon.ThemeHelper.THEME_FOLLOW_DEVICE)

@@ -3,6 +3,9 @@
     <string name="navigation_drawer_open">Open navigation drawer</string>
     <string name="navigation_drawer_close">Close navigation drawer</string>
     <string name="settings">Settings</string>
+    <string name="sheet_other_section">Other</string>
+    <string name="privacy_mode">Privacy mode</string>
+    <string name="privacy_mode_active_summary">Showing private servers and favorites</string>
     <string name="language">Language</string>
     <string name="language_summary">Current language: English</string>
     <string name="theme">App Theme</string>

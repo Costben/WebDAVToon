@@ -3,6 +3,9 @@
     <string name="navigation_drawer_open">打开导航抽屉</string>
     <string name="navigation_drawer_close">关闭导航抽屉</string>
     <string name="settings">设置</string>
+    <string name="sheet_other_section">其他</string>
+    <string name="privacy_mode">隐私模式</string>
+    <string name="privacy_mode_active_summary">当前显示隐私服务器与收藏</string>
     <string name="language">语言</string>
     <string name="language_summary">当前语言：中文</string>
     <string name="theme">应用主题</string>

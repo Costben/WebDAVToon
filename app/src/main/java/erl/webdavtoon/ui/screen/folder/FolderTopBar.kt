@@ -95,12 +95,13 @@ fun FolderTopBarMiuix(
             MiuixTopAppBar(
                 title = stringResource(R.string.app_name),
                 scrollBehavior = scrollBehavior,
-                navigationIcon = {
+                actions = {
+                    // COUI keeps the top-left slot for back/cancel only; a root page leaves it empty
+                    // and puts every action in the top-right group (see the COUI example app's
+                    // Home page). The server-panel switcher is an action, so it lives here.
                     IconButton(onClick = actions.onOpenDrawer) {
                         Icon(COUIIcons.Light.Sidebar, contentDescription = stringResource(R.string.navigation_drawer_open))
                     }
-                },
-                actions = {
                     IconButton(onClick = {
                         searchExpanded = true
                         actions.onToggleSearch()

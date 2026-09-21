@@ -1,29 +1,18 @@
 package erl.webdavtoon.ui.component
 
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.awaitHorizontalTouchSlopOrCancellation
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.captionBar
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemGestures
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -31,13 +20,15 @@ import erl.webdavtoon.R
 import erl.webdavtoon.ui.screen.settings.WebDavSlotUi
 import io.github.suqi8.coui.kmp.basic.BasicComponent
 import io.github.suqi8.coui.kmp.basic.BasicComponentDefaults
-import io.github.suqi8.coui.kmp.basic.Button as MiuixButton
+import io.github.suqi8.coui.kmp.basic.Card
+import io.github.suqi8.coui.kmp.basic.CardDefaults
 import io.github.suqi8.coui.kmp.basic.HorizontalDivider as MiuixHorizontalDivider
 import io.github.suqi8.coui.kmp.basic.Icon as MiuixIcon
 import io.github.suqi8.coui.kmp.basic.IconButton as MiuixIconButton
-import io.github.suqi8.coui.kmp.basic.Text as MiuixText
+import io.github.suqi8.coui.kmp.basic.SmallTitle
 import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.extended.Add
+import io.github.suqi8.coui.kmp.icon.extended.Close
 import io.github.suqi8.coui.kmp.icon.extended.Copy
 import io.github.suqi8.coui.kmp.icon.extended.Edit
 import io.github.suqi8.coui.kmp.icon.extended.Favorites
@@ -45,7 +36,8 @@ import io.github.suqi8.coui.kmp.icon.extended.Ok
 import io.github.suqi8.coui.kmp.icon.extended.Settings
 import io.github.suqi8.coui.kmp.overlay.OverlayBottomSheet
 import io.github.suqi8.coui.kmp.theme.COUITheme
-import kotlin.math.max
+import io.github.suqi8.coui.kmp.utils.overScrollVertical
+import io.github.suqi8.coui.kmp.utils.scrollEndHaptic
 
 data class ServerSheetActions(
     val onSelectSlot: (Int) -> Unit,
@@ -63,6 +55,7 @@ data class ServerSheetActions(
  *
  * COUI ships no drawer component, so the former Material3 modal drawer became an
  * [OverlayBottomSheet] - the closest COUI-native surface for a transient list of servers.
+ * The sheet opens from the top bar button only.
  */
 @Composable
 fun AppServerSheet(
@@ -74,14 +67,26 @@ fun AppServerSheet(
 ) {
     OverlayBottomSheet(
         show = show,
-        title = "WebDAVToon",
+        title = stringResource(R.string.app_name),
         onDismissRequest = onDismiss,
-        content = {
-            ServerSheetContent(slots, isPrivacyMode, actions, onDismiss)
+        startAction = {
+            MiuixIconButton(onClick = onDismiss) {
+                MiuixIcon(
+                    imageVector = COUIIcons.Light.Close,
+                    contentDescription = stringResource(R.string.cancel),
+                    tint = COUITheme.colorScheme.onBackground,
+                )
+            }
         },
-    )
+    ) {
+        ServerSheetContent(slots, isPrivacyMode, actions, onDismiss)
+    }
 }
 
+/**
+ * Mirrors the COUI example's bottom-sheet layout: a scrolling column of `SmallTitle` +
+ * `Card` groups whose rows are split by `HorizontalDivider(16.dp)`.
+ */
 @Composable
 fun ServerSheetContent(
     slots: List<WebDavSlotUi>,
@@ -90,176 +95,186 @@ fun ServerSheetContent(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
+    LazyColumn(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+            .scrollEndHaptic()
+            .overScrollVertical(),
     ) {
-        if (isPrivacyMode) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                MiuixText(
-                    "Private",
-                    style = COUITheme.textStyles.footnote2,
-                    color = COUITheme.colorScheme.primary,
+        item(key = "servers") {
+            SmallTitle(
+                text = stringResource(R.string.webdav_server),
+                insideMargin = PaddingValues(16.dp, 8.dp),
+            )
+            SheetCard {
+                slots.forEachIndexed { index, slot ->
+                    if (index > 0) SheetDivider()
+                    ServerSlotRow(slot, actions, onDismiss)
+                }
+                if (slots.isNotEmpty()) SheetDivider()
+                BasicComponent(
+                    title = stringResource(R.string.add_webdav_server),
+                    startAction = {
+                        MiuixIcon(
+                            imageVector = COUIIcons.Light.Add,
+                            contentDescription = null,
+                            tint = COUITheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    },
+                    // BasicComponent's own clickable is left off so the combined handler owns both
+                    // the tap (add a server) and the long press (enter privacy mode).
+                    onClick = null,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .combinedClickable(
+                            onClick = actions.onAddSlot,
+                            onLongClick = actions.onLongClickAddSlot,
+                            role = Role.Button,
+                        ),
                 )
-                MiuixButton(onClick = actions.onExitPrivacy) {
-                    MiuixText("Exit", color = COUITheme.colorScheme.onPrimary)
+            }
+        }
+
+        if (isPrivacyMode) {
+            item(key = "privacy") {
+                SmallTitle(
+                    text = stringResource(R.string.privacy_mode),
+                    insideMargin = PaddingValues(16.dp, 8.dp),
+                )
+                SheetCard {
+                    BasicComponent(
+                        title = stringResource(R.string.exit_privacy_mode),
+                        summary = stringResource(R.string.privacy_mode_active_summary),
+                        onClick = {
+                            actions.onExitPrivacy()
+                            onDismiss()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
             }
         }
-        MiuixHorizontalDivider()
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = 280.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            items(slots, key = { it.slot }) { slot ->
+
+        item(key = "other") {
+            SmallTitle(
+                text = stringResource(R.string.sheet_other_section),
+                insideMargin = PaddingValues(16.dp, 8.dp),
+            )
+            SheetCard {
                 BasicComponent(
-                    title = slot.alias.ifBlank { stringResource(R.string.server_slot, slot.slot) },
-                    summary = "${slot.protocol}://${slot.url}:${slot.port}",
-                    summaryColor = BasicComponentDefaults.summaryColor(
-                        if (slot.isCurrent) {
-                            COUITheme.colorScheme.primary
-                        } else {
-                            COUITheme.colorScheme.onSurfaceVariantSummary
-                        }
-                    ),
+                    title = stringResource(R.string.favorites),
                     startAction = {
-                        if (slot.isCurrent) {
-                            MiuixIcon(
-                                imageVector = COUIIcons.Light.Ok,
-                                contentDescription = null,
-                                tint = COUITheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp),
-                            )
-                        } else {
-                            Spacer(Modifier.size(20.dp))
-                        }
-                    },
-                    endActions = {
-                        MiuixIconButton(onClick = { actions.onEditSlot(slot.slot) }) {
-                            MiuixIcon(
-                                imageVector = COUIIcons.Light.Edit,
-                                contentDescription = stringResource(R.string.edit),
-                                tint = COUITheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
-                        MiuixIconButton(onClick = { actions.onDuplicateSlot(slot.slot) }) {
-                            MiuixIcon(
-                                imageVector = COUIIcons.Light.Copy,
-                                contentDescription = stringResource(R.string.duplicate_server),
-                                tint = COUITheme.colorScheme.onSurfaceVariantSummary,
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
+                        MiuixIcon(
+                            imageVector = COUIIcons.Light.Favorites,
+                            contentDescription = null,
+                            tint = COUITheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp),
+                        )
                     },
                     onClick = {
-                        actions.onSelectSlot(slot.slot)
+                        actions.onOpenFavorites()
+                        onDismiss()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                SheetDivider()
+                BasicComponent(
+                    title = stringResource(R.string.settings),
+                    startAction = {
+                        MiuixIcon(
+                            imageVector = COUIIcons.Light.Settings,
+                            contentDescription = null,
+                            tint = COUITheme.colorScheme.onSurfaceVariantSummary,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    },
+                    onClick = {
+                        actions.onOpenSettings()
                         onDismiss()
                     },
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
         }
-        MiuixButton(
-            onClick = actions.onAddSlot,
-            modifier = Modifier.fillMaxWidth().combinedClickable(
-                onClick = actions.onAddSlot,
-                onLongClick = actions.onLongClickAddSlot,
-                role = Role.Button,
-            ),
-        ) {
-            MiuixIcon(
-                imageVector = COUIIcons.Light.Add,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp),
+
+        item(key = "inset") {
+            Spacer(
+                Modifier.padding(
+                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() +
+                        WindowInsets.captionBar.asPaddingValues().calculateBottomPadding(),
+                ),
             )
-            Spacer(Modifier.size(4.dp))
-            MiuixText(stringResource(R.string.add_webdav_server))
         }
-        BasicComponent(
-            title = stringResource(R.string.favorites),
-            startAction = {
+    }
+}
+
+@Composable
+private fun ServerSlotRow(
+    slot: WebDavSlotUi,
+    actions: ServerSheetActions,
+    onDismiss: () -> Unit,
+) {
+    BasicComponent(
+        title = slot.alias.ifBlank { stringResource(R.string.server_slot, slot.slot) },
+        summary = "${slot.protocol}://${slot.url}:${slot.port}",
+        summaryColor = BasicComponentDefaults.summaryColor(
+            if (slot.isCurrent) {
+                COUITheme.colorScheme.primary
+            } else {
+                COUITheme.colorScheme.onSurfaceVariantSummary
+            }
+        ),
+        startAction = {
+            if (slot.isCurrent) {
                 MiuixIcon(
-                    imageVector = COUIIcons.Light.Favorites,
+                    imageVector = COUIIcons.Light.Ok,
                     contentDescription = null,
                     tint = COUITheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp),
                 )
-            },
-            onClick = { actions.onOpenFavorites(); onDismiss() },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        BasicComponent(
-            title = stringResource(R.string.settings),
-            startAction = {
+            } else {
+                Spacer(Modifier.size(20.dp))
+            }
+        },
+        endActions = {
+            MiuixIconButton(onClick = { actions.onEditSlot(slot.slot) }) {
                 MiuixIcon(
-                    imageVector = COUIIcons.Light.Settings,
-                    contentDescription = null,
+                    imageVector = COUIIcons.Light.Edit,
+                    contentDescription = stringResource(R.string.edit),
+                    tint = COUITheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            MiuixIconButton(onClick = { actions.onDuplicateSlot(slot.slot) }) {
+                MiuixIcon(
+                    imageVector = COUIIcons.Light.Copy,
+                    contentDescription = stringResource(R.string.duplicate_server),
                     tint = COUITheme.colorScheme.onSurfaceVariantSummary,
                     modifier = Modifier.size(20.dp),
                 )
-            },
-            onClick = { actions.onOpenSettings(); onDismiss() },
-            modifier = Modifier.fillMaxWidth(),
-        )
-    }
+            }
+        },
+        onClick = {
+            actions.onSelectSlot(slot.slot)
+            onDismiss()
+        },
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
-/**
- * Left-edge swipe that opens the server sheet.
- *
- * Carried over from the drawer era: the system back gesture owns the outer ~24dp of the
- * left edge and Android 15+ no longer lets apps exclude those edges, so the strip always
- * reaches past the system gesture inset. A horizontal drag starting inside the strip that
- * crosses the touch slop opens the sheet; vertical drags from the same strip stay with the
- * grid. [edgeWidthPercent] <= 0 disables the gesture.
- */
+/** A sheet group card, tinted like the COUI example's `secondaryContainer` cards. */
 @Composable
-fun ServerSheetEdgeSwipe(
-    onOpen: () -> Unit,
-    edgeWidthPercent: Int,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit,
-) {
-    val density = LocalDensity.current
-    val layoutDirection = LocalLayoutDirection.current
-    val screenWidthPx = with(density) { LocalConfiguration.current.screenWidthDp.dp.toPx() }
-    val configuredEdgePx = screenWidthPx * (edgeWidthPercent.coerceIn(0, 100) / 100f)
-    val systemGestureInsetPx = with(density) {
-        WindowInsets.systemGestures.getLeft(this, layoutDirection).toFloat()
-    }
-    val edgeWidthPx = if (edgeWidthPercent <= 0) {
-        0f
-    } else {
-        max(configuredEdgePx, systemGestureInsetPx + with(density) { 32.dp.toPx() })
-    }
-
-    Box(
-        modifier = modifier.pointerInput(edgeWidthPx) {
-            if (edgeWidthPx <= 0f) return@pointerInput
-            awaitEachGesture {
-                val down = awaitFirstDown(requireUnconsumed = false)
-                if (down.position.x > edgeWidthPx) return@awaitEachGesture
-                var overSlop = 0f
-                val drag = awaitHorizontalTouchSlopOrCancellation(down.id) { change, over ->
-                    overSlop = over
-                    if (over > 0f) change.consume()
-                } ?: return@awaitEachGesture
-                if (overSlop > 0f) {
-                    drag.consume()
-                    onOpen()
-                }
-            }
-        }
+private fun SheetCard(content: @Composable () -> Unit) {
+    Card(
+        modifier = Modifier.padding(bottom = 12.dp),
+        colors = CardDefaults.defaultColors(color = COUITheme.colorScheme.secondaryContainer),
     ) {
         content()
     }
+}
+
+@Composable
+private fun SheetDivider() {
+    MiuixHorizontalDivider(Modifier.padding(horizontal = 16.dp))
 }

@@ -61,7 +61,6 @@ class SettingsManager(context: Context) {
         val GLIDE_MEMORY_CACHE_SCREEN_VALUES = intArrayOf(2, 4, 6)
         const val DEFAULT_GLIDE_MEMORY_CACHE_SCREENS = 4
 
-        const val DEFAULT_DRAWER_EDGE_WIDTH_PERCENT = 33
         const val DEFAULT_READER_MODE_WEBTOON = "webtoon"
         const val DEFAULT_READER_MODE_CARD = "card"
         const val VIDEO_EXTERNAL_PLAYER_MODE_SYSTEM_DEFAULT = "system_default"
@@ -187,15 +186,6 @@ class SettingsManager(context: Context) {
 
     fun setShowWaterfallFilenames(show: Boolean) =
         appSettings.putBoolean(AppSettingsStore.WATERFALL_SHOW_FILENAMES, show)
-
-    fun getDrawerEdgeWidthPercent(): Int =
-        appSettings.getOrDefaultInt(
-            AppSettingsStore.DRAWER_EDGE_WIDTH_PERCENT,
-            DEFAULT_DRAWER_EDGE_WIDTH_PERCENT
-        ).coerceIn(0, 100)
-
-    fun setDrawerEdgeWidthPercent(percent: Int) =
-        appSettings.putInt(AppSettingsStore.DRAWER_EDGE_WIDTH_PERCENT, percent.coerceIn(0, 100))
 
     fun getReaderMaxZoomPercent(): Int =
         appSettings.getOrDefaultInt(AppSettingsStore.READER_MAX_ZOOM_PERCENT, 300)

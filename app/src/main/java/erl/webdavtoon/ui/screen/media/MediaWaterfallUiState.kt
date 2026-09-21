@@ -31,7 +31,6 @@ data class MediaWaterfallUiState(
     val currentSlot: Int = 0,
     val slots: List<WebDavSlotUi> = emptyList(),
     val isPrivacyMode: Boolean = false,
-    val drawerEdgeWidthPercent: Int = SettingsManager.DEFAULT_DRAWER_EDGE_WIDTH_PERCENT,
     val themeId: Int = erl.webdavtoon.ThemeHelper.THEME_FOLLOW_DEVICE,
     val useCouiDefaultColors: Boolean = false,
     val storagePermissionGranted: Boolean = true,

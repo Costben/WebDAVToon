@@ -102,7 +102,7 @@ private fun MiuixPreviewGrid(
     Box(
         modifier = modifier
             .then(if (fillHeight) Modifier else Modifier.aspectRatio(1f))
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(COUITheme.colorScheme.surfaceContainer),
     ) {
         if (folder.previewUris.isEmpty()) {

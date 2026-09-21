@@ -281,11 +281,6 @@ class SettingsActivity : ComponentActivity() {
         onSetUseCouiDefaultColors = { viewModel.setUseCouiDefaultColors(it) },
         onPickLanguage = { showLanguagePicker = true },
         onSetGridColumns = { viewModel.setGridColumns(it) },
-        onSetDrawerEdgeWidth = { percent ->
-            // The Compose screens read the percent from their UiState, so the new trigger
-            // area applies on the next recomposition without any process-wide state.
-            viewModel.setDrawerEdgeWidthPercent(percent)
-        },
         onSetSortOrder = { newOrder ->
             val previousOrder = settingsManager.getSortOrder()
             SmbSortHint.maybeShowPreviewHint(this, settingsManager, previousOrder, newOrder)

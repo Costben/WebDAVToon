@@ -133,8 +133,8 @@ fun WaterfallFolderCardMiuix(
         onDispose { onVisibilityChanged?.invoke(item.folder, false) }
     }
 
-    val cardShape = RoundedCornerShape(16.dp)
-    val innerShape = if (showFilename) RoundedCornerShape(12.dp) else RoundedCornerShape(16.dp)
+    val cardShape = RoundedCornerShape(12.dp)
+    val innerShape = RoundedCornerShape(12.dp)
     val innerPadding = if (showFilename) 8.dp else 0.dp
 
     BoxWithConstraints(
@@ -248,8 +248,8 @@ private fun WaterfallMediaCardMiuix(
     modifier: Modifier = Modifier,
     fillHeight: Boolean = false,
 ) {
-    val cardShape = RoundedCornerShape(16.dp)
-    val innerShape = if (showFilename) RoundedCornerShape(12.dp) else RoundedCornerShape(16.dp)
+    val cardShape = RoundedCornerShape(12.dp)
+    val innerShape = RoundedCornerShape(12.dp)
     val clampedAspectRatio = item.aspectRatio.coerceIn(0.2f, 5.0f)
 
     Card(

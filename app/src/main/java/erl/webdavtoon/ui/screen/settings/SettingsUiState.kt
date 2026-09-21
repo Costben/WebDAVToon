@@ -27,7 +27,6 @@ data class SettingsUiState(
     val useCouiDefaultColors: Boolean = false,
     val language: String = "default",
     val gridColumns: Int = 2,
-    val drawerEdgeWidthPercent: Int = SettingsManager.DEFAULT_DRAWER_EDGE_WIDTH_PERCENT,
     val sortOrder: Int = 2,
     val recursiveImageArrangement: Int = SettingsManager.RECURSIVE_IMAGE_ARRANGEMENT_GROUPED,
     val waterfallShowFilenames: Boolean = true,

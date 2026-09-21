@@ -67,10 +67,10 @@ fun SelectionBottomBarMiuix(
             modifier = Modifier
                 .fillMaxWidth()
                 .widthIn(max = 520.dp),
-            shape = RoundedCornerShape(28.dp),
+            shape = RoundedCornerShape(24.dp),
             color = COUITheme.colorScheme.surfaceContainer,
             border = BorderStroke(1.dp, COUITheme.colorScheme.dividerLine),
-            shadowElevation = 8.dp,
+            shadowElevation = 4.dp,
         ) {
             Row(
                 modifier = Modifier

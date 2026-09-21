@@ -142,11 +142,9 @@ fun MediaWaterfallScreen(
 
     AppAdaptiveNavigationScaffold(
         showServerSheet = showServerSheet,
-        onOpenServerSheet = { showServerSheet = true },
         onDismissServerSheet = { showServerSheet = false },
         slots = uiState.slots,
         isPrivacyMode = uiState.isPrivacyMode,
-        serverSheetEdgeWidthPercent = uiState.drawerEdgeWidthPercent,
         actions = serverSheetActions,
         modifier = modifier,
     ) {
@@ -196,11 +194,11 @@ fun MediaWaterfallScreen(
                             minColumns = 1,
                             maxColumns = 4,
                             onColumnsChanged = actions.onColumnsChange,
-                            spacing = 8.dp,
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+                            spacing = 12.dp,
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                             state = zoomState,
                             itemExtraHeights = extraHeights,
-                            itemHorizontalPadding = 8.dp,
+                            itemHorizontalPadding = 0.dp,
                             modifier = Modifier
                                 .fillMaxSize()
                                 .nestedScroll(topAppBarScrollBehavior.nestedScrollConnection),
@@ -274,15 +272,12 @@ private fun MediaTopBarMiuix(
             title = titleText,
             scrollBehavior = scrollBehavior,
             navigationIcon = {
-                MiuixIconButton(
-                    onClick = if (uiState.isSelectionMode) actions.onExitSelectionMode else onOpenDrawer
-                ) {
-                    MiuixIcon(
-                        if (uiState.isSelectionMode) COUIIcons.Light.Close else COUIIcons.Light.Sidebar,
-                        contentDescription = stringResource(
-                            if (uiState.isSelectionMode) R.string.cancel else R.string.navigation_drawer_open
-                        ),
-                    )
+                // Selection mode's "close" is a cancel/back action, and COUI reserves the top-left
+                // slot for exactly that. Outside selection mode the slot stays empty.
+                if (uiState.isSelectionMode) {
+                    MiuixIconButton(onClick = actions.onExitSelectionMode) {
+                        MiuixIcon(COUIIcons.Light.Close, contentDescription = stringResource(R.string.cancel))
+                    }
                 }
             },
             actions = {
@@ -294,6 +289,11 @@ private fun MediaTopBarMiuix(
                         MiuixIcon(COUIIcons.Light.Edit, contentDescription = stringResource(R.string.edit))
                     }
                 } else {
+                    // COUI keeps the top-left slot for back/cancel only; root pages put every action
+                    // in the top-right group (see the COUI example app's Home page).
+                    MiuixIconButton(onClick = onOpenDrawer) {
+                        MiuixIcon(COUIIcons.Light.Sidebar, contentDescription = stringResource(R.string.navigation_drawer_open))
+                    }
                     MiuixIconButton(onClick = { searchExpanded = true }) {
                         MiuixIcon(FunnelIcon, contentDescription = stringResource(R.string.filter))
                     }
