@@ -117,7 +117,7 @@ fun FolderScreen(
         actions = serverSheetActions,
         modifier = modifier,
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxSize().background(COUITheme.colorScheme.surface)) {
             Column(modifier = Modifier.fillMaxSize()) {
                 FolderTopBarMiuix(
                     uiState = uiState,

@@ -161,7 +161,7 @@ fun WaterfallFolderCardMiuix(
                         .fillMaxWidth()
                         .then(if (fillHeight) Modifier.weight(1f) else Modifier.height(previewSide))
                         .clip(innerShape)
-                        .background(COUITheme.colorScheme.surfaceVariant),
+                        .background(COUITheme.colorScheme.surfaceContainer),
                 ) {
                     if (item.previewUris.isEmpty()) {
                         Icon(
@@ -268,7 +268,7 @@ private fun WaterfallMediaCardMiuix(
                     .fillMaxWidth()
                     .then(if (fillHeight) Modifier.weight(1f) else Modifier.aspectRatio(clampedAspectRatio))
                     .clip(innerShape)
-                    .background(COUITheme.colorScheme.surfaceVariant),
+                    .background(COUITheme.colorScheme.surfaceContainer),
             ) {
                 AndroidView(
                     modifier = Modifier.fillMaxSize(),

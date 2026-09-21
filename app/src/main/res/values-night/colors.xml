@@ -1,5 +1,12 @@
 <resources>
-    <!-- Only the window background needs a dark variant: all other colors are resolved by
-         the Compose/COUI layer at runtime. -->
-    <color name="surface">#1C1B1F</color>
+    <!--
+      Only the window background needs a dark variant: all other colors are resolved by
+      the Compose/COUI layer at runtime.
+
+      The value mirrors COUI's dark default `surface` (coui-ui-android 1.1.0
+      theme/Colors.kt `darkColorScheme()` -> Color.Black), which is the page background used
+      by COUI's Scaffold/TopAppBar/NavigationRail. Keeping it in sync avoids a wrong-colored
+      window flash before the first Compose frame.
+    -->
+    <color name="surface">#000000</color>
 </resources>

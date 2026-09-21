@@ -14,7 +14,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import erl.webdavtoon.ui.component.AnimatedSearchField
@@ -68,7 +67,7 @@ fun FolderTopBarMiuix(
 ) {
     var searchExpanded by remember { mutableStateOf(uiState.isSearching) }
 
-    Column(modifier = modifier.background(COUITheme.colorScheme.background).statusBarsPadding()) {
+    Column(modifier = modifier.background(COUITheme.colorScheme.surface).statusBarsPadding()) {
         if (uiState.isSelectionMode) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
@@ -89,7 +88,7 @@ fun FolderTopBarMiuix(
                     Icon(COUIIcons.Light.SelectAll, contentDescription = "Select all")
                 }
                 IconButton(onClick = actions.onDeleteSelected) {
-                    Icon(COUIIcons.Light.Delete, contentDescription = stringResource(R.string.delete), tint = Color.Red)
+                    Icon(COUIIcons.Light.Delete, contentDescription = stringResource(R.string.delete), tint = COUITheme.colorScheme.error)
                 }
             }
         } else {

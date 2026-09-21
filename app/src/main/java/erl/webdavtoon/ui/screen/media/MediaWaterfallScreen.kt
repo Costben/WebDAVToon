@@ -153,7 +153,7 @@ fun MediaWaterfallScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(COUITheme.colorScheme.background)
+                .background(COUITheme.colorScheme.surface)
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 MediaTopBarMiuix(

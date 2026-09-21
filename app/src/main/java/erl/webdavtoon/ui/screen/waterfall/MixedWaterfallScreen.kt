@@ -114,7 +114,7 @@ fun MixedWaterfallScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(COUITheme.colorScheme.background)
+            .background(COUITheme.colorScheme.surface)
     ) {
         MixedWaterfallTopBarMiuix(
             uiState = uiState,

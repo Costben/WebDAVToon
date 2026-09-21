@@ -12,7 +12,9 @@
     <color name="onTertiary">#FFFFFF</color>
     <color name="tertiaryContainer">#FFD8E4</color>
     <color name="onTertiaryContainer">#31111D</color>
-    <color name="surface">#FEF7FF</color>
+    <!-- COUI light default page surface (coui-ui-android 1.1.0 theme/Colors.kt
+         `lightColorScheme()` -> 0xFFF0F1F2). Used as android:windowBackground. -->
+    <color name="surface">#F0F1F2</color>
     <color name="onSurface">#1D1B20</color>
     <color name="surfaceVariant">#E7E0EB</color>
     <color name="onSurfaceVariant">#49454F</color>

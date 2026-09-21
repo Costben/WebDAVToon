@@ -54,7 +54,7 @@ fun SmokeTestContent() {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(COUITheme.colorScheme.background)
+            .background(COUITheme.colorScheme.surface)
             .padding(16.dp)
     ) {
         Column(

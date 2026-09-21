@@ -93,7 +93,7 @@ fun SettingsScreen(
                 },
             )
         },
-        containerColor = COUITheme.colorScheme.background,
+        containerColor = COUITheme.colorScheme.surface,
     ) { paddingValues ->
         if (uiState.loading) {
             Box(
@@ -159,7 +159,7 @@ private fun SettingsContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(COUITheme.colorScheme.background)
+            .background(COUITheme.colorScheme.surface)
             .padding(paddingValues)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 12.dp),

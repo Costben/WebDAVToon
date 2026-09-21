@@ -110,8 +110,8 @@ fun ReaderOverlayMiuix(
                     .fillMaxWidth()
                     .widthIn(max = 600.dp),
                 shape = RoundedCornerShape(20.dp),
-                color = COUITheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
-                border = BorderStroke(1.dp, COUITheme.colorScheme.outline.copy(alpha = 0.2f)),
+                color = COUITheme.colorScheme.surfaceContainer,
+                border = BorderStroke(1.dp, COUITheme.colorScheme.dividerLine),
                 shadowElevation = 8.dp,
             ) {
                 Row(
@@ -145,7 +145,7 @@ fun ReaderOverlayMiuix(
                         Text(
                             text = pageDisplay,
                             style = COUITheme.textStyles.footnote2.copy(fontSize = 11.sp),
-                            color = COUITheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            color = COUITheme.colorScheme.onSurfaceSecondary,
                             maxLines = 1,
                         )
                     }
@@ -188,8 +188,8 @@ fun ReaderOverlayMiuix(
                     .fillMaxWidth()
                     .widthIn(max = 600.dp),
                 shape = RoundedCornerShape(24.dp),
-                color = COUITheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
-                border = BorderStroke(1.dp, COUITheme.colorScheme.outline.copy(alpha = 0.2f)),
+                color = COUITheme.colorScheme.surfaceContainer,
+                border = BorderStroke(1.dp, COUITheme.colorScheme.dividerLine),
                 shadowElevation = 8.dp,
             ) {
                 Column(
