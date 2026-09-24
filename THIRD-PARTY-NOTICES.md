@@ -84,7 +84,7 @@ Android 侧主要组件：
 - `com.github.wseemann:FFmpegMediaMetadataRetriever` 1.0.14（封装层本身为 Apache-2.0，其内置 FFmpeg 见第三节）
 - `org.jetbrains.kotlin:kotlin-stdlib` 2.4.10、`org.jetbrains.kotlinx:kotlinx-coroutines-*`、`org.jetbrains:annotations` 23.0.0、`dev.drewhamilton.poko:poko-annotations-jvm` 0.23.1
 
-Rust 侧主要组件：`opendal` 0.50.2（WebDAV/FTP 服务）、`backon`、`flagset`、`sync_wrapper`，以及大量 `MIT OR Apache-2.0` 双许可 crate。
+Rust 侧以纯 Apache-2.0 授权的直接依赖：`opendal` 0.50.2（WebDAV/FTP 服务）、`backon`、`flagset`、`sync_wrapper`。（另有 218 个 `MIT OR Apache-2.0` 双许可 crate，本项目按 MIT 使用，见下节。）
 
 **`net.java.dev.jna:jna:5.14.0`** 采用 LGPL-2.1-or-later 与 Apache-2.0 双许可，本项目**选择 Apache-2.0** 这一分支。
 
@@ -92,7 +92,7 @@ Apache-2.0 许可证全文见 [licenses/Apache-2.0.txt](licenses/Apache-2.0.txt)
 
 ## 六、MIT
 
-Rust 侧共 218 个 crate 以 MIT（或 `MIT OR Apache-2.0` 之外的纯 MIT）授权，主要直接依赖包括：`tokio`、`rusqlite`、`libsqlite3-sys`、`smb` 与 `smb-*` 系列（`smb`、`smb-dtyp`、`smb-fscc`、`smb-msg`、`smb-rpc`、`smb-transport`）、`reqwest`、`hyper`、`bytes`、`tracing`、`nom`、`quick-xml`、`lz4_flex` 等。
+Rust 侧共 277 个 crate 以 MIT 授权：其中 59 个为纯 `MIT`，218 个为 `MIT OR Apache-2.0` 双许可（本项目按 MIT 使用）。主要直接依赖包括：`tokio`、`rusqlite`、`libsqlite3-sys`、`smb` 与 `smb-*` 系列（`smb`、`smb-dtyp`、`smb-fscc`、`smb-msg`、`smb-rpc`、`smb-transport`）、`reqwest`、`hyper`、`bytes`、`tracing`、`nom`、`quick-xml`、`lz4_flex` 等。
 
 Android 侧：`com.materialkolor:material-color-utilities-android` 5.0.0。
 
