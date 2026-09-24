@@ -1,6 +1,6 @@
 # WebDAVToon 📱
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Android](https://img.shields.io/badge/Platform-Android-green.svg)](https://developer.android.com)
 [![Rust](https://img.shields.io/badge/Rust-Core-orange.svg)](https://www.rust-lang.org)
 [![Android Build and Release](https://github.com/Costben/WebDAVToon/actions/workflows/build-and-release.yml/badge.svg)](https://github.com/Costben/WebDAVToon/actions/workflows/build-and-release.yml)
@@ -115,4 +115,19 @@ cargo test --manifest-path rust-core/Cargo.toml
 
 ## 📄 开源协议
 
-本项目采用 [MIT License](LICENSE) 开源。欢迎提交 Issue 与 Pull Request 共同改进！
+本项目采用 **GNU General Public License v3.0 or later** 开源，全文见 [LICENSE](LICENSE)：
+
+```
+Copyright (C) 2026 Rin Shibuya
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version.
+```
+
+应用内链接了若干第三方组件，它们各自的许可证（含 GPL-2.0-or-later 的 pinyin4j、LGPL-2.1-or-later 的 FFmpeg 与 HP SPARTA、MPL-2.0 的 uniffi，以及大量 Apache-2.0 / MIT / BSD 组件）与对应的源码获取方式，统一记录在 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)，许可证全文放在 [`licenses/`](licenses)。
+
+> 本项目此前以 MIT 授权。由于 `com.belerweb:pinyin4j` 的实际源码为 GPL-2.0-or-later（其 Maven POM 误标为 BSD），整个分发产物必须遵循 GPL；同时因链接了 Apache-2.0 与 MPL-2.0 的组件（二者与 GPLv2 不兼容），授权版本取 GPLv3。
+
+欢迎提交 Issue 与 Pull Request 共同改进！
