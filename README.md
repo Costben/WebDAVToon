@@ -115,15 +115,18 @@ cargo test --manifest-path rust-core/Cargo.toml
 
 ## 📄 开源协议
 
-本项目采用 **GNU General Public License v3.0 or later** 开源，全文见 [LICENSE](LICENSE)：
+本项目采用 **GNU General Public License v3.0**（仅第 3 版）开源，全文见 [LICENSE](LICENSE)：
 
 ```
 Copyright (C) 2026 Rin Shibuya
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
-Foundation, either version 3 of the License, or (at your option) any later
-version.
+Foundation, version 3 of the License.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU General Public License for more details.
 ```
 
 应用内链接了若干第三方组件，它们各自的许可证（含 GPL-2.0-or-later 的 pinyin4j、LGPL-2.1-or-later 的 FFmpeg 与 HP SPARTA、MPL-2.0 的 uniffi，以及大量 Apache-2.0 / MIT / BSD 组件）与对应的源码获取方式，统一记录在 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)，许可证全文放在 [`licenses/`](licenses)。

@@ -4,15 +4,14 @@
 
 ## 一、本应用自身的许可
 
-WebDAVToon 以 **GNU General Public License v3.0 or later** 授权：
+WebDAVToon 以 **GNU General Public License v3.0**（仅第 3 版，SPDX 标识 `GPL-3.0-only`）授权：
 
 ```
 Copyright (C) 2026 Rin Shibuya
 
 This program is free software: you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free Software
-Foundation, either version 3 of the License, or (at your option) any later
-version.
+Foundation, version 3 of the License.
 
 This program is distributed in the hope that it will be useful, but WITHOUT ANY
 WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
@@ -21,7 +20,7 @@ PARTICULAR PURPOSE. See the GNU General Public License for more details.
 
 许可证全文见仓库根目录的 [LICENSE](LICENSE)。
 
-> **为什么不是 MIT**：本应用链接了 `com.belerweb:pinyin4j:2.5.1`（见下节），其源码实际以 GPL-2.0-or-later 授权，属于强 copyleft，因此整个分发产物必须按 GPL 授权。选用 GPLv3 而非 GPLv2 的原因：本应用同时链接了 Apache-2.0 的 AndroidX/okhttp/Glide 等组件，以及 MPL-2.0 的 uniffi，二者都与 GPLv2 不兼容，但与 GPLv3 兼容。
+> **为什么不是 MIT**：本应用链接了 `com.belerweb:pinyin4j:2.5.1`（见下节），其源码实际以 GPL-2.0-or-later 授权，属于强 copyleft，因此整个分发产物必须按 GPL 授权。选用 GPLv3 而非 GPLv2 的原因：本应用同时链接了 Apache-2.0 的 AndroidX/okhttp/Glide 等组件，以及 MPL-2.0 的 uniffi，二者都与 GPLv2 不兼容，但与 GPLv3 兼容。本应用自身按 GPL-3.0-only 分发；pinyin4j 的作者仍以 GPLv2-or-later 向任何人提供其源码，本应用只是在该版本区间内选择了第 3 版。
 
 ## 二、GPL-2.0-or-later（强 copyleft，决定本应用的授权）
 
