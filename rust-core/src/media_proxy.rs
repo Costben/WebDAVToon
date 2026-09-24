@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Rin Shibuya
 //! Loopback HTTP media proxy for protocols without native HTTP byte access
 //! (SMB, FTP).
 //!

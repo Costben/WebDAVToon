@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Rin Shibuya
 //! Process-global Tokio runtime.
 //!
 //! A single multi-threaded runtime is shared by every `Repository` instance

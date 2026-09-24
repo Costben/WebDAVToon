@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Rin Shibuya
 //! SMB2/3 backend built on the pure-Rust `smb` crate.
 //!
 //! Configuration follows the precedent recorded in docs/TECHNICAL_DOCS.md for

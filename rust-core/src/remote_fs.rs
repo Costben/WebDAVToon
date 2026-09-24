@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Rin Shibuya
 use crate::models::{
     Folder, FolderInspection, MediaType, Photo, RemoteConfig, RemoteProtocol, SortOrder,
 };

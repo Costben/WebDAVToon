@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Rin Shibuya
 use crate::database::Database;
 use crate::models::{Folder, FolderInspection, Photo, RemoteConfig, SortOrder};
 use crate::remote_fs::RemoteService;

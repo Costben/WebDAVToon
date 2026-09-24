@@ -1,4 +1,6 @@
-﻿package erl.webdavtoon
+﻿// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Rin Shibuya
+package erl.webdavtoon
 
 data class MediaQuery(
     val keyword: String = "",

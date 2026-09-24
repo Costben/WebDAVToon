@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Rin Shibuya
 use crate::models::{Folder, MediaType, Photo, SortOrder};
 use rusqlite::{params, Connection, Result};
 use std::path::Path;

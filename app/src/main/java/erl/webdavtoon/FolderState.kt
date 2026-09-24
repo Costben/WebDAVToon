@@ -1,4 +1,6 @@
-﻿package erl.webdavtoon
+﻿// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Rin Shibuya
+package erl.webdavtoon
 
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
