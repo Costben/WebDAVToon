@@ -48,7 +48,7 @@ object LicensesData {
         ),
     )
 
-    /** Third-party groups, in the order of `THIRD-PARTY-NOTICES.md` sections two to eight. */
+    /** Third-party groups, following the section order of `THIRD-PARTY-NOTICES.md`. */
     val thirdPartyEntries = listOf(
         LicenseEntry(
             id = "gpl-2.0-or-later",
@@ -63,8 +63,9 @@ object LicensesData {
             title = "GNU Lesser General Public License v2.1 or later",
             spdxId = "LGPL-2.1-or-later",
             components = listOf(
-                "FFmpeg 3.0.1 (libavcodec, libavformat, libavutil, libswscale; arm64-v8a)",
-                "com.github.wseemann:FFmpegMediaMetadataRetriever 1.0.14",
+                "FFmpeg 7.1.1 (libavcodec, libavformat, libavutil, libswscale; arm64-v8a)",
+                "com.github.wseemann:FFmpegMediaMetadataRetriever-core 1.0.23",
+                "com.github.wseemann:FFmpegMediaMetadataRetriever-native-arm64-v8a 1.0.23",
                 "com.hp.hpl.sparta (bundled in pinyin4j)",
             ),
             assetPath = "licenses/LGPL-2.1.txt",
@@ -92,7 +93,7 @@ object LicensesData {
                 "com.squareup.okhttp3:okhttp 4.12.0, com.squareup.okio:okio-jvm 3.6.0",
                 "com.google.code.gson:gson 2.10.1, com.google.guava:listenablefuture 1.0",
                 "com.github.chrisbanes:PhotoView 2.3.0",
-                "com.github.wseemann:FFmpegMediaMetadataRetriever 1.0.14",
+                "com.github.wseemann:FFmpegMediaMetadataRetriever-core 1.0.23, -native-arm64-v8a 1.0.23",
                 "org.jetbrains.kotlin:kotlin-stdlib 2.4.10, org.jetbrains:annotations 23.0.0, dev.drewhamilton.poko:poko-annotations-jvm 0.23.1",
                 "Rust: opendal 0.50.2, backon, flagset, sync_wrapper",
                 "net.java.dev.jna:jna 5.14.0 (this project selects the Apache-2.0 branch)",
@@ -165,6 +166,21 @@ object LicensesData {
             spdxId = "Public domain",
             components = listOf("SQLite 3.45.0 (sqlite3.c, built via libsqlite3-sys 0.28.0)"),
             assetPath = NOTICES_ASSET,
+        ),
+        /**
+         * Bundled TLS backend of the FFmpeg build. Recorded for completeness: this license is
+         * considered GPL-incompatible, and the conflict with this app's own GPL-3.0-only terms is
+         * unresolved — see section three-one of `THIRD-PARTY-NOTICES.md`.
+         */
+        LicenseEntry(
+            id = "openssl",
+            title = "OpenSSL License / Original SSLeay License",
+            spdxId = "OpenSSL",
+            components = listOf(
+                "OpenSSL 1.1.1w (libcrypto, libssl; TLS backend of the bundled FFmpeg 7.1.1 build)",
+            ),
+            assetPath = "licenses/OpenSSL-1.1.1.txt",
+            sourceUrl = "https://github.com/openssl/openssl/tree/OpenSSL_1_1_1-stable",
         ),
     )
 }

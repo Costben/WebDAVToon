@@ -36,7 +36,8 @@ PARTICULAR PURPOSE. See the GNU General Public License for more details.
 
 | 组件 | 版本 | 形态 |
 | :--- | :--- | :--- |
-| FFmpeg | 3.0.1 | `libavcodec.so` / `libavformat.so` / `libavutil.so` / `libswscale.so` / `libffmpeg_mediametadataretriever_jni.so`，随 `com.github.wseemann:FFmpegMediaMetadataRetriever:1.0.14` 提供，当前仅打包 `arm64-v8a` |
+| FFmpeg | 7.1.1 | `libavcodec.so` / `libavformat.so` / `libavutil.so` / `libswscale.so` / `libffmpeg_mediametadataretriever_jni.so`，随 `com.github.wseemann:FFmpegMediaMetadataRetriever-native-arm64-v8a:1.0.23` 提供，当前仅打包 `arm64-v8a` |
+| OpenSSL | 1.1.1w | `libcrypto.so` / `libssl.so`，同一 FFmpeg 构建的 TLS 后端，见「三之一」 |
 | HP SPARTA | 2003 快照 | 随 `pinyin4j` 打包的 `com.hp.hpl.sparta` 类 |
 
 该 FFmpeg 构件的许可证为 LGPL-2.1-or-later，依据是二进制内嵌的版本串：
@@ -45,17 +46,24 @@ PARTICULAR PURPOSE. See the GNU General Public License for more details.
 libavcodec  license: LGPL version 2.1 or later
 libavformat license: LGPL version 2.1 or later
 libavutil   license: LGPL version 2.1 or later
-FFmpeg version 3.0.1
+FFmpeg version 7.1.1
 ```
 
 其构建配置中显式包含 `--disable-gpl`，未启用任何 GPL 组件（同时 `--disable-encoders`，仅保留 png 编码器）。
 
 **对应源码（Corresponding Source）**：这些原生库以独立 `.so` 文件动态加载，未经修改，可被用户自行替换。对应的完整源码可按以下路径获取：
 
-- FFmpeg 3.0.1 原始源码：<http://ffmpeg.org/releases/ffmpeg-3.0.1.tar.bz2>
-- 构建所用的补丁与配置脚本（tag `v1.0.14`）：<https://github.com/wseemann/FFmpegMediaMetadataRetriever/tree/v1.0.14/gradle/fmmr-library/library/src/main/ffmpeg>
+- FFmpeg 7.1.1 原始源码：<https://ffmpeg.org/releases/ffmpeg-7.1.1.tar.xz>
+- 构建所用的补丁与配置脚本（tag `v1.0.23`）：<https://github.com/wseemann/FFmpegMediaMetadataRetriever/tree/v1.0.23/gradle/fmmr-library/library/src/main/ffmpeg>
+- OpenSSL 1.1.1w 原始源码：<https://github.com/openssl/openssl/releases/tag/OpenSSL_1_1_1w>
 
 LGPL-2.1 许可证全文见 [licenses/LGPL-2.1.txt](licenses/LGPL-2.1.txt)。
+
+### 三之一、OpenSSL 1.1.1w（与 GPL 不兼容，未解决）
+
+随 FFmpeg 7.1.1 一同分发的 `libcrypto.so` / `libssl.so` 为 OpenSSL 1.1.1w，其许可证全文见 [licenses/OpenSSL-1.1.1.txt](licenses/OpenSSL-1.1.1.txt)。该许可证带有「不得以 OpenSSL 名义推广」等额外限制，自由软件基金会（FSF）认定其与 GPL 不兼容。
+
+因此，本应用「整体以 GPL-3.0-only 授权」的声明与这一捆绑关系目前存在冲突。**该冲突尚未解决**，本文件仅作如实记录。
 
 ## 四、MPL-2.0（文件级 copyleft，不改变本应用的授权）
 
@@ -80,7 +88,7 @@ Android 侧主要组件：
 - `com.squareup.okhttp3:okhttp / logging-interceptor` 4.12.0、`com.squareup.okio:okio-jvm` 3.6.0
 - `com.google.code.gson:gson` 2.10.1、`com.google.guava:listenablefuture` 1.0
 - `com.github.chrisbanes:PhotoView` 2.3.0（JitPack 生成的 POM 未填写许可证字段，上游仓库声明为 Apache-2.0）
-- `com.github.wseemann:FFmpegMediaMetadataRetriever` 1.0.14（封装层本身为 Apache-2.0，其内置 FFmpeg 见第三节）
+- `com.github.wseemann:FFmpegMediaMetadataRetriever-core` / `-native-arm64-v8a` 1.0.23（封装层本身为 Apache-2.0，其内置的 FFmpeg 与 OpenSSL 见第三节）
 - `org.jetbrains.kotlin:kotlin-stdlib` 2.4.10、`org.jetbrains.kotlinx:kotlinx-coroutines-*`、`org.jetbrains:annotations` 23.0.0、`dev.drewhamilton.poko:poko-annotations-jvm` 0.23.1
 
 Rust 侧以纯 Apache-2.0 授权的直接依赖：`opendal` 0.50.2（WebDAV/FTP 服务）、`backon`、`flagset`、`sync_wrapper`。（另有 218 个 `MIT OR Apache-2.0` 双许可 crate，本项目按 MIT 使用，见下节。）

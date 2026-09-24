@@ -304,9 +304,15 @@ dependencies {
     implementation("com.github.chrisbanes:PhotoView:2.3.0")
     implementation("com.google.code.gson:gson:2.10.1")
 
-    // Single combined AAR (one namespace) from Maven Central. The split -core/-native
-    // artifacts share namespace "wseemann.media", which AGP 9 rejects in the manifest merger.
-    implementation("com.github.wseemann:FFmpegMediaMetadataRetriever:1.0.14")
+    // 1.0.22 gave the native artifact its own "wseemann.media.ffmpeg" namespace, so the split
+    // -core/-native pair now merges cleanly under AGP 9. The arm64 artifact carries exactly the
+    // seven .so files the core loads, and abiFilters strips every other ABI regardless.
+    implementation("com.github.wseemann:FFmpegMediaMetadataRetriever-core:1.0.23") {
+        // The core POM asks for appcompat 1.7.1, which the app never touches and which would
+        // drag androidx.core past the 1.12.0 that core-ktx pins above for no benefit.
+        exclude(group = "androidx.appcompat", module = "appcompat")
+    }
+    implementation("com.github.wseemann:FFmpegMediaMetadataRetriever-native-arm64-v8a:1.0.23")
 
     implementation("net.java.dev.jna:jna:5.14.0@aar")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
