@@ -17,6 +17,8 @@ fun DeleteConfirmDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val strongHaptic = rememberStrongHaptic()
+
     OverlayDialog(
         show = true,
         title = stringResource(R.string.confirm_delete),
@@ -30,7 +32,10 @@ fun DeleteConfirmDialog(
                 ),
                 positive = DialogButtonBarAction(
                     text = stringResource(R.string.delete),
-                    onClick = onConfirm,
+                    onClick = {
+                        strongHaptic()
+                        onConfirm()
+                    },
                 ),
                 hasContentAbove = true,
             )

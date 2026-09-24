@@ -26,6 +26,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import erl.webdavtoon.R
+import erl.webdavtoon.ui.component.rememberStrongHaptic
+import erl.webdavtoon.ui.component.rememberTapHaptic
 import io.github.suqi8.coui.kmp.basic.FloatingToolbar
 import io.github.suqi8.coui.kmp.basic.Icon
 import io.github.suqi8.coui.kmp.basic.Text
@@ -55,6 +57,8 @@ fun SelectionBottomBarMiuix(
     val normalColor = COUITheme.colorScheme.onSurface
     val disabledColor = COUITheme.colorScheme.disabledOnSurface
     val errorColor = COUITheme.colorScheme.error
+    val tapHaptic = rememberTapHaptic()
+    val strongHaptic = rememberStrongHaptic()
 
     Box(
         modifier = modifier
@@ -85,7 +89,10 @@ fun SelectionBottomBarMiuix(
                     ),
                     tint = normalColor,
                     enabled = true,
-                    onClick = onToggleSelectAll,
+                    onClick = {
+                        tapHaptic()
+                        onToggleSelectAll()
+                    },
                 )
 
                 // Favorite
@@ -94,7 +101,10 @@ fun SelectionBottomBarMiuix(
                     label = stringResource(R.string.favorite),
                     tint = if (hasSelection) normalColor else disabledColor,
                     enabled = hasSelection,
-                    onClick = onToggleFavorite,
+                    onClick = {
+                        tapHaptic()
+                        onToggleFavorite()
+                    },
                 )
 
                 // Share
@@ -103,7 +113,10 @@ fun SelectionBottomBarMiuix(
                     label = stringResource(R.string.share),
                     tint = if (hasSelection) normalColor else disabledColor,
                     enabled = hasSelection,
-                    onClick = onShare,
+                    onClick = {
+                        tapHaptic()
+                        onShare()
+                    },
                 )
 
                 // Delete
@@ -112,7 +125,10 @@ fun SelectionBottomBarMiuix(
                     label = stringResource(R.string.delete),
                     tint = if (hasSelection) errorColor else disabledColor,
                     enabled = hasSelection,
-                    onClick = onDelete,
+                    onClick = {
+                        strongHaptic()
+                        onDelete()
+                    },
                 )
 
                 // Close / Dismiss
@@ -121,7 +137,10 @@ fun SelectionBottomBarMiuix(
                     label = stringResource(R.string.cancel),
                     tint = normalColor,
                     enabled = true,
-                    onClick = onDismiss,
+                    onClick = {
+                        tapHaptic()
+                        onDismiss()
+                    },
                 )
             }
         }

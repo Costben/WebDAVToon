@@ -38,6 +38,8 @@ import erl.webdavtoon.detectMediaTypeByUri
 import erl.webdavtoon.ui.component.FolderCardLabelHeight
 import erl.webdavtoon.ui.component.PreviewTileCornerRadius
 import erl.webdavtoon.ui.component.PreviewTilePlaceholder
+import erl.webdavtoon.ui.component.rememberStrongHaptic
+import erl.webdavtoon.ui.component.rememberTapHaptic
 import io.github.suqi8.coui.kmp.basic.Card
 import io.github.suqi8.coui.kmp.basic.Icon
 import io.github.suqi8.coui.kmp.basic.Text
@@ -140,6 +142,9 @@ fun WaterfallFolderCardMiuix(
     val innerShape = RoundedCornerShape(12.dp)
     val innerPadding = if (showFilename) MediaCardImageMargin else 0.dp
 
+    val tapHaptic = rememberTapHaptic()
+    val strongHaptic = rememberStrongHaptic()
+
     Box(
         modifier = if (fillHeight) modifier.fillMaxSize() else modifier.fillMaxWidth(),
     ) {
@@ -148,8 +153,14 @@ fun WaterfallFolderCardMiuix(
                 .clip(cardShape)
                 .pointerInput(item.key, isSelectionMode) {
                     detectTapGestures(
-                        onTap = { onClick() },
-                        onLongPress = { onLongClick() },
+                        onTap = {
+                            if (isSelectionMode) tapHaptic()
+                            onClick()
+                        },
+                        onLongPress = {
+                            strongHaptic()
+                            onLongClick()
+                        },
                     )
                 },
         ) {
@@ -252,13 +263,22 @@ private fun WaterfallMediaCardMiuix(
     // and leave a letterbox band showing through.
     val tileAspectRatio = item.aspectRatio.takeIf { it > 0f } ?: 1f
 
+    val tapHaptic = rememberTapHaptic()
+    val strongHaptic = rememberStrongHaptic()
+
     Card(
         modifier = (if (fillHeight) modifier.fillMaxSize() else modifier.fillMaxWidth())
             .clip(cardShape)
             .pointerInput(item.key, isSelectionMode) {
                 detectTapGestures(
-                    onTap = { onClick() },
-                    onLongPress = { onLongClick() },
+                    onTap = {
+                        if (isSelectionMode) tapHaptic()
+                        onClick()
+                    },
+                    onLongPress = {
+                        strongHaptic()
+                        onLongClick()
+                    },
                 )
             },
     ) {

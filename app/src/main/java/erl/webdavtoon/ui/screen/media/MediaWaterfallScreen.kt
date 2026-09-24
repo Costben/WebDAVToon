@@ -65,6 +65,7 @@ import io.github.suqi8.coui.kmp.icon.extended.Sort
 import erl.webdavtoon.ui.component.CouiCascadingMenu
 import erl.webdavtoon.ui.component.TopBarActionIcon
 import erl.webdavtoon.ui.component.TopBarIcons
+import erl.webdavtoon.ui.component.rememberTapHaptic
 import io.github.suqi8.coui.kmp.theme.COUITheme
 
 data class MediaWaterfallActions(
@@ -261,6 +262,7 @@ private fun MediaTopBarMiuix(
     onOpenDrawer: () -> Unit,
 ) {
     var searchExpanded by remember { mutableStateOf(uiState.isSearching) }
+    val tapHaptic = rememberTapHaptic()
     val titleText = if (uiState.isSelectionMode) {
         stringResource(R.string.selected_count, uiState.selectedCount)
     } else {
@@ -275,7 +277,10 @@ private fun MediaTopBarMiuix(
                 // Selection mode's "close" is a cancel/back action, and COUI reserves the top-left
                 // slot for exactly that. Outside selection mode the slot stays empty.
                 if (uiState.isSelectionMode) {
-                    MiuixIconButton(onClick = actions.onExitSelectionMode) {
+                    MiuixIconButton(onClick = {
+                        tapHaptic()
+                        actions.onExitSelectionMode()
+                    }) {
                         MiuixIcon(COUIIcons.Light.Close, contentDescription = stringResource(R.string.cancel))
                     }
                 }

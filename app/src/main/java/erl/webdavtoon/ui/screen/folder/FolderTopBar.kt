@@ -20,6 +20,8 @@ import erl.webdavtoon.ui.component.AnimatedSearchField
 import erl.webdavtoon.ui.component.CouiCascadingMenu
 import erl.webdavtoon.ui.component.TopBarActionIcon
 import erl.webdavtoon.ui.component.TopBarIcons
+import erl.webdavtoon.ui.component.rememberStrongHaptic
+import erl.webdavtoon.ui.component.rememberTapHaptic
 import erl.webdavtoon.R
 import erl.webdavtoon.SettingsManager
 import io.github.suqi8.coui.kmp.basic.DropdownEntry
@@ -65,6 +67,8 @@ fun FolderTopBarMiuix(
     scrollBehavior: ScrollBehavior? = null,
 ) {
     var searchExpanded by remember { mutableStateOf(uiState.isSearching) }
+    val tapHaptic = rememberTapHaptic()
+    val strongHaptic = rememberStrongHaptic()
 
     Column(modifier = modifier.background(COUITheme.colorScheme.surface).statusBarsPadding()) {
         if (uiState.isSelectionMode) {
@@ -72,7 +76,10 @@ fun FolderTopBarMiuix(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = actions.onClearSelection) {
+                IconButton(onClick = {
+                    tapHaptic()
+                    actions.onClearSelection()
+                }) {
                     Icon(COUIIcons.Light.Close, contentDescription = stringResource(R.string.cancel))
                 }
                 MiuixText(
@@ -83,10 +90,16 @@ fun FolderTopBarMiuix(
                     overflow = TextOverflow.Ellipsis,
                     softWrap = false,
                 )
-                IconButton(onClick = actions.onSelectAll) {
+                IconButton(onClick = {
+                    tapHaptic()
+                    actions.onSelectAll()
+                }) {
                     Icon(COUIIcons.Light.SelectAll, contentDescription = "Select all")
                 }
-                IconButton(onClick = actions.onDeleteSelected) {
+                IconButton(onClick = {
+                    strongHaptic()
+                    actions.onDeleteSelected()
+                }) {
                     Icon(COUIIcons.Light.Delete, contentDescription = stringResource(R.string.delete), tint = COUITheme.colorScheme.error)
                 }
             }

@@ -58,6 +58,7 @@ import io.github.suqi8.coui.kmp.icon.extended.Sort
 import erl.webdavtoon.ui.component.CouiCascadingMenu
 import erl.webdavtoon.ui.component.TopBarActionIcon
 import erl.webdavtoon.ui.component.TopBarIcons
+import erl.webdavtoon.ui.component.rememberTapHaptic
 import io.github.suqi8.coui.kmp.theme.COUITheme
 
 data class MixedWaterfallActions(
@@ -260,6 +261,7 @@ private fun MixedWaterfallTopBarMiuix(
     modifier: Modifier = Modifier,
 ) {
     var searchExpanded by remember { mutableStateOf(uiState.isSearching) }
+    val tapHaptic = rememberTapHaptic()
 
     val titleText = if (uiState.isSelectionMode) {
         stringResource(R.string.selected_count, uiState.selectedCount)
@@ -269,6 +271,7 @@ private fun MixedWaterfallTopBarMiuix(
 
     val onNavClick = {
         if (uiState.isSelectionMode) {
+            tapHaptic()
             actions.onExitSelectionMode()
         } else {
             actions.onBackClick()

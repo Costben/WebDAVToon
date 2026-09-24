@@ -34,6 +34,8 @@ import erl.webdavtoon.detectMediaTypeByUri
 import erl.webdavtoon.ui.component.FolderCardLabelHeight
 import erl.webdavtoon.ui.component.PreviewTileCornerRadius
 import erl.webdavtoon.ui.component.PreviewTilePlaceholder
+import erl.webdavtoon.ui.component.rememberStrongHaptic
+import erl.webdavtoon.ui.component.rememberTapHaptic
 import erl.webdavtoon.ui.screen.waterfall.MediaCardImageMargin
 import io.github.suqi8.coui.kmp.basic.Card
 import io.github.suqi8.coui.kmp.basic.Icon
@@ -61,12 +63,21 @@ fun FolderCardMiuix(
         onDispose { onVisibilityChanged?.invoke(folder.path, false) }
     }
 
+    val tapHaptic = rememberTapHaptic()
+    val strongHaptic = rememberStrongHaptic()
+
     Card(
         modifier = (if (fillHeight) modifier.fillMaxSize() else modifier.fillMaxWidth())
             .pointerInput(folder.path, isSelectionMode) {
                 detectTapGestures(
-                    onTap = { onClick() },
-                    onLongPress = { onLongClick() },
+                    onTap = {
+                        if (isSelectionMode) tapHaptic()
+                        onClick()
+                    },
+                    onLongPress = {
+                        strongHaptic()
+                        onLongClick()
+                    },
                 )
             },
     ) {
