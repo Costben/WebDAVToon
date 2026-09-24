@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Rin Shibuya
 package erl.webdavtoon
 
 import android.content.pm.ActivityInfo
@@ -5,6 +7,7 @@ import android.content.res.Configuration
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Arrangement
@@ -33,6 +36,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
+import erl.webdavtoon.ui.screen.settings.LicensesScreen
+import erl.webdavtoon.ui.screen.settings.LicensesViewModel
 import erl.webdavtoon.ui.screen.settings.SettingsActions
 import erl.webdavtoon.ui.screen.settings.SettingsDefaults
 import erl.webdavtoon.ui.screen.settings.SettingsEvent
@@ -69,9 +74,13 @@ class SettingsActivity : ComponentActivity() {
     private lateinit var settingsManager: SettingsManager
     private val viewModel: SettingsViewModel by viewModels()
     private val serverConfigViewModel: ServerConfigViewModel by viewModels()
+    private val licensesViewModel: LicensesViewModel by viewModels()
 
     /** Drives the clear-cache confirmation; the ViewModel call is destructive and irreversible. */
     private var showClearCacheConfirm by mutableStateOf(false)
+
+    /** When set, the licenses screen replaces the settings screen instead of stacking on top. */
+    private var showLicenses by mutableStateOf(false)
 
     /** Slot pending delete confirmation; null means no delete dialog is shown. */
     private var deleteServerSlotTarget by mutableStateOf<Int?>(null)
@@ -129,7 +138,15 @@ class SettingsActivity : ComponentActivity() {
                     themeId = uiState.themeId,
                     useCouiDefaultColors = uiState.useCouiDefaultColors,
                 ) {
-                    SettingsScreen(uiState = uiState, actions = settingsActions())
+                    if (showLicenses) {
+                        BackHandler { showLicenses = false }
+                        LicensesScreen(
+                            onBack = { showLicenses = false },
+                            viewModel = licensesViewModel,
+                        )
+                    } else {
+                        SettingsScreen(uiState = uiState, actions = settingsActions())
+                    }
                     if (showClearCacheConfirm) {
                         ClearCacheConfirmDialog(
                             onConfirm = {
@@ -323,6 +340,7 @@ class SettingsActivity : ComponentActivity() {
             applyRotationLock(locked)
         },
         onClearCache = { showClearCacheConfirm = true },
+        onOpenLicenses = { showLicenses = true },
         onBack = { finish() },
     )
 

@@ -10,6 +10,9 @@ plugins {
 val skipRust = project.hasProperty("skipRust")
 val ndkVersion = "28.2.13676358"
 
+// Filled by syncOssAssets from the repo root so the license texts exist in exactly one place.
+val ossAssetsDir = layout.buildDirectory.dir("generated/oss-assets")
+
 android {
     namespace = "erl.webdavtoon"
     compileSdk = 37
@@ -72,6 +75,9 @@ android {
     sourceSets {
         getByName("main") {
             java.srcDirs(file("src/main/java"), file("build/generated/source/uniffi/java"))
+            // A File, not a Provider: AGP 9 rejects Provider source dirs. The task dependency is
+            // wired explicitly below through preBuild and the merge*Assets tasks.
+            assets.srcDir(ossAssetsDir.get().asFile)
         }
     }
 
@@ -183,6 +189,28 @@ if (!skipRust) {
     }.configureEach {
         dependsOn(copyRustJniLibs)
     }
+}
+
+// Mirrors the repo root into the generated assets dir: LICENSE is renamed to its SPDX name,
+// THIRD-PARTY-NOTICES.md and licenses/* keep theirs. Sync keeps the output free of stale files.
+val syncOssAssets = tasks.register<Sync>("syncOssAssets") {
+    group = "build"
+    description = "Copy LICENSE / THIRD-PARTY-NOTICES.md / licenses/* into the generated OSS assets"
+
+    into(ossAssetsDir.map { it.dir("licenses") })
+    from(rootProject.file("LICENSE")) { rename { "GPL-3.0.txt" } }
+    from(rootProject.file("THIRD-PARTY-NOTICES.md"))
+    from(rootProject.file("licenses"))
+}
+
+tasks.named("preBuild").configure {
+    dependsOn(syncOssAssets)
+}
+
+tasks.matching { task ->
+    task.name.startsWith("merge") && task.name.endsWith("Assets")
+}.configureEach {
+    dependsOn(syncOssAssets)
 }
 
 fun registerRootApkExportTask(

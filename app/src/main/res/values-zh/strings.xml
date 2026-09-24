@@ -15,6 +15,14 @@
     <string name="sort_order">排序方式</string>
     <string name="clear_cache">清除缓存</string>
     <string name="clear_cache_summary">通过删除缓存的图像来释放空间</string>
+    <string name="oss_licenses">开源许可</string>
+    <string name="oss_licenses_summary">随应用分发的许可证与第三方组件</string>
+    <string name="oss_licenses_app_section">本应用</string>
+    <string name="oss_licenses_third_party_section">第三方组件</string>
+    <string name="oss_licenses_source_hint">对应源码：%1$s</string>
+    <string name="oss_licenses_expand">展开许可证全文</string>
+    <string name="oss_licenses_collapse">收起许可证全文</string>
+    <string name="oss_licenses_load_failed">无法读取许可证全文</string>
     <string name="about">关于</string>
     <string name="server_type">服务器类型</string>
     <string name="host_address">主机地址</string>

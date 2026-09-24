@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Rin Shibuya
 package erl.webdavtoon.ui.screen.settings
 
 import androidx.compose.foundation.background
@@ -73,6 +75,7 @@ data class SettingsActions(
     val onPickPrivacyExitPolicy: () -> Unit,
     val onSetRotationLocked: (Boolean) -> Unit,
     val onClearCache: () -> Unit,
+    val onOpenLicenses: () -> Unit,
     val onBack: () -> Unit,
 )
 
@@ -342,6 +345,8 @@ private fun SettingsContent(
                     SettingsRowDivider()
                 }
                 ArrowPreference(title = stringResource(R.string.about), summary = stringResource(R.string.app_version_format, BuildConfig.VERSION_NAME), enabled = false)
+                SettingsRowDivider()
+                ArrowPreference(title = stringResource(R.string.oss_licenses), summary = stringResource(R.string.oss_licenses_summary), onClick = actions.onOpenLicenses)
                 SettingsRowDivider()
                 SwitchPreference(checked = uiState.rotationLocked, onCheckedChange = actions.onSetRotationLocked, title = stringResource(R.string.rotation_lock))
             }

@@ -15,6 +15,14 @@
     <string name="sort_order">Sort Order</string>
     <string name="clear_cache">Clear Cache</string>
     <string name="clear_cache_summary">Free up space by removing cached images</string>
+    <string name="oss_licenses">Open Source Licenses</string>
+    <string name="oss_licenses_summary">Licenses and third-party components shipped with this app</string>
+    <string name="oss_licenses_app_section">This app</string>
+    <string name="oss_licenses_third_party_section">Third-party components</string>
+    <string name="oss_licenses_source_hint">Corresponding source: %1$s</string>
+    <string name="oss_licenses_expand">Show the full license text</string>
+    <string name="oss_licenses_collapse">Hide the full license text</string>
+    <string name="oss_licenses_load_failed">The license text could not be read</string>
     <string name="about">About</string>
     <string name="server_type">Server Type</string>
     <string name="host_address">Host Address</string>
