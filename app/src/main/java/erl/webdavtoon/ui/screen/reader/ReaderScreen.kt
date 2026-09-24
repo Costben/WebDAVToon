@@ -15,6 +15,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -66,14 +67,21 @@ fun ReaderScreen(
     val currentPhoto = uiState.currentPhoto
     val currentPhotoTitle = currentPhoto?.title ?: ""
     val settingsManager = remember(context) { SettingsManager(context) }
+    val downloadSuccessMessage = stringResource(R.string.download_success)
+    val downloadFailedMessage = stringResource(R.string.download_failed)
 
-    val onSaveImage: () -> Unit = remember(context, currentPhoto) {
+    val onSaveImage: () -> Unit = remember(
+        context,
+        currentPhoto,
+        downloadSuccessMessage,
+        downloadFailedMessage
+    ) {
         {
             if (currentPhoto != null) {
                 coroutineScope.launch {
                     val success = FileUtils.downloadImage(context, currentPhoto)
-                    val messageRes = if (success) R.string.download_success else R.string.download_failed
-                    Toast.makeText(context, context.getString(messageRes), Toast.LENGTH_SHORT).show()
+                    val message = if (success) downloadSuccessMessage else downloadFailedMessage
+                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                 }
             }
         }
