@@ -111,11 +111,39 @@ class RemoteFolderPreviewBackfillTest {
     }
 
     @Test
-    fun defaultPredicate_acceptsOnlyRemoteFolderWithoutPreviewsOrHiddenSegments() {
-        val needs = RemoteFolderPreviewBackfill.defaultNeedsPreview
-        assertTrue(needs(folder("/sub")))
-        assertFalse(needs(folder("/local", isLocal = true)))
-        assertFalse(needs(folder("virtual://local_root")))
-        assertFalse(needs(folder("/parent/.hidden")))
+    fun forceRefresh_reinspectsFoldersThePredicateWouldSkip() = runBlocking {
+        val inspected = mutableListOf<String>()
+        val backfill = countingBackfill(inspected, missing = { false })
+
+        backfill.setVisible(folder("/already-cached"), true)
+        backfill.requestVisiblePreviews()
+        assertEquals(emptyList<String>(), inspected)
+
+        backfill.requestVisiblePreviews(forceRefresh = true)
+        assertEquals(listOf("/already-cached"), inspected)
+    }
+
+    @Test
+    fun forceRefresh_stillSkipsFoldersThatCannotBeInspected() = runBlocking {
+        val inspected = mutableListOf<String>()
+        val backfill = countingBackfill(inspected, missing = { false })
+
+        backfill.setVisible(folder("/local", isLocal = true), true)
+        backfill.setVisible(folder("virtual://local_root"), true)
+        backfill.requestVisiblePreviews(forceRefresh = true)
+
+        assertEquals(emptyList<String>(), inspected)
+    }
+
+    @Test
+    fun defaultGates_separateEligibilityFromMissingPreviews() {
+        val inspectable = RemoteFolderPreviewBackfill.defaultIsInspectable
+        assertTrue(inspectable(folder("/sub")))
+        assertFalse(inspectable(folder("/local", isLocal = true)))
+        assertFalse(inspectable(folder("virtual://local_root")))
+        assertFalse(inspectable(folder("/parent/.hidden")))
+
+        // A remote tile that carries no previews for the active order still needs an inspect.
+        assertTrue(RemoteFolderPreviewBackfill.defaultNeedsPreview(folder("/sub")))
     }
 }

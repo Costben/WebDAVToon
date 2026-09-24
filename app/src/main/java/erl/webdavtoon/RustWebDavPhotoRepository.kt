@@ -115,11 +115,18 @@ class RustWebDavPhotoRepository(
         }
     }
 
-    override suspend fun getFolders(rootPath: String, forceRefresh: Boolean): List<Folder> = withContext(Dispatchers.IO) {
+    override suspend fun getFolders(rootPath: String, forceRefresh: Boolean): List<Folder> {
+        return getFolders(rootPath, forceRefresh, settingsManager.getSortOrder())
+    }
+
+    suspend fun getFolders(
+        rootPath: String,
+        forceRefresh: Boolean,
+        sortOrder: Int
+    ): List<Folder> = withContext(Dispatchers.IO) {
         val repo = rustRepo ?: return@withContext emptyList()
         initializeWebDavIfNeeded(repo)
         val accountKey = previewCacheAccountKey()
-        val sortOrder = settingsManager.getSortOrder()
         val startedAt = SystemClock.elapsedRealtime()
 
         try {
@@ -437,7 +444,7 @@ class RustWebDavPhotoRepository(
     }
 
     private fun previewCacheAccountKey(): String {
-        return "${settingsManager.getFullWebDavUrl().trimEnd('/')}|${settingsManager.getWebDavUsername()}"
+        return settingsManager.previewCacheAccountKey()
     }
 
     private fun getSortedPhotosFromRepo(

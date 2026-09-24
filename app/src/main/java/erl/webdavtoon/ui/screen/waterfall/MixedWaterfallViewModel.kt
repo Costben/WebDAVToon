@@ -19,6 +19,7 @@ import erl.webdavtoon.PhotoAspectRatioResolver
 import erl.webdavtoon.PhotoRepository
 import erl.webdavtoon.R
 import erl.webdavtoon.RemoteFolderPreviewBackfill
+import erl.webdavtoon.RemoteFolderPreviewMemoryCache
 import erl.webdavtoon.RemoteFolderSynthesizer
 import erl.webdavtoon.RustWebDavPhotoRepository
 import erl.webdavtoon.SettingsManager
@@ -47,7 +48,17 @@ class MixedWaterfallViewModel(app: Application) : AndroidViewModel(app) {
     private var folderShuffleSeed = Random.nextLong()
     private var photoShuffleSeed = Random.nextLong()
     private var loadJob: Job? = null
-    private val previewBackfill = RemoteFolderPreviewBackfill(viewModelScope) { folder, force ->
+    private val previewBackfill = RemoteFolderPreviewBackfill(
+        scope = viewModelScope,
+        // Eligibility (remote, not hidden) is handled by the coordinator's isInspectable
+        // gate; this only decides whether the active sort order still needs an inspect.
+        needsPreview = { folder ->
+            val accountKey = settingsManager.previewCacheAccountKey()
+            val sortOrder = settingsManager.getPhotoSortOrder()
+            val cached = RemoteFolderPreviewMemoryCache.get(accountKey, sortOrder, folder.path)
+            cached == null || cached.previewUriStrings.isEmpty()
+        }
+    ) { folder, force ->
         loadRemoteFolderPreview(folder, force)
     }
 
@@ -160,16 +171,33 @@ class MixedWaterfallViewModel(app: Application) : AndroidViewModel(app) {
                             LocalPhotoRepository(context)
                         }
 
-                        val loadedFolders = repository.getFolders(path, forceRefresh)
-                            .asSequence()
-                            .filterNot { it.path.startsWith("virtual://internal_photos") }
-                            .filterNot { folder ->
-                                !folder.isLocal && (
-                                    folder.name.startsWith(".") ||
-                                        folder.path.trim('/').split('/').any { it.startsWith(".") }
-                                )
-                            }
-                            .toList()
+                        val loadedFolders = if (isWd) {
+                            RustWebDavPhotoRepository(settingsManager).getFolders(
+                                rootPath = path,
+                                forceRefresh = forceRefresh,
+                                sortOrder = settingsManager.getPhotoSortOrder()
+                            )
+                                .asSequence()
+                                .filterNot { it.path.startsWith("virtual://internal_photos") }
+                                .filterNot { folder ->
+                                    !folder.isLocal && (
+                                        folder.name.startsWith(".") ||
+                                            folder.path.trim('/').split('/').any { it.startsWith(".") }
+                                    )
+                                }
+                                .toList()
+                        } else {
+                            repository.getFolders(path, forceRefresh)
+                                .asSequence()
+                                .filterNot { it.path.startsWith("virtual://internal_photos") }
+                                .filterNot { folder ->
+                                    !folder.isLocal && (
+                                        folder.name.startsWith(".") ||
+                                            folder.path.trim('/').split('/').any { it.startsWith(".") }
+                                    )
+                                }
+                                .toList()
+                        }
 
                         val directMedia = repository.getPhotos(
                             folderPath = path,
@@ -197,9 +225,16 @@ class MixedWaterfallViewModel(app: Application) : AndroidViewModel(app) {
                         )
 
                         val sourceSlot = if (isWd) settingsManager.getCurrentSlot() else -1
+                        val currentPreviewsByPath = _uiState.value.rawFolders.associate { it.path to it.previewUris }
                         val sourcedFolders = resolvedFolders.map { folder ->
                             val resolvedSlot = if (folder.isLocal) -1 else sourceSlot
-                            if (folder.sourceSlot == resolvedSlot) folder else folder.copy(sourceSlot = resolvedSlot)
+                            val slotFolder = if (folder.sourceSlot == resolvedSlot) folder else folder.copy(sourceSlot = resolvedSlot)
+                            if (slotFolder.previewUris.isNotEmpty()) {
+                                slotFolder
+                            } else {
+                                val prev = currentPreviewsByPath[slotFolder.path]
+                                if (!prev.isNullOrEmpty()) slotFolder.copy(previewUris = prev) else slotFolder
+                            }
                         }
 
                         val items = MixedWaterfallPlanner.buildItems(
@@ -271,6 +306,9 @@ class MixedWaterfallViewModel(app: Application) : AndroidViewModel(app) {
                 is MixedWaterfallItem.FolderTile -> {
                     val folder = item.folder
                     val key = MixedWaterfallIdentity.folderKey(folder)
+                    val existingPreviewUris = (_uiState.value.items.firstOrNull { it is MixedWaterfallItemUi.FolderItem && it.key == key } as? MixedWaterfallItemUi.FolderItem)?.previewUris.orEmpty()
+                    val folderUris = folder.previewUris.map { it.toString() }
+                    val resolvedPreviewUris = if (folderUris.isNotEmpty()) folderUris else existingPreviewUris
                     MixedWaterfallItemUi.FolderItem(
                         folder = folder,
                         key = key,
@@ -278,7 +316,7 @@ class MixedWaterfallViewModel(app: Application) : AndroidViewModel(app) {
                         path = folder.path,
                         isLocal = folder.isLocal,
                         photoCount = folder.photoCount,
-                        previewUris = folder.previewUris.map { it.toString() },
+                        previewUris = resolvedPreviewUris,
                         aspectRatio = 1.0f,
                         isSelected = key in selectedKeys
                     )
@@ -428,8 +466,31 @@ class MixedWaterfallViewModel(app: Application) : AndroidViewModel(app) {
         if (SettingsManager.isRandomPhotoSort(order)) {
             photoShuffleSeed = Random.nextLong()
         }
-        _uiState.update { it.copy(sortOrder = order) }
+        val accountKey = settingsManager.previewCacheAccountKey()
+        _uiState.update { state ->
+            val updatedItems = state.items.map { item ->
+                if (item is MixedWaterfallItemUi.FolderItem && !item.isLocal) {
+                    val cached = RemoteFolderPreviewMemoryCache.get(accountKey, order, item.path)
+                    if (cached != null && cached.previewUriStrings.isNotEmpty()) {
+                        val stringUris = cached.previewUriStrings
+                        val uris = stringUris.map(Uri::parse)
+                        item.copy(
+                            folder = item.folder.copy(previewUris = uris, hasSubFolders = item.folder.hasSubFolders || cached.hasSubFolders),
+                            previewUris = stringUris
+                        )
+                    } else {
+                        // Retain existing preview thumbnails while calculating or loading new sort order
+                        item
+                    }
+                } else {
+                    item
+                }
+            }
+            state.copy(sortOrder = order, items = updatedItems)
+        }
+        previewBackfill.retire(forgetResolved = true)
         loadContent()
+        requestMissingFolderPreviews()
     }
 
     fun toggleRotationLock() {
@@ -622,13 +683,24 @@ class MixedWaterfallViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun loadRemoteFolderPreview(folder: Folder, forceRefresh: Boolean) {
         if (folder.isLocal) return
-        val sortOrder = settingsManager.getSortOrder()
+        val sortOrder = settingsManager.getPhotoSortOrder()
+        val accountKey = settingsManager.previewCacheAccountKey()
+        if (!forceRefresh) {
+            val cached = RemoteFolderPreviewMemoryCache.get(accountKey, sortOrder, folder.path)
+            if (cached != null && cached.previewUriStrings.isNotEmpty()) {
+                val cachedUris = cached.previewUriStrings.map(Uri::parse)
+                updateFolderPreview(folder, cachedUris, cached.hasSubFolders)
+                previewBackfill.markResolved(folder)
+                return
+            }
+        }
         val preview = withFolderSourceSlot(folder, restoreAfter = true) {
             RustWebDavPhotoRepository(settingsManager).inspectFolder(folder.path, sortOrder, forceRefresh)
         } ?: return
-        if (settingsManager.getSortOrder() != sortOrder) return
+        if (settingsManager.getPhotoSortOrder() != sortOrder) return
         val hasPreview = preview.previewUris.isNotEmpty()
-        updateFolderPreview(folder, preview.previewUris, preview.hasSubFolders)
+        val resolvedUris = if (hasPreview) preview.previewUris else folder.previewUris
+        updateFolderPreview(folder, resolvedUris, preview.hasSubFolders)
         if (hasPreview) {
             previewBackfill.markResolved(folder)
         } else {

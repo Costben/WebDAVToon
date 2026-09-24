@@ -454,26 +454,55 @@ private fun MiuixFolderPreviewSlot(item: MixedWaterfallItemUi.FolderItem, index:
                     ImageView(context).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
                 },
                 update = { imageView ->
+                    val lastUri = imageView.getTag(R.id.tag_media_bind_key) as? String
+                    if (lastUri == uri && imageView.drawable != null) return@AndroidView
+                    imageView.setTag(R.id.tag_media_bind_key, uri)
+
                     val imageUri = Uri.parse(uri)
+                    val hasExisting = imageView.drawable != null
+                    val crossFadeMs = if (hasExisting) 300 else 0
                     if (detectMediaTypeByUri(imageUri) == MediaType.VIDEO && item.isLocal) {
                         WebDavImageLoader.loadLocalVideoThumbnail(
-                            imageView.context, imageUri, imageView, isFolderPreview = true,
+                            imageView.context,
+                            imageUri,
+                            imageView,
+                            isFolderPreview = true,
+                            preserveCurrentDrawable = true,
+                            crossFadeDurationMs = crossFadeMs,
                         )
                     } else if (detectMediaTypeByUri(imageUri) == MediaType.VIDEO) {
                         WebDavImageLoader.loadWebDavVideoThumbnail(
-                            imageView.context, imageUri, imageView, isFolderPreview = true,
+                            imageView.context,
+                            imageUri,
+                            imageView,
+                            isFolderPreview = true,
+                            preserveCurrentDrawable = true,
+                            crossFadeDurationMs = crossFadeMs,
                         )
                     } else if (item.isLocal) {
                         WebDavImageLoader.loadLocalImage(
-                            imageView.context, imageUri, imageView, isFolderPreview = true,
+                            imageView.context,
+                            imageUri,
+                            imageView,
+                            isFolderPreview = true,
+                            preserveCurrentDrawable = true,
+                            crossFadeDurationMs = crossFadeMs,
                         )
                     } else {
                         WebDavImageLoader.loadWebDavImage(
-                            imageView.context, imageUri, imageView, isFolderPreview = true,
+                            imageView.context,
+                            imageUri,
+                            imageView,
+                            isFolderPreview = true,
+                            preserveCurrentDrawable = true,
+                            crossFadeDurationMs = crossFadeMs,
                         )
                     }
                 },
-                onRelease = WebDavImageLoader::clear,
+                onRelease = { imageView ->
+                    imageView.setTag(R.id.tag_media_bind_key, null)
+                    WebDavImageLoader.clear(imageView)
+                },
             )
         }
     }

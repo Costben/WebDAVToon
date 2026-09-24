@@ -33,8 +33,8 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
         }
     }
 
-    private fun buildFolderPreviewSortOrder(): String {
-        return when (SettingsManager(context).getSortOrder()) {
+    private fun buildFolderPreviewSortOrder(sortOrder: Int): String {
+        return when (sortOrder) {
             SettingsManager.SORT_NAME_ASC -> "${MediaStore.Files.FileColumns.DISPLAY_NAME} ASC"
             SettingsManager.SORT_NAME_DESC -> "${MediaStore.Files.FileColumns.DISPLAY_NAME} DESC"
             SettingsManager.SORT_DATE_DESC -> "${MediaStore.Files.FileColumns.DATE_MODIFIED} DESC"
@@ -174,7 +174,10 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
         }
     }
 
-    private fun selectPreviewUris(candidates: List<LocalPreviewCandidate>): List<Uri> {
+    private fun selectPreviewUris(
+        candidates: List<LocalPreviewCandidate>,
+        sortOrder: Int
+    ): List<Uri> {
         return FolderPreviewOrdering.selectPreviewValues(
             candidates.mapIndexed { index, candidate ->
                 FolderPreviewOrdering.Candidate(
@@ -189,7 +192,7 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
                     sourceOrder = index
                 )
             },
-            sortOrder = SettingsManager(context).getSortOrder(),
+            sortOrder = sortOrder,
             preferUsableMedia = true
         )
     }
@@ -276,7 +279,20 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
         } ?: emptyList()
     }
 
-    override suspend fun getFolders(rootPath: String, forceRefresh: Boolean): List<Folder> = withContext(Dispatchers.IO) {
+    override suspend fun getFolders(rootPath: String, forceRefresh: Boolean): List<Folder> {
+        val defaultSort = if (rootPath.isEmpty()) {
+            SettingsManager(context).getSortOrder()
+        } else {
+            SettingsManager(context).getPhotoSortOrder()
+        }
+        return getFolders(rootPath, forceRefresh, defaultSort)
+    }
+
+    suspend fun getFolders(
+        rootPath: String,
+        forceRefresh: Boolean,
+        sortOrder: Int
+    ): List<Folder> = withContext(Dispatchers.IO) {
         val foldersMap = linkedMapOf<String, Folder>()
         val previewCandidatesByFolder = linkedMapOf<String, MutableList<LocalPreviewCandidate>>()
         val projection = arrayOf(
@@ -307,7 +323,7 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
             projection,
             selection,
             selectionArgs,
-            buildFolderPreviewSortOrder()
+            buildFolderPreviewSortOrder(sortOrder)
         )?.use { cursor ->
             val idCol = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID)
             val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DISPLAY_NAME)
@@ -442,7 +458,7 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
 
         foldersMap.values.map { folder ->
             folder.copy(
-                previewUris = selectPreviewUris(previewCandidatesByFolder[folder.path].orEmpty())
+                previewUris = selectPreviewUris(previewCandidatesByFolder[folder.path].orEmpty(), sortOrder)
             )
         }
     }

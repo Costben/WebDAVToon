@@ -1,6 +1,7 @@
 package erl.webdavtoon.ui.screen.folder
 
 import android.app.Application
+import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.bumptech.glide.Glide
@@ -10,6 +11,7 @@ import erl.webdavtoon.FolderSearchMatcher
 import erl.webdavtoon.LocalPhotoRepository
 import erl.webdavtoon.PrivacyModeState
 import erl.webdavtoon.R
+import erl.webdavtoon.RemoteFolderPreviewMemoryCache
 import erl.webdavtoon.RustWebDavPhotoRepository
 import erl.webdavtoon.SettingsManager
 import erl.webdavtoon.VisibleRemotePreviewScheduler
@@ -42,8 +44,13 @@ class FolderViewModel @JvmOverloads constructor(app: Application) : AndroidViewM
 
     private fun observeSettings() {
         observe(appSettings.observeInt(AppSettingsStore.GRID_COLUMNS, 2)) { copy(gridColumns = it) }
-        observe(appSettings.observeInt(AppSettingsStore.SORT_ORDER, SettingsManager.SORT_DATE_DESC)) {
-            copy(sortOrder = it)
+        viewModelScope.launch {
+            appSettings.observeInt(AppSettingsStore.SORT_ORDER, SettingsManager.SORT_DATE_DESC).collect { order ->
+                if (order == _uiState.value.sortOrder) return@collect
+                if (order == SettingsManager.SORT_RANDOM_FOLDERS) resetShuffleSeed()
+                applySortOrderPreviews(order)
+                refreshVisibleFolderPreviews()
+            }
         }
         observe(appSettings.observeBoolean(AppSettingsStore.ROTATION_LOCKED, false)) { copy(rotationLocked = it) }
         observe(appSettings.observeInt(AppSettingsStore.THEME_ID, erl.webdavtoon.ThemeHelper.THEME_FOLLOW_DEVICE)) {
@@ -117,6 +124,7 @@ class FolderViewModel @JvmOverloads constructor(app: Application) : AndroidViewM
                     )
                 }
                 publishFolders()
+                if (forceRefresh) refreshVisibleFolderPreviews(forceRefresh = true)
             } catch (error: Exception) {
                 _uiState.update {
                     it.copy(
@@ -138,8 +146,71 @@ class FolderViewModel @JvmOverloads constructor(app: Application) : AndroidViewM
     fun setSortOrder(order: Int) {
         settingsManager.setSortOrder(order)
         if (order == SettingsManager.SORT_RANDOM_FOLDERS) resetShuffleSeed()
-        _uiState.update { it.copy(sortOrder = order) }
+        applySortOrderPreviews(order)
+        refreshVisibleFolderPreviews()
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val local = LocalPhotoRepository(context).getFolders("", false, order)
+                if (local.isNotEmpty()) {
+                    val localPreviews = local.flatMap { it.previewUris }.take(4)
+                    _uiState.update { state ->
+                        if (state.sortOrder != order) state
+                        else state.copy(
+                            rawFolders = state.rawFolders.map { folder ->
+                                if (folder.path == "virtual://local_root") {
+                                    folder.copy(previewUris = localPreviews)
+                                } else folder
+                            }
+                        )
+                    }
+                    publishFolders()
+                }
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    /**
+     * Swaps in the cached previews for [order] and keeps whatever thumbnails a tile is
+     * already showing when that order has no cache yet, so a sort change never blanks it.
+     */
+    private fun applySortOrderPreviews(order: Int) {
+        val accountKey = settingsManager.previewCacheAccountKey()
+        _uiState.update { state ->
+            val updatedRawFolders = state.rawFolders.map { folder ->
+                if (folder.isLocal) folder
+                else {
+                    val cached = RemoteFolderPreviewMemoryCache.get(accountKey, order, folder.path)
+                    if (cached != null && cached.previewUriStrings.isNotEmpty()) {
+                        folder.copy(
+                            previewUris = cached.previewUriStrings.map(Uri::parse),
+                            hasSubFolders = folder.hasSubFolders || cached.hasSubFolders
+                        )
+                    } else {
+                        // Retain existing preview thumbnails while calculating or loading new sort order
+                        folder
+                    }
+                }
+            }
+            state.copy(sortOrder = order, rawFolders = updatedRawFolders)
+        }
         publishFolders()
+    }
+
+    private fun refreshVisibleFolderPreviews(forceRefresh: Boolean = false) {
+        val accountKey = settingsManager.previewCacheAccountKey()
+        val sortOrder = settingsManager.getSortOrder()
+        val foldersToRefresh = _uiState.value.rawFolders.filter { folder ->
+            if (folder.isLocal) false
+            else if (forceRefresh) true
+            else {
+                val cached = RemoteFolderPreviewMemoryCache.get(accountKey, sortOrder, folder.path)
+                cached == null || cached.previewUriStrings.isEmpty()
+            }
+        }
+        if (foldersToRefresh.isNotEmpty()) {
+            previewScheduler.enqueueVisible(foldersToRefresh, forceRefresh = forceRefresh)
+        }
     }
 
     fun resetShuffleSeed() {
@@ -157,20 +228,56 @@ class FolderViewModel @JvmOverloads constructor(app: Application) : AndroidViewM
     }
 
     fun requestRemotePreview(folder: Folder, forceRefresh: Boolean = false) {
-        if (folder.isLocal || (!forceRefresh && folder.previewUris.isNotEmpty())) return
+        if (folder.isLocal) return
+        val accountKey = settingsManager.previewCacheAccountKey()
+        val sortOrder = settingsManager.getSortOrder()
+        val cached = RemoteFolderPreviewMemoryCache.get(accountKey, sortOrder, folder.path)
+        if (!forceRefresh && cached != null && cached.previewUriStrings.isNotEmpty()) {
+            val cachedUris = cached.previewUriStrings.map(Uri::parse)
+            if (folder.previewUris != cachedUris) {
+                _uiState.update { state ->
+                    state.copy(rawFolders = state.rawFolders.map { current ->
+                        if (current.path != folder.path) current else current.copy(
+                            previewUris = cachedUris,
+                            hasSubFolders = current.hasSubFolders || cached.hasSubFolders
+                        )
+                    })
+                }
+                publishFolders()
+            }
+            return
+        }
         previewScheduler.enqueue(folder, forceRefresh)
     }
 
     private suspend fun loadRemotePreview(folder: Folder, forceRefresh: Boolean) {
-        if (folder.isLocal || (!forceRefresh && folder.previewUris.isNotEmpty())) return
+        if (folder.isLocal) return
         val sortOrder = settingsManager.getSortOrder()
+        val accountKey = settingsManager.previewCacheAccountKey()
+        if (!forceRefresh) {
+            val cached = RemoteFolderPreviewMemoryCache.get(accountKey, sortOrder, folder.path)
+            if (cached != null && cached.previewUriStrings.isNotEmpty()) {
+                val cachedUris = cached.previewUriStrings.map(Uri::parse)
+                _uiState.update { state ->
+                    state.copy(rawFolders = state.rawFolders.map { current ->
+                        if (current.path != folder.path) current else current.copy(
+                            previewUris = cachedUris,
+                            hasSubFolders = current.hasSubFolders || cached.hasSubFolders
+                        )
+                    })
+                }
+                publishFolders()
+                return
+            }
+        }
         val preview = RustWebDavPhotoRepository(settingsManager).inspectFolder(folder.path, sortOrder, forceRefresh)
             ?: return
         if (settingsManager.getSortOrder() != sortOrder) return
+        val resolvedUris = if (preview.previewUris.isNotEmpty()) preview.previewUris else folder.previewUris
         _uiState.update { state ->
             state.copy(rawFolders = state.rawFolders.map { current ->
                 if (current.path != folder.path) current else current.copy(
-                    previewUris = if (forceRefresh) preview.previewUris else preview.previewUris.ifEmpty { current.previewUris },
+                    previewUris = resolvedUris,
                     hasSubFolders = current.hasSubFolders || preview.hasSubFolders,
                 )
             })
@@ -267,13 +374,16 @@ class FolderViewModel @JvmOverloads constructor(app: Application) : AndroidViewM
             else -> filtered.sortedByDescending { it.dateModified }
         }
         val selected = state.selectedPaths
+        val previousPreviewsByPath = state.folders.associate { it.path to it.previewUris }
         _uiState.update { it.copy(folders = sorted.map { folder ->
+            val stringPreviews = folder.previewUris.map { uri -> uri.toString() }
+            val resolvedPreviews = if (stringPreviews.isNotEmpty()) stringPreviews else previousPreviewsByPath[folder.path].orEmpty()
             FolderItemUi(
                 path = folder.path,
                 name = folder.name,
                 isLocal = folder.isLocal,
                 photoCount = folder.photoCount,
-                previewUris = folder.previewUris.map { uri -> uri.toString() },
+                previewUris = resolvedPreviews,
                 hasSubFolders = folder.hasSubFolders,
                 isSelected = folder.path in selected,
             )

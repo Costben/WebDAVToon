@@ -109,6 +109,9 @@ class SettingsManager(context: Context) {
     fun getPhotoSortOrder(): Int = appSettings.getOrDefaultInt(AppSettingsStore.PHOTO_SORT_ORDER, 2)
     fun setPhotoSortOrder(order: Int) = appSettings.putInt(AppSettingsStore.PHOTO_SORT_ORDER, order)
 
+    fun previewCacheAccountKey(): String =
+        "${getFullWebDavUrl().trimEnd('/')}|${getWebDavUsername()}"
+
     fun getRecursiveImageArrangement(): Int = appSettings.getOrDefaultInt(
         AppSettingsStore.RECURSIVE_IMAGE_ARRANGEMENT,
         RECURSIVE_IMAGE_ARRANGEMENT_GROUPED

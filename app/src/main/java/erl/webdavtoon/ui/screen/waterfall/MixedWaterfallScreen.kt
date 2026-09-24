@@ -36,6 +36,7 @@ import io.github.suqi8.coui.kmp.basic.CircularProgressIndicator as MiuixCircular
 import io.github.suqi8.coui.kmp.basic.FloatingActionButton as MiuixFloatingActionButton
 import io.github.suqi8.coui.kmp.basic.Icon as MiuixIcon
 import io.github.suqi8.coui.kmp.basic.IconButton as MiuixIconButton
+import io.github.suqi8.coui.kmp.basic.PullToRefresh
 import io.github.suqi8.coui.kmp.basic.COUIScrollBehavior
 import io.github.suqi8.coui.kmp.basic.ScrollBehavior
 import io.github.suqi8.coui.kmp.basic.Text as MiuixText
@@ -127,59 +128,65 @@ fun MixedWaterfallScreen(
                 .fillMaxSize()
                 .weight(1f)
         ) {
-            when {
-                uiState.loading && uiState.items.isEmpty() -> {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        MiuixCircularProgressIndicator()
+            PullToRefresh(
+                isRefreshing = uiState.isRefreshing,
+                onRefresh = actions.onRefresh,
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                when {
+                    uiState.loading && uiState.items.isEmpty() -> {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            MiuixCircularProgressIndicator()
+                        }
                     }
-                }
-                !uiState.loading && uiState.visibleItems.isEmpty() -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(24.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        MiuixText(
-                            text = stringResource(R.string.no_photos_found),
-                            style = COUITheme.textStyles.body1,
-                            color = COUITheme.colorScheme.disabledOnSurface,
-                        )
+                    !uiState.loading && uiState.visibleItems.isEmpty() -> {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(24.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            MiuixText(
+                                text = stringResource(R.string.no_photos_found),
+                                style = COUITheme.textStyles.body1,
+                                color = COUITheme.colorScheme.disabledOnSurface,
+                            )
+                        }
                     }
-                }
-                else -> {
-                    // The custom layout keeps folders and media in strict index order while
-                    // continuously reflowing the visible window as the pinch column count changes.
-                    FollowZoomWaterfallLayout(
-                        itemCount = visibleItems.size,
-                        aspectRatios = aspectRatios,
-                        columns = uiState.columns,
-                        minColumns = 1,
-                        maxColumns = 4,
-                        onColumnsChanged = actions.onColumnsChange,
-                        spacing = 12.dp,
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                        state = zoomState,
-                        itemExtraHeights = extraHeights,
-                        itemHorizontalPadding = MediaCardImageMargin,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .nestedScroll(topAppBarScrollBehavior.nestedScrollConnection),
-                    ) { index, widthPx, heightPx ->
-                        // A filtered list can shrink while a stale subcomposition is still
-                        // alive, so guard the index instead of crashing the composer.
-                        val item = visibleItems.getOrNull(index) ?: return@FollowZoomWaterfallLayout
-                        MixedWaterfallCard(
-                            item,
-                            uiState,
-                            actions,
-                            fillHeight = true,
-                            targetWidthPx = widthPx,
-                            targetHeightPx = heightPx,
-                        )
+                    else -> {
+                        // The custom layout keeps folders and media in strict index order while
+                        // continuously reflowing the visible window as the pinch column count changes.
+                        FollowZoomWaterfallLayout(
+                            itemCount = visibleItems.size,
+                            aspectRatios = aspectRatios,
+                            columns = uiState.columns,
+                            minColumns = 1,
+                            maxColumns = 4,
+                            onColumnsChanged = actions.onColumnsChange,
+                            spacing = 12.dp,
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                            state = zoomState,
+                            itemExtraHeights = extraHeights,
+                            itemHorizontalPadding = MediaCardImageMargin,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .nestedScroll(topAppBarScrollBehavior.nestedScrollConnection),
+                        ) { index, widthPx, heightPx ->
+                            // A filtered list can shrink while a stale subcomposition is still
+                            // alive, so guard the index instead of crashing the composer.
+                            val item = visibleItems.getOrNull(index) ?: return@FollowZoomWaterfallLayout
+                            MixedWaterfallCard(
+                                item,
+                                uiState,
+                                actions,
+                                fillHeight = true,
+                                targetWidthPx = widthPx,
+                                targetHeightPx = heightPx,
+                            )
+                        }
                     }
                 }
             }

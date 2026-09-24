@@ -13,6 +13,7 @@ import kotlinx.coroutines.CoroutineScope
 internal class RemoteFolderPreviewBackfill(
     scope: CoroutineScope,
     private val needsPreview: (Folder) -> Boolean = defaultNeedsPreview,
+    private val isInspectable: (Folder) -> Boolean = defaultIsInspectable,
     private val inspect: suspend (Folder, Boolean) -> Unit
 ) {
 
@@ -42,6 +43,13 @@ internal class RemoteFolderPreviewBackfill(
         scheduler.setVisible(folder, visible)
     }
 
+    /**
+     * Queues every visible card that still needs preview work.
+     *
+     * A forced round ([forceRefresh]) is a user-visible refresh: the cached previews
+     * a card may already show are the *old* answer, so the cache check is skipped and
+     * every inspectable card is re-inspected while it keeps rendering its old images.
+     */
     fun requestVisiblePreviews(forceRefresh: Boolean = false) {
         val pending = synchronized(lock) {
             if (forceRefresh) {
@@ -49,7 +57,8 @@ internal class RemoteFolderPreviewBackfill(
                 inFlightPaths.clear()
             }
             visibleFolders.values
-                .filter { needsPreview(it) }
+                .filter { isInspectable(it) }
+                .filter { forceRefresh || needsPreview(it) }
                 .filterNot { it.path in resolvedPaths || it.path in inFlightPaths }
                 .onEach { inFlightPaths += it.path }
                 .toList()
@@ -81,11 +90,16 @@ internal class RemoteFolderPreviewBackfill(
     }
 
     companion object {
-        val defaultNeedsPreview: (Folder) -> Boolean = { folder ->
+        /** Structural gate: which folders this coordinator is allowed to inspect at all. */
+        val defaultIsInspectable: (Folder) -> Boolean = { folder ->
             !folder.isLocal &&
                 !folder.path.startsWith("virtual://") &&
-                folder.previewUris.isEmpty() &&
                 folder.path.trim('/').split('/').none { it.length > 1 && it.startsWith(".") }
+        }
+
+        /** Whether an inspectable card still lacks previews for the active sort order. */
+        val defaultNeedsPreview: (Folder) -> Boolean = { folder ->
+            folder.previewUris.isEmpty()
         }
     }
 }

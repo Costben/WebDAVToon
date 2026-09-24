@@ -51,6 +51,19 @@ internal class VisibleRemotePreviewScheduler(
         ensureWorker()
     }
 
+    fun enqueueVisible(folders: List<Folder>, forceRefresh: Boolean = false) {
+        synchronized(lock) {
+            folders.filter { it.path in visiblePaths }.forEach { folder ->
+                val existing = pendingByPath.remove(folder.path)
+                pendingByPath[folder.path] = Request(
+                    folder = folder,
+                    forceRefresh = forceRefresh || existing?.forceRefresh == true
+                )
+            }
+        }
+        ensureWorker()
+    }
+
     private fun ensureWorker() {
         synchronized(lock) {
             if (worker?.isActive == true) return
