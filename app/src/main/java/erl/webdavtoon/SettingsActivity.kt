@@ -47,6 +47,8 @@ import io.github.suqi8.coui.kmp.basic.RadioButton
 import io.github.suqi8.coui.kmp.basic.Text
 import io.github.suqi8.coui.kmp.basic.TextButton
 import io.github.suqi8.coui.kmp.basic.TextField
+import io.github.suqi8.coui.kmp.layout.DialogButtonBar
+import io.github.suqi8.coui.kmp.layout.DialogButtonBarAction
 import io.github.suqi8.coui.kmp.overlay.OverlayDialog
 import kotlinx.coroutines.launch
 
@@ -70,6 +72,9 @@ class SettingsActivity : ComponentActivity() {
 
     /** Drives the clear-cache confirmation; the ViewModel call is destructive and irreversible. */
     private var showClearCacheConfirm by mutableStateOf(false)
+
+    /** Slot pending delete confirmation; null means no delete dialog is shown. */
+    private var deleteServerSlotTarget by mutableStateOf<Int?>(null)
 
     /** Picker dialog states. */
     private var showThemePicker by mutableStateOf(false)
@@ -132,6 +137,19 @@ class SettingsActivity : ComponentActivity() {
                                 viewModel.clearCache()
                             },
                             onDismiss = { showClearCacheConfirm = false },
+                        )
+                    }
+                    deleteServerSlotTarget?.let { slot ->
+                        val server = uiState.slots.firstOrNull { it.slot == slot }
+                        val serverName = server?.alias?.takeIf { it.isNotBlank() }
+                            ?: stringResource(R.string.slot_name, slot)
+                        DeleteServerConfirmDialog(
+                            serverName = serverName,
+                            onConfirm = {
+                                deleteServerSlotTarget = null
+                                viewModel.deleteSlot(slot)
+                            },
+                            onDismiss = { deleteServerSlotTarget = null },
                         )
                     }
                     LaunchedEffect(Unit) {
@@ -274,7 +292,7 @@ class SettingsActivity : ComponentActivity() {
             val slot = viewModel.addSlot()
             openServerConfig(slot)
         },
-        onDeleteSlot = { viewModel.deleteSlot(it) },
+        onDeleteSlot = { slot -> deleteServerSlotTarget = slot },
         onEditSlot = { slot -> openServerConfig(slot) },
         onRefreshSlots = { viewModel.refreshSlots() },
         onPickTheme = { showThemePicker = true },
@@ -334,21 +352,44 @@ private fun ClearCacheConfirmDialog(onConfirm: () -> Unit, onDismiss: () -> Unit
         summary = stringResource(R.string.clear_cache_message),
         onDismissRequest = onDismiss,
         content = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                TextButton(
+            DialogButtonBar(
+                negative = DialogButtonBarAction(
                     text = stringResource(R.string.cancel),
                     onClick = onDismiss,
-                    modifier = Modifier.weight(1f),
-                )
-                TextButton(
+                ),
+                positive = DialogButtonBarAction(
                     text = stringResource(R.string.delete),
                     onClick = onConfirm,
-                    modifier = Modifier.weight(1f),
-                )
-            }
+                ),
+                hasContentAbove = true,
+            )
+        },
+    )
+}
+
+@Composable
+private fun DeleteServerConfirmDialog(
+    serverName: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    OverlayDialog(
+        show = true,
+        title = stringResource(R.string.delete_server),
+        summary = stringResource(R.string.delete_server_message) + "\n($serverName)",
+        onDismissRequest = onDismiss,
+        content = {
+            DialogButtonBar(
+                negative = DialogButtonBarAction(
+                    text = stringResource(R.string.cancel),
+                    onClick = onDismiss,
+                ),
+                positive = DialogButtonBarAction(
+                    text = stringResource(R.string.delete),
+                    onClick = onConfirm,
+                ),
+                hasContentAbove = true,
+            )
         },
     )
 }

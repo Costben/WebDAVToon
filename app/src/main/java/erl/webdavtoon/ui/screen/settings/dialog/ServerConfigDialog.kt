@@ -38,6 +38,8 @@ import io.github.suqi8.coui.kmp.basic.Switch
 import io.github.suqi8.coui.kmp.basic.Text
 import io.github.suqi8.coui.kmp.basic.TextButton
 import io.github.suqi8.coui.kmp.basic.TextField
+import io.github.suqi8.coui.kmp.layout.DialogButtonBar
+import io.github.suqi8.coui.kmp.layout.DialogButtonBarAction
 import io.github.suqi8.coui.kmp.overlay.OverlayDialog
 import io.github.suqi8.coui.kmp.theme.COUITheme
 
@@ -87,164 +89,178 @@ private fun ServerConfigDialogContent(
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(max = 420.dp)
-            .verticalScroll(rememberScrollState())
-            .padding(vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        TextField(
-            value = state.alias,
-            onValueChange = { value -> onAction(ServerConfigAction.Update { copy(alias = value) }) },
-            modifier = Modifier.fillMaxWidth(),
-            label = stringResource(R.string.alias_hint),
-            singleLine = true,
-        )
-        var protocolExpanded by remember { mutableStateOf(false) }
-        val protocolDescription = "${stringResource(R.string.protocol_hint)}: ${state.protocol}"
-        Box(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 420.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
             TextField(
-                value = state.protocol,
-                onValueChange = {},
+                value = state.alias,
+                onValueChange = { value -> onAction(ServerConfigAction.Update { copy(alias = value) }) },
                 modifier = Modifier.fillMaxWidth(),
-                label = stringResource(R.string.protocol_hint),
+                label = stringResource(R.string.alias_hint),
                 singleLine = true,
             )
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .semantics { contentDescription = protocolDescription }
-                    .clickable(role = Role.Button) { protocolExpanded = true }
+            var protocolExpanded by remember { mutableStateOf(false) }
+            val protocolDescription = "${stringResource(R.string.protocol_hint)}: ${state.protocol}"
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.Bottom,
             ) {
-                Text(
-                    text = "\u25BE",
-                    modifier = Modifier.align(Alignment.CenterEnd).padding(end = 16.dp),
-                )
-            }
-            CouiFlatMenu(
-                expanded = protocolExpanded,
-                entries = listOf(
-                    DropdownEntry(
-                        items = state.protocols.map { proto ->
-                            DropdownItem(
-                                text = proto,
-                                selected = proto == state.protocol,
-                                onClick = {
-                                    onAction(ServerConfigAction.Update { selectProtocol(proto) })
-                                    protocolExpanded = false
+                Box(modifier = Modifier.weight(1f)) {
+                    TextField(
+                        value = state.protocol,
+                        onValueChange = {},
+                        modifier = Modifier.fillMaxWidth(),
+                        label = stringResource(R.string.protocol_hint),
+                        singleLine = true,
+                    )
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .semantics { contentDescription = protocolDescription }
+                            .clickable(role = Role.Button) { protocolExpanded = true }
+                    ) {
+                        Text(
+                            text = "\u25BE",
+                            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 12.dp),
+                        )
+                    }
+                    CouiFlatMenu(
+                        expanded = protocolExpanded,
+                        entries = listOf(
+                            DropdownEntry(
+                                items = state.protocols.map { proto ->
+                                    DropdownItem(
+                                        text = proto,
+                                        selected = proto == state.protocol,
+                                        onClick = {
+                                            onAction(ServerConfigAction.Update { selectProtocol(proto) })
+                                            protocolExpanded = false
+                                        },
+                                    )
                                 },
                             )
-                        },
+                        ),
+                        onDismissRequest = { protocolExpanded = false },
                     )
-                ),
-                onDismissRequest = { protocolExpanded = false },
-            )
-        }
-        TextButton(
-            text = stringResource(R.string.discover_devices),
-            onClick = { onAction(ServerConfigAction.DiscoverHosts) },
-            enabled = !state.discoveringHosts,
-        )
-        TextField(
-            value = state.url,
-            onValueChange = { value -> onAction(ServerConfigAction.Update { copy(url = value) }) },
-            modifier = Modifier.fillMaxWidth(),
-            label = stringResource(if (isSmb) R.string.host_hint_smb else R.string.host_hint),
-            singleLine = true,
-        )
-        if (isSmb) {
-            TextButton(
-                text = stringResource(R.string.smb_list_shares),
-                onClick = { onAction(ServerConfigAction.EnumerateShares) },
-                enabled = !state.enumeratingShares,
-            )
-        }
-        TextField(
-            value = state.port,
-            onValueChange = { value -> onAction(ServerConfigAction.Update { copy(port = value) }) },
-            modifier = Modifier.fillMaxWidth(),
-            label = stringResource(R.string.port_hint),
-            singleLine = true,
-        )
-        TextField(
-            value = state.username,
-            onValueChange = { value -> onAction(ServerConfigAction.Update { copy(username = value) }) },
-            modifier = Modifier.fillMaxWidth(),
-            label = stringResource(R.string.username_hint),
-            singleLine = true,
-        )
-        if (isSmb) {
+                }
+                TextButton(
+                    text = stringResource(R.string.discover_devices),
+                    onClick = { onAction(ServerConfigAction.DiscoverHosts) },
+                    enabled = !state.discoveringHosts,
+                    modifier = Modifier.padding(bottom = 2.dp),
+                )
+            }
             TextField(
-                value = state.domain,
-                onValueChange = { value -> onAction(ServerConfigAction.Update { copy(domain = value) }) },
+                value = state.url,
+                onValueChange = { value -> onAction(ServerConfigAction.Update { copy(url = value) }) },
                 modifier = Modifier.fillMaxWidth(),
-                label = stringResource(R.string.domain_hint),
+                label = stringResource(if (isSmb) R.string.host_hint_smb else R.string.host_hint),
                 singleLine = true,
             )
-        }
-        TextField(
-            value = state.password,
-            onValueChange = { value -> onAction(ServerConfigAction.Update { copy(password = value) }) },
-            modifier = Modifier.fillMaxWidth(),
-            label = stringResource(R.string.password_hint),
-            singleLine = true,
-            visualTransformation = passwordTransformation,
-            keyboardOptions = KeyboardOptions(autoCorrectEnabled = false),
-        )
-
-        // The password hint doubles as the reveal-label here: values/ has no
-        // dedicated `show_password` key and adding one is out of scope.
-        LabeledSwitch(
-            checked = state.showPassword,
-            label = stringResource(R.string.password_hint),
-            onCheckedChange = { onAction(ServerConfigAction.ToggleShowPassword) },
-        )
-        LabeledCheckbox(
-            checked = state.rememberPassword,
-            label = stringResource(R.string.remember_password),
-            onCheckedChange = { value ->
-                onAction(ServerConfigAction.Update { copy(rememberPassword = value) })
-            },
-        )
-        if (state.isPrivacyMode) {
-            LabeledCheckbox(
-                checked = state.isPrivate,
-                label = stringResource(R.string.private_server),
-                onCheckedChange = { value ->
-                    onAction(ServerConfigAction.Update { copy(isPrivate = value) })
-                },
+            if (isSmb) {
+                TextButton(
+                    text = stringResource(R.string.smb_list_shares),
+                    onClick = { onAction(ServerConfigAction.EnumerateShares) },
+                    enabled = !state.enumeratingShares,
+                )
+            }
+            TextField(
+                value = state.port,
+                onValueChange = { value -> onAction(ServerConfigAction.Update { copy(port = value) }) },
+                modifier = Modifier.fillMaxWidth(),
+                label = stringResource(R.string.port_hint),
+                singleLine = true,
             )
-        }
+            TextField(
+                value = state.username,
+                onValueChange = { value -> onAction(ServerConfigAction.Update { copy(username = value) }) },
+                modifier = Modifier.fillMaxWidth(),
+                label = stringResource(R.string.username_hint),
+                singleLine = true,
+            )
+            if (isSmb) {
+                TextField(
+                    value = state.domain,
+                    onValueChange = { value -> onAction(ServerConfigAction.Update { copy(domain = value) }) },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = stringResource(R.string.domain_hint),
+                    singleLine = true,
+                )
+            }
+            TextField(
+                value = state.password,
+                onValueChange = { value -> onAction(ServerConfigAction.Update { copy(password = value) }) },
+                modifier = Modifier.fillMaxWidth(),
+                label = stringResource(R.string.password_hint),
+                singleLine = true,
+                visualTransformation = passwordTransformation,
+                keyboardOptions = KeyboardOptions(autoCorrectEnabled = false),
+            )
 
-        ServerConfigStatus(
-            testing = state.testing,
-            enumeratingShares = state.enumeratingShares,
-            shares = state.shares,
-            testResult = state.testResult,
-            error = state.error,
-            onShareSelected = { name -> onAction(ServerConfigAction.ApplyShare(name)) },
-        )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                LabeledCheckbox(
+                    checked = state.rememberPassword,
+                    label = stringResource(R.string.remember_password),
+                    onCheckedChange = { value ->
+                        onAction(ServerConfigAction.Update { copy(rememberPassword = value) })
+                    },
+                )
+                LabeledSwitch(
+                    checked = state.showPassword,
+                    label = stringResource(R.string.password_hint),
+                    onCheckedChange = { onAction(ServerConfigAction.ToggleShowPassword) },
+                )
+            }
+            if (state.isPrivacyMode) {
+                LabeledCheckbox(
+                    checked = state.isPrivate,
+                    label = stringResource(R.string.private_server),
+                    onCheckedChange = { value ->
+                        onAction(ServerConfigAction.Update { copy(isPrivate = value) })
+                    },
+                )
+            }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
             TextButton(
                 text = stringResource(R.string.test_connection),
                 onClick = { onAction(ServerConfigAction.TestConnection) },
                 enabled = !state.testing,
+                modifier = Modifier.fillMaxWidth(),
             )
-            TextButton(
-                text = stringResource(R.string.cancel),
-                onClick = onDismiss,
-            )
-            TextButton(
-                text = stringResource(R.string.save),
-                onClick = { onAction(ServerConfigAction.Save) },
+
+            ServerConfigStatus(
+                testing = state.testing,
+                enumeratingShares = state.enumeratingShares,
+                shares = state.shares,
+                testResult = state.testResult,
+                error = state.error,
+                onShareSelected = { name -> onAction(ServerConfigAction.ApplyShare(name)) },
             )
         }
+
+        DialogButtonBar(
+            negative = DialogButtonBarAction(
+                text = stringResource(R.string.cancel),
+                onClick = onDismiss,
+            ),
+            positive = DialogButtonBarAction(
+                text = stringResource(R.string.save),
+                onClick = { onAction(ServerConfigAction.Save) },
+            ),
+            hasContentAbove = true,
+        )
     }
 }
 

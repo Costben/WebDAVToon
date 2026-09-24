@@ -1,14 +1,10 @@
 package erl.webdavtoon.ui.component
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import erl.webdavtoon.R
-import io.github.suqi8.coui.kmp.basic.TextButton
+import io.github.suqi8.coui.kmp.layout.DialogButtonBar
+import io.github.suqi8.coui.kmp.layout.DialogButtonBarAction
 import io.github.suqi8.coui.kmp.overlay.OverlayDialog
 
 /**
@@ -27,21 +23,17 @@ fun DeleteConfirmDialog(
         summary = message,
         onDismissRequest = onDismiss,
         content = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                TextButton(
+            DialogButtonBar(
+                negative = DialogButtonBarAction(
                     text = stringResource(R.string.cancel),
                     onClick = onDismiss,
-                    modifier = Modifier.weight(1f),
-                )
-                TextButton(
+                ),
+                positive = DialogButtonBarAction(
                     text = stringResource(R.string.delete),
                     onClick = onConfirm,
-                    modifier = Modifier.weight(1f),
-                )
-            }
+                ),
+                hasContentAbove = true,
+            )
         },
     )
 }
