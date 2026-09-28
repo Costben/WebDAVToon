@@ -30,6 +30,7 @@ fun AppSideRail(
     isPrivacyMode: Boolean,
     actions: ServerSheetActions,
     modifier: Modifier = Modifier,
+    isLocalMode: Boolean = false,
 ) {
     NavigationRail(
         modifier = modifier,
@@ -42,20 +43,22 @@ fun AppSideRail(
             }
         },
     ) {
-        slots.forEach { slot ->
+        if (!isLocalMode) {
+            slots.forEach { slot ->
+                NavigationRailItem(
+                    selected = slot.isCurrent,
+                    onClick = { actions.onSelectSlot(slot.slot) },
+                    icon = COUIIcons.Light.Folder,
+                    label = slot.alias.ifBlank { "${slot.slot}" },
+                )
+            }
             NavigationRailItem(
-                selected = slot.isCurrent,
-                onClick = { actions.onSelectSlot(slot.slot) },
-                icon = COUIIcons.Light.Folder,
-                label = slot.alias.ifBlank { "${slot.slot}" },
+                selected = false,
+                onClick = actions.onAddSlot,
+                icon = COUIIcons.Light.Add,
+                label = stringResource(R.string.add_webdav_server),
             )
         }
-        NavigationRailItem(
-            selected = false,
-            onClick = actions.onAddSlot,
-            icon = COUIIcons.Light.Add,
-            label = stringResource(R.string.add_webdav_server),
-        )
         NavigationRailItem(
             selected = false,
             onClick = actions.onOpenFavorites,
@@ -83,12 +86,13 @@ fun AppAdaptiveNavigationScaffold(
     isPrivacyMode: Boolean,
     actions: ServerSheetActions,
     modifier: Modifier = Modifier,
+    isLocalMode: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val wide = LocalConfiguration.current.screenWidthDp >= 600
     if (wide) {
         Row(modifier.fillMaxSize()) {
-            AppSideRail(slots, isPrivacyMode, actions)
+            AppSideRail(slots, isPrivacyMode, actions, isLocalMode = isLocalMode)
             Box(Modifier.weight(1f).fillMaxHeight()) { content() }
         }
     } else {
@@ -100,6 +104,7 @@ fun AppAdaptiveNavigationScaffold(
                 isPrivacyMode = isPrivacyMode,
                 actions = actions,
                 onDismiss = onDismissServerSheet,
+                isLocalMode = isLocalMode,
             )
         }
     }

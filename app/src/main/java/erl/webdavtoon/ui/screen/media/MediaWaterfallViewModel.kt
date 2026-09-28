@@ -102,6 +102,22 @@ class MediaWaterfallViewModel(app: Application) : AndroidViewModel(app) {
             appSettings.observeBoolean(AppSettingsStore.USE_COUI_DEFAULT_COLORS, false)
                 .collect { enabled -> _uiState.update { it.copy(useCouiDefaultColors = enabled) } }
         }
+        viewModelScope.launch {
+            appSettings.observeBoolean(AppSettingsStore.LOCAL_MODE_ENABLED, false)
+                .collect { updateLocalModeState() }
+        }
+        viewModelScope.launch {
+            appSettings.observeString(AppSettingsStore.LOCAL_HOME_FOLDER_PATH, "")
+                .collect { updateLocalModeState() }
+        }
+    }
+
+    private fun updateLocalModeState() {
+        val state = _uiState.value
+        val isLocalMode = settingsManager.isLocalModeEnabled()
+        val currentHome = settingsManager.getLocalHomeFolderPath()
+        val canSet = isLocalMode && !state.isRemote && !state.isRecursive && state.folderPath != currentHome
+        _uiState.update { it.copy(isLocalMode = isLocalMode, canSetAsHomeFolder = canSet) }
     }
 
     fun init(folderPath: String, isRemote: Boolean, isRecursive: Boolean) {
@@ -111,6 +127,7 @@ class MediaWaterfallViewModel(app: Application) : AndroidViewModel(app) {
             current.isRecursive == isRecursive &&
             current.items.isNotEmpty()
         ) {
+            updateLocalModeState()
             return
         }
         _uiState.update {
@@ -121,6 +138,7 @@ class MediaWaterfallViewModel(app: Application) : AndroidViewModel(app) {
                 title = computeTitle(folderPath, isRemote, isRecursive),
             )
         }
+        updateLocalModeState()
         load()
     }
 
@@ -391,7 +409,18 @@ class MediaWaterfallViewModel(app: Application) : AndroidViewModel(app) {
             folderPath.isEmpty() && isRemote -> context.getString(R.string.remote)
             else -> {
                 val last = folderPath.trimEnd('/').split('/').lastOrNull { it.isNotEmpty() } ?: folderPath
-                Uri.decode(last)
+                val decoded = Uri.decode(last)
+                if (!isRemote) {
+                    when (decoded) {
+                        "Pictures" -> context.getString(R.string.folder_pictures)
+                        "DCIM" -> context.getString(R.string.folder_dcim)
+                        "Download" -> context.getString(R.string.folder_download)
+                        "Movies" -> context.getString(R.string.folder_movies)
+                        else -> decoded
+                    }
+                } else {
+                    decoded
+                }
             }
         }
         return if (isRecursive) "$base ${context.getString(R.string.all_suffix)}" else base

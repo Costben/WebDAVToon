@@ -66,6 +66,7 @@ fun AppServerSheet(
     isPrivacyMode: Boolean,
     actions: ServerSheetActions,
     onDismiss: () -> Unit,
+    isLocalMode: Boolean = false,
 ) {
     OverlayBottomSheet(
         show = show,
@@ -81,7 +82,7 @@ fun AppServerSheet(
             }
         },
     ) {
-        ServerSheetContent(slots, isPrivacyMode, actions, onDismiss)
+        ServerSheetContent(slots, isPrivacyMode, actions, onDismiss, isLocalMode = isLocalMode)
     }
 }
 
@@ -96,6 +97,7 @@ fun ServerSheetContent(
     actions: ServerSheetActions,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    isLocalMode: Boolean = false,
 ) {
     LazyColumn(
         modifier = modifier
@@ -103,38 +105,40 @@ fun ServerSheetContent(
             .scrollEndHaptic()
             .overScrollVertical(),
     ) {
-        item(key = "servers") {
-            SmallTitle(
-                text = stringResource(R.string.webdav_server),
-                insideMargin = PaddingValues(16.dp, 8.dp),
-            )
-            SheetCard {
-                slots.forEachIndexed { index, slot ->
-                    if (index > 0) SheetDivider()
-                    ServerSlotRow(slot, actions, onDismiss)
-                }
-                if (slots.isNotEmpty()) SheetDivider()
-                BasicComponent(
-                    title = stringResource(R.string.add_webdav_server),
-                    startAction = {
-                        MiuixIcon(
-                            imageVector = COUIIcons.Light.Add,
-                            contentDescription = null,
-                            tint = COUITheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    },
-                    // BasicComponent's own clickable is left off so the combined handler owns both
-                    // the tap (add a server) and the long press (enter privacy mode).
-                    onClick = null,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .combinedClickable(
-                            onClick = actions.onAddSlot,
-                            onLongClick = actions.onLongClickAddSlot,
-                            role = Role.Button,
-                        ),
+        if (!isLocalMode) {
+            item(key = "servers") {
+                SmallTitle(
+                    text = stringResource(R.string.webdav_server),
+                    insideMargin = PaddingValues(16.dp, 8.dp),
                 )
+                SheetCard {
+                    slots.forEachIndexed { index, slot ->
+                        if (index > 0) SheetDivider()
+                        ServerSlotRow(slot, actions, onDismiss)
+                    }
+                    if (slots.isNotEmpty()) SheetDivider()
+                    BasicComponent(
+                        title = stringResource(R.string.add_webdav_server),
+                        startAction = {
+                            MiuixIcon(
+                                imageVector = COUIIcons.Light.Add,
+                                contentDescription = null,
+                                tint = COUITheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        },
+                        // BasicComponent's own clickable is left off so the combined handler owns both
+                        // the tap (add a server) and the long press (enter privacy mode).
+                        onClick = null,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .combinedClickable(
+                                onClick = actions.onAddSlot,
+                                onLongClick = actions.onLongClickAddSlot,
+                                role = Role.Button,
+                            ),
+                    )
+                }
             }
         }
 

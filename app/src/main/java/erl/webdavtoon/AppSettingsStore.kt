@@ -54,6 +54,8 @@ class AppSettingsStore(context: Context) {
         val WEBDAV_SECRET_MIGRATED = booleanPreferencesKey("webdav_secret_migrated")
         val PRIVACY_MODE_EXIT_POLICY = stringPreferencesKey("privacy_mode_exit_policy")
         val PRIVACY_MODE_ACTIVE = booleanPreferencesKey("privacy_mode_active")
+        val LOCAL_MODE_ENABLED = booleanPreferencesKey("local_mode_enabled")
+        val LOCAL_HOME_FOLDER_PATH = stringPreferencesKey("local_home_folder_path")
 
         private val initLock = Any()
 

@@ -61,7 +61,9 @@ data class MixedWaterfallUiState(
     val selectedKeys: Set<String> = emptySet(),
     val favoritePhotoIds: Set<String> = emptySet(),
     val favoriteFolderPaths: Set<String> = emptySet(),
-    val storagePermissionGranted: Boolean = true
+    val storagePermissionGranted: Boolean = true,
+    val canSetAsHomeFolder: Boolean = false,
+    val isRootPage: Boolean = false,
 ) {
     /** [items] filtered by the current search keyword (folders by name, media by title). */
     val visibleItems: List<MixedWaterfallItemUi>

@@ -29,6 +29,7 @@ import erl.webdavtoon.ui.screen.waterfall.MixedWaterfallItemUi
 import erl.webdavtoon.ui.screen.waterfall.MixedWaterfallScreen
 import erl.webdavtoon.ui.screen.waterfall.MixedWaterfallViewModel
 import erl.webdavtoon.ui.component.DeleteConfirmDialog
+import erl.webdavtoon.ui.component.SetHomeFolderConfirmDialog
 import erl.webdavtoon.ui.theme.WebDAVToonTheme
 import kotlinx.coroutines.launch
 
@@ -38,6 +39,7 @@ class SubFolderActivity : ComponentActivity() {
     private val viewModel: MixedWaterfallViewModel by viewModels()
 
     private var showDeleteConfirmDialog by mutableStateOf(false)
+    private var showSetHomeConfirmDialog by mutableStateOf(false)
     private var pendingDeleteRequest: PendingMixedDelete? = null
 
     private data class PendingMixedDelete(
@@ -228,6 +230,9 @@ class SubFolderActivity : ComponentActivity() {
                         },
                         onFolderPreviewsRequested = {
                             viewModel.requestMissingFolderPreviews()
+                        },
+                        onSetAsHomeFolder = {
+                            showSetHomeConfirmDialog = true
                         }
                     )
                 }
@@ -240,6 +245,23 @@ class SubFolderActivity : ComponentActivity() {
                         uiState = uiState,
                         actions = actions,
                     )
+
+                    if (showSetHomeConfirmDialog) {
+                        val folderName = uiState.title.ifBlank { folderPath }
+                        SetHomeFolderConfirmDialog(
+                            folderName = folderName,
+                            onConfirm = {
+                                showSetHomeConfirmDialog = false
+                                settingsManager.setLocalHomeFolderPath(folderPath)
+                                Toast.makeText(
+                                    this@SubFolderActivity,
+                                    getString(R.string.home_folder_set_toast, folderName),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            },
+                            onDismiss = { showSetHomeConfirmDialog = false }
+                        )
+                    }
 
                     if (showDeleteConfirmDialog) {
                         DeleteConfirmDialog(

@@ -61,6 +61,20 @@ class FolderViewModel @JvmOverloads constructor(app: Application) : AndroidViewM
         observe(appSettings.observeBoolean(AppSettingsStore.USE_COUI_DEFAULT_COLORS, false)) {
             copy(useCouiDefaultColors = it)
         }
+        viewModelScope.launch {
+            appSettings.observeBoolean(AppSettingsStore.LOCAL_MODE_ENABLED, false).collect { enabled ->
+                val changed = _uiState.value.isLocalMode != enabled
+                _uiState.update { it.copy(isLocalMode = enabled) }
+                if (changed) loadFolders(forceRefresh = true)
+            }
+        }
+        viewModelScope.launch {
+            appSettings.observeString(AppSettingsStore.LOCAL_HOME_FOLDER_PATH, "").collect { homePath ->
+                val changed = _uiState.value.localHomeFolderPath != homePath
+                _uiState.update { it.copy(localHomeFolderPath = homePath) }
+                if (changed && _uiState.value.isLocalMode) loadFolders(forceRefresh = true)
+            }
+        }
     }
 
     private fun <T> observe(flow: kotlinx.coroutines.flow.Flow<T>, transform: FolderUiState.(T) -> FolderUiState) {
@@ -68,6 +82,8 @@ class FolderViewModel @JvmOverloads constructor(app: Application) : AndroidViewM
     }
 
     fun loadFolders(forceRefresh: Boolean = false) {
+        val localMode = settingsManager.isLocalModeEnabled()
+        val homePath = settingsManager.getLocalHomeFolderPath()
         _uiState.update {
             it.copy(
                 loading = !forceRefresh && it.rawFolders.isEmpty(),
@@ -75,7 +91,9 @@ class FolderViewModel @JvmOverloads constructor(app: Application) : AndroidViewM
                 refreshStatus = RefreshStatus.Refreshing,
                 error = null,
                 remoteError = null,
-                isWebDavEnabled = settingsManager.isWebDavEnabled(),
+                isWebDavEnabled = !localMode && settingsManager.isWebDavEnabled(),
+                isLocalMode = localMode,
+                localHomeFolderPath = homePath,
             )
         }
         viewModelScope.launch {
@@ -83,31 +101,38 @@ class FolderViewModel @JvmOverloads constructor(app: Application) : AndroidViewM
                 val (folders, remoteError) = withContext(Dispatchers.IO) {
                     val result = mutableListOf<Folder>()
                     var remoteFailure: String? = null
-                    if (settingsManager.isWebDavEnabled()) {
-                        val remoteRepo = RustWebDavPhotoRepository(settingsManager)
-                        val remote = remoteRepo.getFolders("/", forceRefresh).filterNot { folder ->
-                            folder.name.startsWith(".") ||
-                                folder.path.trim('/').split('/').any { it.startsWith(".") }
+                    if (localMode) {
+                        try {
+                            result += LocalPhotoRepository(context).getFolders(homePath, forceRefresh)
+                        } catch (_: Exception) {
                         }
-                        result += remote
-                        if (remote.isEmpty()) {
-                            remoteFailure = remoteRepo.diagnoseEmptyFolderResult("/")
+                    } else {
+                        if (settingsManager.isWebDavEnabled()) {
+                            val remoteRepo = RustWebDavPhotoRepository(settingsManager)
+                            val remote = remoteRepo.getFolders("/", forceRefresh).filterNot { folder ->
+                                folder.name.startsWith(".") ||
+                                    folder.path.trim('/').split('/').any { it.startsWith(".") }
+                            }
+                            result += remote
+                            if (remote.isEmpty()) {
+                                remoteFailure = remoteRepo.diagnoseEmptyFolderResult("/")
+                            }
                         }
-                    }
-                    try {
-                        val local = LocalPhotoRepository(context).getFolders("", forceRefresh)
-                        if (local.isNotEmpty()) {
-                            result += Folder(
-                                path = "virtual://local_root",
-                                name = context.getString(R.string.local_photos),
-                                isLocal = true,
-                                photoCount = local.sumOf { it.photoCount },
-                                previewUris = local.flatMap { it.previewUris }.take(4),
-                                hasSubFolders = true,
-                            )
+                        try {
+                            val local = LocalPhotoRepository(context).getFolders("", forceRefresh)
+                            if (local.isNotEmpty()) {
+                                result += Folder(
+                                    path = "virtual://local_root",
+                                    name = context.getString(R.string.local_photos),
+                                    isLocal = true,
+                                    photoCount = local.sumOf { it.photoCount },
+                                    previewUris = local.flatMap { it.previewUris }.take(4),
+                                    hasSubFolders = true,
+                                )
+                            }
+                        } catch (_: Exception) {
+                            // A missing local media permission should not hide remote folders.
                         }
-                    } catch (_: Exception) {
-                        // A missing local media permission should not hide remote folders.
                     }
                     // Nothing at all to show: surface the remote reason as a fatal error.
                     if (result.isEmpty() && remoteFailure != null) {

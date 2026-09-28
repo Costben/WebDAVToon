@@ -218,4 +218,18 @@
     <string name="glide_memory_cache_summary">缓存越大，往回翻看时重复读取越少，但更占内存。重启应用后生效。</string>
     <string name="screens_suffix">%1$d 屏</string>
     <string name="restart_to_apply">重启应用后生效</string>
+    <string name="local_mode">本地模式</string>
+    <string name="local_mode_summary">只看本地图片与视频，不再使用远程服务器与 Web 功能</string>
+    <string name="home_folder">首页文件夹</string>
+    <string name="home_folder_default">默认（存储根目录）</string>
+    <string name="select_home_folder">选择首页文件夹</string>
+    <string name="current_directory_label">当前目录：%1$s</string>
+    <string name="parent_directory">返回上一级 (..)</string>
+    <string name="no_subfolders_in_directory">当前目录下没有子文件夹</string>
+    <string name="set_current_as_home">设为首页</string>
+    <string name="reset_to_default_root">恢复默认根目录</string>
+    <string name="set_as_home_folder">设置为首页</string>
+    <string name="set_as_home_folder_confirm_message">确定要将「%1$s」设置为首页吗？</string>
+    <string name="home_folder_set_toast">已将「%1$s」设置为首页</string>
+    <string name="confirm">确定</string>
 </resources>

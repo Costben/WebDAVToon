@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
@@ -30,6 +31,12 @@ import erl.webdavtoon.ui.screen.folder.FolderItemUi
 import erl.webdavtoon.ui.screen.folder.FolderScreen
 import erl.webdavtoon.ui.screen.folder.FolderScreenActions
 import erl.webdavtoon.ui.screen.folder.FolderViewModel
+import erl.webdavtoon.ui.screen.waterfall.MixedWaterfallActions
+import erl.webdavtoon.ui.screen.waterfall.MixedWaterfallItemUi
+import erl.webdavtoon.ui.screen.waterfall.MixedWaterfallScreen
+import erl.webdavtoon.ui.screen.waterfall.MixedWaterfallViewModel
+import erl.webdavtoon.ui.component.AppAdaptiveNavigationScaffold
+import erl.webdavtoon.ui.component.ServerSheetActions
 import erl.webdavtoon.ui.screen.settings.dialog.ServerConfigAction
 import erl.webdavtoon.ui.screen.settings.dialog.ServerConfigDialog
 import erl.webdavtoon.ui.screen.settings.dialog.ServerConfigEvent
@@ -42,9 +49,11 @@ class FolderViewActivity : FragmentActivity() {
 
     private lateinit var settingsManager: SettingsManager
     private val viewModel: FolderViewModel by viewModels()
+    private val mixedViewModel: MixedWaterfallViewModel by viewModels()
     private val serverConfigViewModel: ServerConfigViewModel by viewModels()
 
     private var showDeleteConfirmDialog by mutableStateOf(false)
+    private var showLocalDeleteConfirmDialog by mutableStateOf(false)
     private var serverConfigSlot by mutableStateOf<Int?>(null)
     private var pendingFolderNavigationPath: String? = null
 
@@ -63,6 +72,15 @@ class FolderViewActivity : FragmentActivity() {
     ) { result ->
         if (result.resultCode == RESULT_OK) {
             viewModel.loadFolders(forceRefresh = true)
+            if (settingsManager.isLocalModeEnabled()) {
+                mixedViewModel.init(
+                    folderPath = settingsManager.getLocalHomeFolderPath(),
+                    isWebDav = false,
+                    isFavorites = false,
+                    isRootPage = true
+                )
+                mixedViewModel.loadContent(forceRefresh = true)
+            }
         }
     }
 
@@ -81,7 +99,17 @@ class FolderViewActivity : FragmentActivity() {
             Toast.makeText(this, getString(R.string.rust_core_not_initialized), Toast.LENGTH_LONG).show()
         }
 
-        LibraryState.update("webdav", "")
+        if (settingsManager.isLocalModeEnabled()) {
+            LibraryState.update("local", settingsManager.getLocalHomeFolderPath())
+            mixedViewModel.init(
+                folderPath = settingsManager.getLocalHomeFolderPath(),
+                isWebDav = false,
+                isFavorites = false,
+                isRootPage = true
+            )
+        } else {
+            LibraryState.update("webdav", "")
+        }
 
         setContent {
             val navOwner = androidx.navigationevent.compose.rememberNavigationEventDispatcherOwner(parent = null)
@@ -89,16 +117,50 @@ class FolderViewActivity : FragmentActivity() {
                 androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner provides navOwner,
             ) {
                 val uiState by viewModel.uiState.collectAsState()
+                val mixedUiState by mixedViewModel.uiState.collectAsState()
                 val cfgState by serverConfigViewModel.state.collectAsState()
+                var showLocalDrawer by remember { mutableStateOf(false) }
 
                 WebDAVToonTheme(
                     themeId = uiState.themeId,
                     useCouiDefaultColors = uiState.useCouiDefaultColors,
                 ) {
-                    FolderScreen(
-                        uiState = uiState,
-                        actions = createFolderActions(),
-                    )
+                    if (uiState.isLocalMode) {
+                        AppAdaptiveNavigationScaffold(
+                            showServerSheet = showLocalDrawer,
+                            onDismissServerSheet = { showLocalDrawer = false },
+                            slots = emptyList(),
+                            isPrivacyMode = false,
+                            actions = ServerSheetActions(
+                                onSelectSlot = {},
+                                onEditSlot = {},
+                                onDuplicateSlot = {},
+                                onAddSlot = {},
+                                onLongClickAddSlot = {},
+                                onExitPrivacy = {},
+                                onOpenFavorites = {
+                                    val intent = Intent(this@FolderViewActivity, MixedFolderActivity::class.java).apply {
+                                        putExtra("EXTRA_IS_FAVORITES", true)
+                                    }
+                                    startActivity(intent)
+                                },
+                                onOpenSettings = {
+                                    settingsLauncher.launch(Intent(this@FolderViewActivity, SettingsActivity::class.java))
+                                },
+                            ),
+                            isLocalMode = true,
+                        ) {
+                            MixedWaterfallScreen(
+                                uiState = mixedUiState,
+                                actions = createLocalMixedActions(onOpenDrawer = { showLocalDrawer = true }),
+                            )
+                        }
+                    } else {
+                        FolderScreen(
+                            uiState = uiState,
+                            actions = createFolderActions(),
+                        )
+                    }
 
                     if (showDeleteConfirmDialog) {
                         DeleteConfirmDialog(
@@ -114,6 +176,17 @@ class FolderViewActivity : FragmentActivity() {
                                 }
                             },
                             onDismiss = { showDeleteConfirmDialog = false },
+                        )
+                    }
+
+                    if (showLocalDeleteConfirmDialog) {
+                        DeleteConfirmDialog(
+                            message = stringResource(R.string.delete_items_message, mixedUiState.selectedCount),
+                            onConfirm = {
+                                showLocalDeleteConfirmDialog = false
+                                confirmDeleteLocalItems(mixedUiState.selectedPhotos, mixedUiState.selectedFolders)
+                            },
+                            onDismiss = { showLocalDeleteConfirmDialog = false }
                         )
                     }
 
@@ -206,8 +279,30 @@ class FolderViewActivity : FragmentActivity() {
 
         if (hasStoragePermission()) {
             viewModel.loadFolders()
+            if (settingsManager.isLocalModeEnabled()) {
+                mixedViewModel.init(
+                    folderPath = settingsManager.getLocalHomeFolderPath(),
+                    isWebDav = false,
+                    isFavorites = false,
+                    isRootPage = true
+                )
+            }
         } else {
             requestPermissionLauncher.launch(permissions)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (settingsManager.isLocalModeEnabled()) {
+            val homePath = settingsManager.getLocalHomeFolderPath()
+            LibraryState.update("local", homePath)
+            mixedViewModel.init(
+                folderPath = homePath,
+                isWebDav = false,
+                isFavorites = false,
+                isRootPage = true
+            )
         }
     }
 
@@ -408,6 +503,124 @@ class FolderViewActivity : FragmentActivity() {
             prompt.authenticate(info)
         } catch (_: Throwable) {
             // Silent failure
+        }
+    }
+
+    private fun createLocalMixedActions(onOpenDrawer: () -> Unit): MixedWaterfallActions = MixedWaterfallActions(
+        onBackClick = { finish() },
+        onOpenDrawer = onOpenDrawer,
+        onItemClick = { item ->
+            val state = mixedViewModel.uiState.value
+            if (state.isSelectionMode) {
+                mixedViewModel.toggleSelection(item.key)
+            } else when (item) {
+                is MixedWaterfallItemUi.FolderItem -> {
+                    lifecycleScope.launch {
+                        try {
+                            val target = FolderNavigationResolver.resolveTarget(
+                                this@FolderViewActivity,
+                                item.folder.path,
+                                isWebDav = false
+                            )
+                            FolderNavigationResolver.start(this@FolderViewActivity, target)
+                        } catch (e: Exception) {
+                            startActivity(Intent(this@FolderViewActivity, SubFolderActivity::class.java).apply {
+                                putExtra("EXTRA_FOLDER_PATH", item.folder.path)
+                                putExtra("EXTRA_IS_WEBDAV", false)
+                            })
+                        }
+                    }
+                }
+                is MixedWaterfallItemUi.MediaItem -> {
+                    if (item.isVideo) {
+                        ExternalVideoOpener.open(
+                            this@FolderViewActivity,
+                            item.photo.imageUri.toString(),
+                            item.photo.title,
+                            isRemote = false,
+                            settingsManager
+                        )
+                    } else {
+                        val imageOnly = state.items
+                            .filterIsInstance<MixedWaterfallItemUi.MediaItem>()
+                            .filterNot { it.isVideo }
+                            .map { it.photo }
+                        val imageIndex = imageOnly.indexOfFirst { it.id == item.photo.id }
+                        if (imageIndex != -1) {
+                            val session = ReaderSessions.create(
+                                ReaderSessionSource.MIXED_FOLDER,
+                                photos = imageOnly
+                            )
+                            startActivity(Intent(this@FolderViewActivity, PhotoViewActivity::class.java).apply {
+                                putExtra(ReaderSessions.EXTRA_SESSION_ID, session.id)
+                                putExtra("EXTRA_CURRENT_INDEX", imageIndex)
+                                putExtra("EXTRA_IS_FAVORITES", false)
+                            })
+                        }
+                    }
+                }
+            }
+        },
+        onItemLongClick = { item -> mixedViewModel.enterSelectionMode(item.key) },
+        onRefresh = { mixedViewModel.loadContent(forceRefresh = true) },
+        onColumnsChange = { cols -> mixedViewModel.setColumns(cols) },
+        onSearchQueryChange = { query -> mixedViewModel.setSearchKeyword(query) },
+        onClearSearch = { mixedViewModel.setSearchKeyword("") },
+        onSetSortOrder = { order -> mixedViewModel.setSortOrder(order) },
+        onToggleRotationLock = {
+            mixedViewModel.toggleRotationLock()
+            applyRotationLock(settingsManager.isRotationLocked())
+        },
+        onOpenSettings = {
+            settingsLauncher.launch(Intent(this@FolderViewActivity, SettingsActivity::class.java))
+        },
+        onOpenRecursiveBrowser = {
+            startActivity(Intent(this@FolderViewActivity, MainActivity::class.java).apply {
+                putExtra("EXTRA_FOLDER_PATH", settingsManager.getLocalHomeFolderPath())
+                putExtra("EXTRA_IS_WEBDAV", false)
+                putExtra("EXTRA_RECURSIVE", true)
+            })
+        },
+        onToggleSelectAll = {
+            val state = mixedViewModel.uiState.value
+            if (state.isAllSelected) mixedViewModel.clearSelection() else mixedViewModel.selectAll()
+        },
+        onToggleFavorite = {
+            val state = mixedViewModel.uiState.value
+            mixedViewModel.batchToggleFavorite(state.selectedPhotos, state.selectedFolders)
+        },
+        onDeleteClick = { showLocalDeleteConfirmDialog = true },
+        onShareClick = {
+            val state = mixedViewModel.uiState.value
+            MediaShareHelper.sharePhotos(
+                context = this@FolderViewActivity,
+                scope = lifecycleScope,
+                settingsManager = settingsManager,
+                photos = state.selectedPhotos
+            )
+        },
+        onExitSelectionMode = { mixedViewModel.exitSelectionMode() },
+        onDimensionsResolved = { photoId, width, height ->
+            mixedViewModel.updateResolvedDimensions(photoId, width, height)
+        },
+        onFolderVisibilityChanged = { folder, visible ->
+            mixedViewModel.onFolderPreviewVisible(folder, visible)
+        },
+        onFolderPreviewsRequested = { mixedViewModel.requestMissingFolderPreviews() }
+    )
+
+    private fun confirmDeleteLocalItems(selectedPhotos: List<Photo>, selectedFolders: List<Folder>) {
+        lifecycleScope.launch {
+            val deletedCount = mixedViewModel.executeDelete(
+                selectedPhotos = selectedPhotos,
+                selectedFolders = selectedFolders,
+                alreadyDeletedLocalPhotos = emptyList()
+            )
+            Toast.makeText(
+                this@FolderViewActivity,
+                getString(R.string.deleted_folders_count, deletedCount),
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 

@@ -17,6 +17,44 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
     private val maxFolderPreviewCandidates = 12
     private val tinyPreviewImageBytes = 96L * 1024L
 
+    companion object {
+        fun getStorageRoots(context: Context? = null): List<String> {
+            val roots = linkedSetOf<String>()
+            runCatching {
+                android.os.Environment.getExternalStorageDirectory()?.absolutePath?.trimEnd('/')?.takeIf { it.isNotEmpty() }?.let {
+                    roots.add(it)
+                }
+            }
+            if (context != null) {
+                runCatching {
+                    context.getExternalFilesDirs(null).filterNotNull().forEach { dir ->
+                        val path = dir.absolutePath
+                        val androidIdx = path.indexOf("/Android/")
+                        if (androidIdx > 0) {
+                            roots.add(path.substring(0, androidIdx).trimEnd('/'))
+                        }
+                    }
+                }
+            }
+            if (roots.isEmpty()) {
+                roots.add("/storage/emulated/0")
+            }
+            return roots.toList()
+        }
+    }
+
+    private fun getStorageRoots(): List<String> = Companion.getStorageRoots(context)
+
+    private fun localizeFolderName(name: String): String {
+        return when (name) {
+            "Pictures" -> context.getString(R.string.folder_pictures)
+            "DCIM" -> context.getString(R.string.folder_dcim)
+            "Download" -> context.getString(R.string.folder_download)
+            "Movies" -> context.getString(R.string.folder_movies)
+            else -> name
+        }
+    }
+
     private data class LocalPreviewCandidate(
         val uri: Uri,
         val title: String,
@@ -65,6 +103,16 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
             if (!recursive) {
                 parts.add("${MediaStore.Files.FileColumns.DATA} NOT LIKE ?")
                 args.add("$normalized/%/%")
+            }
+        } else if (!recursive) {
+            val roots = getStorageRoots()
+            val rootClauses = roots.map {
+                "(${MediaStore.Files.FileColumns.DATA} LIKE ? AND ${MediaStore.Files.FileColumns.DATA} NOT LIKE ?)"
+            }
+            parts.add("(${rootClauses.joinToString(" OR ")})")
+            roots.forEach { root ->
+                args.add("$root/%")
+                args.add("$root/%/%")
             }
         }
 
@@ -120,7 +168,7 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
 
         val path = cursor.getString(dataCol) ?: return null
         val name = cursor.getString(nameCol) ?: return null
-        if (path.contains("/.") || name.startsWith(".")) return null
+        if (path.contains("/.") || name.startsWith(".") || path.contains("/dev-dump/")) return null
 
         val rawType = cursor.getInt(mediaTypeCol)
         val mediaType = when (rawType) {
@@ -295,6 +343,10 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
         forceRefresh: Boolean,
         sortOrder: Int
     ): List<Folder> = withContext(Dispatchers.IO) {
+        val storageRoots = getStorageRoots()
+        val primaryRoot = storageRoots.firstOrNull() ?: "/storage/emulated/0"
+        val normalizedRootPath = rootPath.trimEnd('/')
+
         val foldersMap = linkedMapOf<String, Folder>()
         val previewCandidatesByFolder = linkedMapOf<String, MutableList<LocalPreviewCandidate>>()
         val projection = arrayOf(
@@ -312,9 +364,9 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
         baseSelectionArgs.add(MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE.toString())
         baseSelectionArgs.add(MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO.toString())
 
-        if (rootPath.isNotEmpty()) {
+        if (normalizedRootPath.isNotEmpty()) {
             baseSelectionParts.add("${MediaStore.Files.FileColumns.DATA} LIKE ?")
-            baseSelectionArgs.add("${rootPath.trimEnd('/')}/%")
+            baseSelectionArgs.add("$normalizedRootPath/%")
         }
 
         val selection = baseSelectionParts.joinToString(" AND ")
@@ -341,12 +393,12 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
             while (cursor.moveToNext()) {
                 val path = cursor.getString(dataCol) ?: continue
                 val name = cursor.getString(nameCol) ?: continue
-                if (path.contains("/.") || name.startsWith(".")) continue
+                if (path.contains("/.") || name.startsWith(".") || path.contains("/dev-dump/")) continue
                 if (!isSupportedMediaName(name)) continue
 
                 val file = File(path)
                 val parent = file.parentFile ?: continue
-                val parentPath = parent.absolutePath
+                val parentPath = parent.absolutePath.trimEnd('/')
 
                 val id = cursor.getLong(idCol)
                 val dateModified = cursor.getLong(dateCol)
@@ -357,68 +409,46 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
                 }
                 val uri = toContentUri(id, mediaType)
 
-                if (rootPath.isNotEmpty() && parentPath == rootPath) {
-                    directRootCount++
-                    registerPreviewCandidate(directRootPreviewCandidates, uri, name, dateModified, mediaType, sizeBytes)
-                    directRootDateModified = maxOf(directRootDateModified, dateModified)
-                    continue
-                }
-
                 val folderKey: String
                 val folderName: String
                 val hasSubFolders: Boolean
 
-                if (rootPath.isEmpty()) {
-                    val commonRoots = listOf("Pictures", "DCIM", "Download", "Movies")
-                    val pathSegments = parentPath.split(File.separator).filter { it.isNotEmpty() }
-
-                    var foundRootIndex = -1
-                    for (rootName in commonRoots) {
-                        foundRootIndex = pathSegments.indexOf(rootName)
-                        if (foundRootIndex != -1) break
+                if (normalizedRootPath.isNotEmpty()) {
+                    if (parentPath == normalizedRootPath) {
+                        directRootCount++
+                        registerPreviewCandidate(directRootPreviewCandidates, uri, name, dateModified, mediaType, sizeBytes)
+                        directRootDateModified = maxOf(directRootDateModified, dateModified)
+                        continue
                     }
-
-                    if (foundRootIndex != -1 && foundRootIndex < pathSegments.size - 1) {
-                        val topLevelName = pathSegments[foundRootIndex + 1]
-                        val topLevelPath = pathSegments.take(foundRootIndex + 2)
-                            .joinToString(File.separator, prefix = File.separator)
-
-                        folderKey = topLevelPath
-                        folderName = when (topLevelName) {
-                            "Pictures" -> context.getString(R.string.folder_pictures)
-                            "DCIM" -> context.getString(R.string.folder_dcim)
-                            "Download" -> context.getString(R.string.folder_download)
-                            "Movies" -> context.getString(R.string.folder_movies)
-                            else -> topLevelName
-                        }
-                        hasSubFolders = parentPath != topLevelPath
-                    } else {
-                        folderKey = parentPath
-                        val rawName = parent.name
-                        folderName = when (rawName) {
-                            "Pictures" -> context.getString(R.string.folder_pictures)
-                            "DCIM" -> context.getString(R.string.folder_dcim)
-                            "Download" -> context.getString(R.string.folder_download)
-                            "Movies" -> context.getString(R.string.folder_movies)
-                            else -> rawName
-                        }
-                        hasSubFolders = false
-                    }
-                } else {
-                    if (!parentPath.startsWith(rootPath)) continue
-                    val relative = parentPath.removePrefix(rootPath).trimStart(File.separatorChar)
+                    if (!parentPath.startsWith("$normalizedRootPath/")) continue
+                    val relative = parentPath.removePrefix(normalizedRootPath).trimStart(File.separatorChar)
                     if (relative.isBlank()) continue
                     val first = relative.substringBefore(File.separator)
-                    val directChildPath = File(rootPath, first).absolutePath
+                    val directChildPath = File(normalizedRootPath, first).absolutePath
                     folderKey = directChildPath
-                    folderName = when (first) {
-                        "Pictures" -> context.getString(R.string.folder_pictures)
-                        "DCIM" -> context.getString(R.string.folder_dcim)
-                        "Download" -> context.getString(R.string.folder_download)
-                        "Movies" -> context.getString(R.string.folder_movies)
-                        else -> first
-                    }
+                    folderName = localizeFolderName(first)
                     hasSubFolders = parentPath != directChildPath
+                } else {
+                    val matchedStorageRoot = storageRoots.firstOrNull { parentPath == it || parentPath.startsWith("$it/") } ?: primaryRoot
+                    if (parentPath == matchedStorageRoot) {
+                        directRootCount++
+                        registerPreviewCandidate(directRootPreviewCandidates, uri, name, dateModified, mediaType, sizeBytes)
+                        directRootDateModified = maxOf(directRootDateModified, dateModified)
+                        continue
+                    }
+                    if (matchedStorageRoot == primaryRoot || storageRoots.size == 1) {
+                        val relative = parentPath.removePrefix(matchedStorageRoot).trimStart(File.separatorChar)
+                        if (relative.isBlank()) continue
+                        val first = relative.substringBefore(File.separator)
+                        val directChildPath = File(matchedStorageRoot, first).absolutePath
+                        folderKey = directChildPath
+                        folderName = localizeFolderName(first)
+                        hasSubFolders = parentPath != directChildPath
+                    } else {
+                        folderKey = matchedStorageRoot
+                        folderName = File(matchedStorageRoot).name
+                        hasSubFolders = true
+                    }
                 }
 
                 val existing = foldersMap[folderKey]
@@ -443,10 +473,11 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
                 }
             }
 
-            if (rootPath.isNotEmpty() && directRootCount > 0 && foldersMap.isNotEmpty()) {
-                val virtualPath = "virtual://internal_photos?path=$rootPath"
+            val effectiveDirectPath = if (normalizedRootPath.isNotEmpty()) normalizedRootPath else primaryRoot
+            if (directRootCount > 0 && (normalizedRootPath.isEmpty() || foldersMap.isNotEmpty())) {
+                val virtualPath = "virtual://internal_photos?path=$effectiveDirectPath"
                 previewCandidatesByFolder[virtualPath] = directRootPreviewCandidates
-                foldersMap["virtual://internal_photos?path=$rootPath"] = Folder(
+                foldersMap[virtualPath] = Folder(
                     path = virtualPath,
                     name = context.getString(R.string.internal_photos, directRootCount),
                     isLocal = true,

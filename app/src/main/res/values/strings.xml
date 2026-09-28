@@ -226,4 +226,18 @@
     <string name="glide_memory_cache_summary">A larger cache re-reads less when scrolling back through pictures, using more memory. Restart to apply.</string>
     <string name="screens_suffix">%1$d screens</string>
     <string name="restart_to_apply">Takes effect after restarting the app</string>
+    <string name="local_mode">Local Mode</string>
+    <string name="local_mode_summary">Only browse local photos and videos; disable remote servers and Web features</string>
+    <string name="home_folder">Home Folder</string>
+    <string name="home_folder_default">Default (Storage Root)</string>
+    <string name="select_home_folder">Select Home Folder</string>
+    <string name="current_directory_label">Current directory: %1$s</string>
+    <string name="parent_directory">Parent directory (..)</string>
+    <string name="no_subfolders_in_directory">No subfolders in this directory</string>
+    <string name="set_current_as_home">Set as Home</string>
+    <string name="reset_to_default_root">Reset to Root</string>
+    <string name="set_as_home_folder">Set as Home</string>
+    <string name="set_as_home_folder_confirm_message">Set \"%1$s\" as the home folder?</string>
+    <string name="home_folder_set_toast">Home folder set to: %1$s</string>
+    <string name="confirm">Confirm</string>
 </resources>

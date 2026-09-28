@@ -10,7 +10,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -31,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -48,14 +51,24 @@ import erl.webdavtoon.ui.screen.settings.dialog.ServerConfigDialog
 import erl.webdavtoon.ui.screen.settings.dialog.ServerConfigEvent
 import erl.webdavtoon.ui.screen.settings.dialog.ServerConfigViewModel
 import erl.webdavtoon.ui.theme.WebDAVToonTheme
+import io.github.suqi8.coui.kmp.basic.CircularProgressIndicator
+import io.github.suqi8.coui.kmp.basic.HorizontalDivider
+import io.github.suqi8.coui.kmp.basic.Icon
 import io.github.suqi8.coui.kmp.basic.RadioButton
 import io.github.suqi8.coui.kmp.basic.Text
 import io.github.suqi8.coui.kmp.basic.TextButton
 import io.github.suqi8.coui.kmp.basic.TextField
+import io.github.suqi8.coui.kmp.icon.COUIIcons
+import io.github.suqi8.coui.kmp.icon.extended.ChevronBackward
+import io.github.suqi8.coui.kmp.icon.extended.ChevronForward
+import io.github.suqi8.coui.kmp.icon.extended.Folder
 import io.github.suqi8.coui.kmp.layout.DialogButtonBar
 import io.github.suqi8.coui.kmp.layout.DialogButtonBarAction
 import io.github.suqi8.coui.kmp.overlay.OverlayDialog
+import io.github.suqi8.coui.kmp.theme.COUITheme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Compose host for the settings screen.
@@ -92,6 +105,7 @@ class SettingsActivity : ComponentActivity() {
     private var showVideoExternalPlayerModePicker by mutableStateOf(false)
     private var showAutoWorkflowUrlDialog by mutableStateOf(false)
     private var showPrivacyExitPolicyPicker by mutableStateOf(false)
+    private var showHomeFolderPicker by mutableStateOf(false)
 
     /** Slot whose server-config dialog is open; `null` means closed. One state, no boolean twin. */
     private var serverConfigSlot by mutableStateOf<Int?>(null)
@@ -230,6 +244,21 @@ class SettingsActivity : ComponentActivity() {
                             onDismiss = { showPrivacyExitPolicyPicker = false },
                         )
                     }
+                    if (showHomeFolderPicker) {
+                        LocalFolderPickerDialog(
+                            initialPath = uiState.localHomeFolderPath,
+                            onConfirm = { path, displayName ->
+                                showHomeFolderPicker = false
+                                viewModel.setLocalHomeFolderPath(path)
+                                Toast.makeText(
+                                    this@SettingsActivity,
+                                    getString(R.string.home_folder_set_toast, displayName),
+                                    Toast.LENGTH_SHORT,
+                                ).show()
+                            },
+                            onDismiss = { showHomeFolderPicker = false },
+                        )
+                    }
                     io.github.suqi8.coui.kmp.utils.COUIPopupUtils.COUIPopupHost()
                 }
             }
@@ -339,6 +368,8 @@ class SettingsActivity : ComponentActivity() {
             // main thread, so reading it back here would race.
             applyRotationLock(locked)
         },
+        onSetLocalModeEnabled = { viewModel.setLocalModeEnabled(it) },
+        onPickHomeFolder = { showHomeFolderPicker = true },
         onClearCache = { showClearCacheConfirm = true },
         onOpenLicenses = { showLicenses = true },
         onBack = { finish() },
@@ -606,6 +637,189 @@ private fun InputDialog(
                         modifier = Modifier.weight(1f),
                     )
                 }
+            }
+        },
+    )
+}
+
+private fun parentPathOf(path: String): String {
+    val normalized = path.trimEnd('/')
+    if (normalized.isEmpty()) return ""
+    val roots = LocalPhotoRepository.getStorageRoots()
+    if (roots.any { normalized.equals(it, ignoreCase = true) }) return ""
+    val parent = normalized.substringBeforeLast('/', "")
+    if (parent.isEmpty() || roots.any { parent.equals(it, ignoreCase = true) }) return ""
+    return parent
+}
+
+@Composable
+private fun LocalFolderPickerDialog(
+    initialPath: String,
+    onConfirm: (path: String, displayName: String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+    var currentPath by remember { mutableStateOf(initialPath) }
+    var folders by remember { mutableStateOf<List<Folder>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    val defaultRootName = stringResource(R.string.home_folder_default)
+
+    val currentDisplayName = remember(currentPath) {
+        if (currentPath.isBlank()) {
+            defaultRootName
+        } else {
+            val lastSegment = currentPath.trimEnd('/').split('/').lastOrNull { it.isNotEmpty() } ?: currentPath
+            android.net.Uri.decode(lastSegment)
+        }
+    }
+
+    LaunchedEffect(currentPath) {
+        loading = true
+        folders = withContext(Dispatchers.IO) {
+            runCatching {
+                LocalPhotoRepository(context).getFolders(currentPath, forceRefresh = false)
+                    .sortedBy { it.name.lowercase() }
+            }.getOrDefault(emptyList())
+        }
+        loading = false
+    }
+
+    OverlayDialog(
+        show = true,
+        title = stringResource(R.string.select_home_folder),
+        onDismissRequest = onDismiss,
+        content = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = stringResource(R.string.current_directory_label, currentDisplayName),
+                    style = COUITheme.textStyles.footnote1,
+                    color = COUITheme.colorScheme.onSurfaceVariantSummary,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 360.dp),
+                ) {
+                    if (currentPath.isNotEmpty()) {
+                        item(key = "parent_dir") {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        currentPath = parentPathOf(currentPath)
+                                    }
+                                    .padding(vertical = 12.dp, horizontal = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(
+                                    imageVector = COUIIcons.Light.ChevronBackward,
+                                    contentDescription = null,
+                                    tint = COUITheme.colorScheme.primary,
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    text = stringResource(R.string.parent_directory),
+                                    style = COUITheme.textStyles.body1,
+                                    color = COUITheme.colorScheme.primary,
+                                )
+                            }
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp))
+                        }
+                    }
+
+                    if (loading) {
+                        item(key = "loading") {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(24.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                CircularProgressIndicator()
+                            }
+                        }
+                    } else if (folders.isEmpty()) {
+                        item(key = "empty") {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(24.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.no_subfolders_in_directory),
+                                    style = COUITheme.textStyles.footnote1,
+                                    color = COUITheme.colorScheme.onSurfaceVariantSummary,
+                                )
+                            }
+                        }
+                    } else {
+                        items(folders, key = { it.path }) { folder ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        currentPath = folder.path
+                                    }
+                                    .padding(vertical = 12.dp, horizontal = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(
+                                    imageVector = COUIIcons.Light.Folder,
+                                    contentDescription = null,
+                                    tint = COUITheme.colorScheme.primary,
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = folder.name,
+                                        style = COUITheme.textStyles.body1,
+                                    )
+                                    if (folder.photoCount > 0) {
+                                        Text(
+                                            text = "${folder.photoCount} 项",
+                                            style = COUITheme.textStyles.footnote2,
+                                            color = COUITheme.colorScheme.onSurfaceVariantSummary,
+                                        )
+                                    }
+                                }
+                                Icon(
+                                    imageVector = COUIIcons.Light.ChevronForward,
+                                    contentDescription = null,
+                                    tint = COUITheme.colorScheme.onSurfaceVariantSummary,
+                                )
+                            }
+                        }
+                    }
+                }
+
+                if (currentPath.isNotEmpty() || initialPath.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                    ) {
+                        TextButton(
+                            text = stringResource(R.string.reset_to_default_root),
+                            onClick = { onConfirm("", defaultRootName) },
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                DialogButtonBar(
+                    negative = DialogButtonBarAction(
+                        text = stringResource(R.string.cancel),
+                        onClick = onDismiss,
+                    ),
+                    positive = DialogButtonBarAction(
+                        text = stringResource(R.string.set_current_as_home),
+                        onClick = { onConfirm(currentPath, currentDisplayName) },
+                    ),
+                    hasContentAbove = true,
+                )
             }
         },
     )

@@ -74,6 +74,8 @@ data class SettingsActions(
     val onEditAutoWorkflowUrl: () -> Unit,
     val onPickPrivacyExitPolicy: () -> Unit,
     val onSetRotationLocked: (Boolean) -> Unit,
+    val onSetLocalModeEnabled: (Boolean) -> Unit,
+    val onPickHomeFolder: () -> Unit,
     val onClearCache: () -> Unit,
     val onOpenLicenses: () -> Unit,
     val onBack: () -> Unit,
@@ -167,57 +169,84 @@ private fun SettingsContent(
             bottom = paddingValues.calculateBottomPadding(),
         ),
     ) {
-        item(key = "server") {
-            SettingsGroup(stringResource(R.string.webdav_server)) {
-                uiState.slots.forEachIndexed { index, slot ->
-                    if (index > 0) SettingsRowDivider()
-                    val currentServerDescription = stringResource(R.string.current_server)
-                    BasicComponent(
-                        title = slot.alias.ifBlank { stringResource(R.string.slot_name, slot.slot) },
-                        summary = if (slot.url.isBlank()) stringResource(R.string.not_configured)
-                        else stringResource(R.string.server_endpoint_format, slot.protocol, slot.url, slot.port),
-                        startAction = {
-                            SettingsIcon(
-                                icon = COUIIcons.Light.CloudFill,
-                                descriptionRes = R.string.webdav_server,
-                                modifier = Modifier.padding(end = 4.dp),
-                            )
-                        },
-                        endActions = {
-                            // The marker slot is always laid out (even when empty) so the summary
-                            // column keeps a constant width; otherwise selecting a row would shrink
-                            // it and re-wrap the server address.
-                            Box(
-                                modifier = Modifier
-                                    .padding(end = 10.dp)
-                                    .size(10.dp)
-                                    .then(
-                                        if (slot.isCurrent) {
-                                            Modifier
-                                                .background(CurrentServerDotColor, CircleShape)
-                                                .semantics { contentDescription = currentServerDescription }
-                                        } else {
-                                            Modifier
-                                        },
-                                    ),
-                            )
-                            IconButton(onClick = { actions.onEditSlot(slot.slot) }) {
-                                Icon(COUIIcons.Light.Edit, contentDescription = stringResource(R.string.edit_server))
-                            }
-                            IconButton(onClick = { actions.onDeleteSlot(slot.slot) }) {
-                                Icon(COUIIcons.Light.Delete, contentDescription = stringResource(R.string.delete))
-                            }
-                        },
-                        onClick = { actions.onSelectSlot(slot.slot) },
-                        insideMargin = SlotRowInsideMargin,
+        item(key = "localMode") {
+            SettingsGroup(stringResource(R.string.local_mode)) {
+                SwitchPreference(
+                    checked = uiState.localModeEnabled,
+                    onCheckedChange = actions.onSetLocalModeEnabled,
+                    title = stringResource(R.string.local_mode),
+                    summary = stringResource(R.string.local_mode_summary),
+                )
+                if (uiState.localModeEnabled) {
+                    SettingsRowDivider()
+                    val homeFolderSummary = if (uiState.localHomeFolderPath.isBlank()) {
+                        stringResource(R.string.home_folder_default)
+                    } else {
+                        val lastSegment = uiState.localHomeFolderPath.trimEnd('/').split('/').lastOrNull { it.isNotEmpty() } ?: uiState.localHomeFolderPath
+                        android.net.Uri.decode(lastSegment)
+                    }
+                    ArrowPreference(
+                        title = stringResource(R.string.home_folder),
+                        summary = homeFolderSummary,
+                        onClick = actions.onPickHomeFolder,
                     )
                 }
-                if (uiState.slots.isNotEmpty()) SettingsRowDivider()
-                ArrowPreference(
-                    title = stringResource(R.string.add_webdav_server),
-                    startAction = { SettingsIcon(COUIIcons.Light.AddCircle, R.string.add_webdav_server) },
-                    onClick = actions.onAddSlot,
-                )
+            }
+        }
+
+        if (!uiState.localModeEnabled) {
+            item(key = "server") {
+                SettingsGroup(stringResource(R.string.webdav_server)) {
+                    uiState.slots.forEachIndexed { index, slot ->
+                        if (index > 0) SettingsRowDivider()
+                        val currentServerDescription = stringResource(R.string.current_server)
+                        BasicComponent(
+                            title = slot.alias.ifBlank { stringResource(R.string.slot_name, slot.slot) },
+                            summary = if (slot.url.isBlank()) stringResource(R.string.not_configured)
+                            else stringResource(R.string.server_endpoint_format, slot.protocol, slot.url, slot.port),
+                            startAction = {
+                                SettingsIcon(
+                                    icon = COUIIcons.Light.CloudFill,
+                                    descriptionRes = R.string.webdav_server,
+                                    modifier = Modifier.padding(end = 4.dp),
+                                )
+                            },
+                            endActions = {
+                                // The marker slot is always laid out (even when empty) so the summary
+                                // column keeps a constant width; otherwise selecting a row would shrink
+                                // it and re-wrap the server address.
+                                Box(
+                                    modifier = Modifier
+                                        .padding(end = 10.dp)
+                                        .size(10.dp)
+                                        .then(
+                                            if (slot.isCurrent) {
+                                                Modifier
+                                                    .background(CurrentServerDotColor, CircleShape)
+                                                    .semantics { contentDescription = currentServerDescription }
+                                            } else {
+                                                Modifier
+                                            },
+                                        ),
+                                )
+                                IconButton(onClick = { actions.onEditSlot(slot.slot) }) {
+                                    Icon(COUIIcons.Light.Edit, contentDescription = stringResource(R.string.edit_server))
+                                }
+                                IconButton(onClick = { actions.onDeleteSlot(slot.slot) }) {
+                                    Icon(COUIIcons.Light.Delete, contentDescription = stringResource(R.string.delete))
+                                }
+                            },
+                            onClick = { actions.onSelectSlot(slot.slot) },
+                            insideMargin = SlotRowInsideMargin,
+                        )
+                    }
+                    if (uiState.slots.isNotEmpty()) SettingsRowDivider()
+                    ArrowPreference(
+                        title = stringResource(R.string.add_webdav_server),
+                        startAction = { SettingsIcon(COUIIcons.Light.AddCircle, R.string.add_webdav_server) },
+                        onClick = actions.onAddSlot,
+                    )
+                }
             }
         }
 

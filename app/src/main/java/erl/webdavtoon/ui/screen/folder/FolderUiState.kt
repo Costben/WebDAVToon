@@ -46,4 +46,6 @@ data class FolderUiState(
     val isPrivacyMode: Boolean = false,
     val themeId: Int = erl.webdavtoon.ThemeHelper.THEME_FOLLOW_DEVICE,
     val useCouiDefaultColors: Boolean = false,
+    val isLocalMode: Boolean = false,
+    val localHomeFolderPath: String = "",
 )

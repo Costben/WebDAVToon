@@ -44,6 +44,8 @@ data class SettingsUiState(
     val privacyExitPolicy: PrivacyModeState.ExitPolicy = PrivacyModeState.ExitPolicy.ON_BACKGROUND,
     val isPrivacyMode: Boolean = false,
     val rotationLocked: Boolean = false,
+    val localModeEnabled: Boolean = false,
+    val localHomeFolderPath: String = "",
 )
 
 /** Constants exposed to the Compose settings slices without duplicate literals. */

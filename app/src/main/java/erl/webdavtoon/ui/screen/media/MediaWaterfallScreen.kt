@@ -61,6 +61,7 @@ import io.github.suqi8.coui.kmp.icon.extended.Edit
 import io.github.suqi8.coui.kmp.icon.extended.GridView
 import io.github.suqi8.coui.kmp.icon.extended.Info
 import io.github.suqi8.coui.kmp.icon.extended.Lock
+import io.github.suqi8.coui.kmp.icon.extended.Ok
 import io.github.suqi8.coui.kmp.icon.extended.Refresh
 import io.github.suqi8.coui.kmp.icon.extended.Settings
 import io.github.suqi8.coui.kmp.icon.extended.Sort
@@ -98,6 +99,7 @@ data class MediaWaterfallActions(
     val onEnterPrivacy: () -> Unit = {},
     val onExitPrivacy: () -> Unit = {},
     val onOpenFavorites: () -> Unit = {},
+    val onSetAsHomeFolder: (() -> Unit)? = null,
 )
 
 @Composable
@@ -335,43 +337,66 @@ private fun MediaMiuixMenuButton(uiState: MediaWaterfallUiState, actions: MediaW
         )
     }
 
+    val menuItems = buildList {
+        add(
+            DropdownItem(
+                text = stringResource(R.string.sort_order),
+                icon = { modifier -> MiuixIcon(COUIIcons.Light.Sort, null, modifier) },
+                children = sortItems,
+            )
+        )
+        add(
+            DropdownItem(
+                text = stringResource(R.string.grid_columns),
+                icon = { modifier -> MiuixIcon(COUIIcons.Light.GridView, null, modifier) },
+                children = columnItems,
+            )
+        )
+        add(
+            DropdownItem(
+                text = stringResource(R.string.randomize_photos),
+                summary = if (shuffleAllPhotos) "On" else "Off",
+                icon = { modifier -> MiuixIcon(COUIIcons.Light.Sort, null, modifier) },
+                onClick = actions.onToggleRandomizePhotos,
+            )
+        )
+        if (uiState.canSetAsHomeFolder && actions.onSetAsHomeFolder != null) {
+            add(
+                DropdownItem(
+                    text = stringResource(R.string.set_as_home_folder),
+                    icon = { modifier -> MiuixIcon(COUIIcons.Light.Ok, null, modifier) },
+                    onClick = actions.onSetAsHomeFolder,
+                )
+            )
+        }
+        add(
+            DropdownItem(
+                text = stringResource(R.string.refresh),
+                icon = { modifier -> MiuixIcon(COUIIcons.Light.Refresh, null, modifier) },
+                onClick = actions.onRefresh,
+            )
+        )
+        add(
+            DropdownItem(
+                text = stringResource(R.string.settings),
+                icon = { modifier -> MiuixIcon(COUIIcons.Light.Settings, null, modifier) },
+                onClick = actions.onOpenSettings,
+            )
+        )
+        add(
+            DropdownItem(
+                text = stringResource(R.string.rotation_lock),
+                summary = if (uiState.rotationLocked) "On" else "Off",
+                icon = { modifier -> MiuixIcon(COUIIcons.Light.Lock, null, modifier) },
+                onClick = actions.onToggleRotationLock,
+            )
+        )
+    }
+
     CouiCascadingMenu(
         entries = listOf(
             DropdownEntry(
-                items = listOf(
-                    DropdownItem(
-                        text = stringResource(R.string.sort_order),
-                        icon = { modifier -> MiuixIcon(COUIIcons.Light.Sort, null, modifier) },
-                        children = sortItems,
-                    ),
-                    DropdownItem(
-                        text = stringResource(R.string.grid_columns),
-                        icon = { modifier -> MiuixIcon(COUIIcons.Light.GridView, null, modifier) },
-                        children = columnItems,
-                    ),
-                    DropdownItem(
-                        text = stringResource(R.string.randomize_photos),
-                        summary = if (shuffleAllPhotos) "On" else "Off",
-                        icon = { modifier -> MiuixIcon(COUIIcons.Light.Sort, null, modifier) },
-                        onClick = actions.onToggleRandomizePhotos,
-                    ),
-                    DropdownItem(
-                        text = stringResource(R.string.refresh),
-                        icon = { modifier -> MiuixIcon(COUIIcons.Light.Refresh, null, modifier) },
-                        onClick = actions.onRefresh,
-                    ),
-                    DropdownItem(
-                        text = stringResource(R.string.settings),
-                        icon = { modifier -> MiuixIcon(COUIIcons.Light.Settings, null, modifier) },
-                        onClick = actions.onOpenSettings,
-                    ),
-                    DropdownItem(
-                        text = stringResource(R.string.rotation_lock),
-                        summary = if (uiState.rotationLocked) "On" else "Off",
-                        icon = { modifier -> MiuixIcon(COUIIcons.Light.Lock, null, modifier) },
-                        onClick = actions.onToggleRotationLock,
-                    ),
-                ),
+                items = menuItems,
             ),
         ),
     ) {

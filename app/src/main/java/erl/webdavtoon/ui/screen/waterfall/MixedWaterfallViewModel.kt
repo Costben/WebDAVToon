@@ -107,15 +107,35 @@ class MixedWaterfallViewModel(app: Application) : AndroidViewModel(app) {
                 _uiState.update { it.copy(rotationLocked = locked) }
             }
         }
+        viewModelScope.launch {
+            appSettings.observeBoolean(AppSettingsStore.LOCAL_MODE_ENABLED, false).collect {
+                updateCanSetAsHomeFolder()
+            }
+        }
+        viewModelScope.launch {
+            appSettings.observeString(AppSettingsStore.LOCAL_HOME_FOLDER_PATH, "").collect {
+                updateCanSetAsHomeFolder()
+            }
+        }
     }
 
-    fun init(folderPath: String, isWebDav: Boolean, isFavorites: Boolean) {
+    private fun updateCanSetAsHomeFolder() {
+        val state = _uiState.value
+        val isLocalMode = settingsManager.isLocalModeEnabled()
+        val currentHome = settingsManager.getLocalHomeFolderPath()
+        val canSet = isLocalMode && !state.isWebDav && !state.isFavorites && state.folderPath != currentHome
+        _uiState.update { it.copy(canSetAsHomeFolder = canSet) }
+    }
+
+    fun init(folderPath: String, isWebDav: Boolean, isFavorites: Boolean, isRootPage: Boolean = false) {
         val current = _uiState.value
         if (current.folderPath == folderPath &&
             current.isWebDav == isWebDav &&
             current.isFavorites == isFavorites &&
+            current.isRootPage == isRootPage &&
             current.items.isNotEmpty()
         ) {
+            updateCanSetAsHomeFolder()
             return
         }
 
@@ -125,9 +145,11 @@ class MixedWaterfallViewModel(app: Application) : AndroidViewModel(app) {
                 folderPath = folderPath,
                 isWebDav = isWebDav,
                 isFavorites = isFavorites,
+                isRootPage = isRootPage,
                 title = title
             )
         }
+        updateCanSetAsHomeFolder()
         loadContent()
     }
 
@@ -768,7 +790,18 @@ class MixedWaterfallViewModel(app: Application) : AndroidViewModel(app) {
             folderPath.isEmpty() && isWebDav -> context.getString(R.string.remote)
             else -> {
                 val lastSegment = folderPath.trimEnd('/').split('/').lastOrNull { it.isNotEmpty() } ?: folderPath
-                Uri.decode(lastSegment)
+                val decoded = Uri.decode(lastSegment)
+                if (!isWebDav) {
+                    when (decoded) {
+                        "Pictures" -> context.getString(R.string.folder_pictures)
+                        "DCIM" -> context.getString(R.string.folder_dcim)
+                        "Download" -> context.getString(R.string.folder_download)
+                        "Movies" -> context.getString(R.string.folder_movies)
+                        else -> decoded
+                    }
+                } else {
+                    decoded
+                }
             }
         }
     }

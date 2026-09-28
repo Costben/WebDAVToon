@@ -62,6 +62,8 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         observe(appSettings.observeString(AppSettingsStore.VIDEO_EXTERNAL_PLAYER_MODE, SettingsManager.VIDEO_EXTERNAL_PLAYER_MODE_SYSTEM_DEFAULT)) { copy(videoExternalPlayerMode = it) }
         observe(appSettings.observeString(AppSettingsStore.AUTO_WORKFLOW_URL, "")) { copy(autoWorkflowUrl = it) }
         observe(appSettings.observeBoolean(AppSettingsStore.ROTATION_LOCKED, false)) { copy(rotationLocked = it) }
+        observe(appSettings.observeBoolean(AppSettingsStore.LOCAL_MODE_ENABLED, false)) { copy(localModeEnabled = it) }
+        observe(appSettings.observeString(AppSettingsStore.LOCAL_HOME_FOLDER_PATH, "")) { copy(localHomeFolderPath = it) }
         observe(appSettings.observeString(AppSettingsStore.PRIVACY_MODE_EXIT_POLICY, PrivacyModeState.ExitPolicy.ON_BACKGROUND.code)) {
             copy(privacyExitPolicy = PrivacyModeState.ExitPolicy.fromCode(it))
         }
@@ -115,6 +117,8 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
                 privacyExitPolicy = PrivacyModeState.exitPolicy,
                 isPrivacyMode = PrivacyModeState.isPrivacyMode,
                 rotationLocked = settingsManager.isRotationLocked(),
+                localModeEnabled = settingsManager.isLocalModeEnabled(),
+                localHomeFolderPath = settingsManager.getLocalHomeFolderPath(),
             )
         }
     }
@@ -175,6 +179,16 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setAutoWorkflowUrl(url: String) = io { settingsManager.setAutoWorkflowUrl(url.trim().trimEnd('/')); _uiState.update { it.copy(autoWorkflowUrl = settingsManager.getAutoWorkflowUrl()) } }
     fun setPrivacyExitPolicy(policy: PrivacyModeState.ExitPolicy) = io { PrivacyModeState.setExitPolicy(context, policy); _uiState.update { it.copy(privacyExitPolicy = policy) } }
     fun setRotationLocked(b: Boolean) = io { settingsManager.setRotationLocked(b); _uiState.update { it.copy(rotationLocked = b) }; eventChannel.send(SettingsEvent.ResultChanged) }
+    fun setLocalModeEnabled(enabled: Boolean) = io {
+        settingsManager.setLocalModeEnabled(enabled)
+        _uiState.update { it.copy(localModeEnabled = enabled) }
+        eventChannel.send(SettingsEvent.ResultChanged)
+    }
+    fun setLocalHomeFolderPath(path: String) = io {
+        settingsManager.setLocalHomeFolderPath(path)
+        _uiState.update { it.copy(localHomeFolderPath = path) }
+        eventChannel.send(SettingsEvent.ResultChanged)
+    }
 
     fun clearCache() = io {
         try {

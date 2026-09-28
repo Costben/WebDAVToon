@@ -41,6 +41,7 @@ import erl.webdavtoon.ui.screen.settings.dialog.ServerConfigEvent
 import erl.webdavtoon.ui.screen.settings.dialog.ServerConfigViewModel
 import erl.webdavtoon.ui.component.ComfyUiEditDialog
 import erl.webdavtoon.ui.component.DeleteConfirmDialog
+import erl.webdavtoon.ui.component.SetHomeFolderConfirmDialog
 import erl.webdavtoon.ui.theme.WebDAVToonTheme
 import io.github.suqi8.coui.kmp.basic.TextButton
 import io.github.suqi8.coui.kmp.overlay.OverlayDialog
@@ -59,6 +60,7 @@ class MainActivity : FragmentActivity() {
     private val serverConfigViewModel: ServerConfigViewModel by viewModels()
 
     private var showDeleteConfirmDialog by mutableStateOf(false)
+    private var showSetHomeConfirmDialog by mutableStateOf(false)
     private var serverConfigSlot by mutableStateOf<Int?>(null)
     private var comfyUiDialogState by mutableStateOf<EditDialogHelper.DialogState?>(null)
 
@@ -200,6 +202,9 @@ class MainActivity : FragmentActivity() {
                                 putExtra("EXTRA_IS_FAVORITES", true)
                             })
                         },
+                        onSetAsHomeFolder = {
+                            showSetHomeConfirmDialog = true
+                        },
                     )
                 }
 
@@ -211,6 +216,23 @@ class MainActivity : FragmentActivity() {
                         uiState = uiState,
                         actions = actions,
                     )
+
+                    if (showSetHomeConfirmDialog) {
+                        val displayName = uiState.title.ifBlank { folderPath }
+                        SetHomeFolderConfirmDialog(
+                            folderName = displayName,
+                            onConfirm = {
+                                showSetHomeConfirmDialog = false
+                                settingsManager.setLocalHomeFolderPath(folderPath)
+                                Toast.makeText(
+                                    this@MainActivity,
+                                    getString(R.string.home_folder_set_toast, displayName),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            },
+                            onDismiss = { showSetHomeConfirmDialog = false }
+                        )
+                    }
 
                     if (showDeleteConfirmDialog) {
                         DeleteConfirmDialog(

@@ -36,6 +36,8 @@ data class MediaWaterfallUiState(
     val themeId: Int = erl.webdavtoon.ThemeHelper.THEME_FOLLOW_DEVICE,
     val useCouiDefaultColors: Boolean = false,
     val storagePermissionGranted: Boolean = true,
+    val canSetAsHomeFolder: Boolean = false,
+    val isLocalMode: Boolean = false,
 ) {
     /** [items] filtered by the current search keyword. */
     val visibleItems: List<MediaWaterfallItemUi>

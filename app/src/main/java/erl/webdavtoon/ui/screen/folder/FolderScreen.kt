@@ -116,6 +116,7 @@ fun FolderScreen(
         slots = uiState.slots,
         isPrivacyMode = uiState.isPrivacyMode,
         actions = serverSheetActions,
+        isLocalMode = uiState.isLocalMode,
         modifier = modifier,
     ) {
         Box(modifier = Modifier.fillMaxSize().background(COUITheme.colorScheme.surface)) {

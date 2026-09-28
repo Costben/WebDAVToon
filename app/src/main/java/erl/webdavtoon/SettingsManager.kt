@@ -254,6 +254,18 @@ class SettingsManager(context: Context) {
     fun setRotationLocked(locked: Boolean) =
         appSettings.putBoolean(AppSettingsStore.ROTATION_LOCKED, locked)
 
+    fun isLocalModeEnabled(): Boolean =
+        appSettings.getOrDefaultBoolean(AppSettingsStore.LOCAL_MODE_ENABLED, false)
+
+    fun setLocalModeEnabled(enabled: Boolean) =
+        appSettings.putBoolean(AppSettingsStore.LOCAL_MODE_ENABLED, enabled)
+
+    fun getLocalHomeFolderPath(): String =
+        appSettings.getOrDefaultString(AppSettingsStore.LOCAL_HOME_FOLDER_PATH, "")
+
+    fun setLocalHomeFolderPath(path: String) =
+        appSettings.putString(AppSettingsStore.LOCAL_HOME_FOLDER_PATH, path)
+
     fun getReaderGestureControlConfig(): ReaderGestureControlConfig {
         val json = appSettings.getOrDefaultString(AppSettingsStore.READER_GESTURE_CONTROL_JSON, "")
         if (json.isBlank()) {
