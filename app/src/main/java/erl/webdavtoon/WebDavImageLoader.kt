@@ -109,7 +109,13 @@ object WebDavImageLoader {
                 )
             )
         if (preserveCurrentDrawable && imageView.drawable != null) {
-            request = request.placeholder(imageView.drawable)
+            val current = imageView.drawable
+            val placeholder = if (current is com.bumptech.glide.load.resource.gif.GifDrawable) {
+                BitmapDrawable(imageView.resources, current.firstFrame)
+            } else {
+                current
+            }
+            request = request.placeholder(placeholder)
         }
         if (crossFadeDurationMs > 0) {
             request = request.transition(DrawableTransitionOptions.withCrossFade(crossFadeDurationMs))
@@ -270,7 +276,13 @@ object WebDavImageLoader {
                 )
             )
         if (preserveCurrentDrawable && imageView.drawable != null) {
-            request = request.placeholder(imageView.drawable)
+            val current = imageView.drawable
+            val placeholder = if (current is com.bumptech.glide.load.resource.gif.GifDrawable) {
+                BitmapDrawable(imageView.resources, current.firstFrame)
+            } else {
+                current
+            }
+            request = request.placeholder(placeholder)
         }
         if (crossFadeDurationMs > 0) {
             request = request.transition(DrawableTransitionOptions.withCrossFade(crossFadeDurationMs))
@@ -338,6 +350,12 @@ object WebDavImageLoader {
         val logTag = if (isLocal) "Local slideshow" else "WebDAV slideshow"
         val target = object : CustomTarget<Drawable>(targetWidth, targetHeight) {
             override fun onResourceReady(resource: Drawable, transition: Transition<in Drawable>?) {
+                if (resource is com.bumptech.glide.load.resource.gif.GifDrawable) {
+                    resource.setLoopCount(com.bumptech.glide.load.resource.gif.GifDrawable.LOOP_FOREVER)
+                    resource.start()
+                } else if (resource is android.graphics.drawable.Animatable) {
+                    resource.start()
+                }
                 onReady(resource)
             }
 
@@ -1011,11 +1029,9 @@ object WebDavImageLoader {
                 .placeholder(R.drawable.ic_coui_image)
                 .override(targetWidth, targetHeight)
                 .downsample(DownsampleStrategy.AT_MOST)
-                .dontAnimate()
         } else if (isWaterfall) {
             requestOptions = requestOptions
                 .placeholder(R.drawable.ic_coui_image)
-                .dontAnimate()
             val settings = getSettingsManager(context)
             val targetWidth = width?.takeIf { it > 0 }
             if (targetWidth != null) {
@@ -1046,22 +1062,26 @@ object WebDavImageLoader {
                         )
                     }
                 }
+                val boundedHeight = if (height != null && height > 0) {
+                    (boundedWidth.toLong() * height / targetWidth).toInt().coerceAtLeast(1)
+                } else {
+                    boundedWidth * 2
+                }
                 requestOptions
-                    .override(boundedWidth, Target.SIZE_ORIGINAL)
+                    .override(boundedWidth, boundedHeight)
                     .downsample(DownsampleStrategy.AT_MOST)
             } else {
                 when (settings.getWaterfallQualityMode()) {
                     SettingsManager.WATERFALL_MODE_MAX_WIDTH -> {
                         val maxWidth = settings.getWaterfallMaxWidth()
                         requestOptions
-                            .override(maxWidth, Target.SIZE_ORIGINAL)
+                            .override(maxWidth, maxWidth * 2)
                             .downsample(DownsampleStrategy.AT_MOST)
                     }
 
                     else -> {
                         val percent = settings.getWaterfallPercent().coerceIn(10, 100)
                         requestOptions
-                            .override(Target.SIZE_ORIGINAL)
                             .sizeMultiplier(percent / 100f)
                             .downsample(DownsampleStrategy.AT_MOST)
                     }
@@ -1075,7 +1095,6 @@ object WebDavImageLoader {
         } else {
             requestOptions = requestOptions
                 .downsample(DownsampleStrategy.AT_MOST)
-                .dontAnimate()
         }
 
         return requestOptions
@@ -1217,6 +1236,12 @@ object WebDavImageLoader {
                 val intrinsicHeight = resource.intrinsicHeight
                 if (intrinsicWidth > 0 && intrinsicHeight > 0) {
                     onDimensionsReady?.invoke(intrinsicWidth, intrinsicHeight)
+                }
+                if (resource is com.bumptech.glide.load.resource.gif.GifDrawable) {
+                    resource.setLoopCount(com.bumptech.glide.load.resource.gif.GifDrawable.LOOP_FOREVER)
+                    resource.start()
+                } else if (resource is android.graphics.drawable.Animatable) {
+                    resource.start()
                 }
                 if (logReady) {
                     android.util.Log.d(

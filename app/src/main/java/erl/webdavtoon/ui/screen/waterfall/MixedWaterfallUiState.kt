@@ -5,6 +5,7 @@ package erl.webdavtoon.ui.screen.waterfall
 import android.net.Uri
 import erl.webdavtoon.Folder
 import erl.webdavtoon.Photo
+import erl.webdavtoon.isGif
 
 sealed interface MixedWaterfallItemUi {
     val key: String
@@ -34,7 +35,8 @@ sealed interface MixedWaterfallItemUi {
         val durationText: String,
         override val aspectRatio: Float,
         val isFavorite: Boolean,
-        override val isSelected: Boolean = false
+        override val isSelected: Boolean = false,
+        val isGif: Boolean = photo.isGif()
     ) : MixedWaterfallItemUi
 }
 

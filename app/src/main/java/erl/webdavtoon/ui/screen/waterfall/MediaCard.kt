@@ -303,6 +303,14 @@ private fun WaterfallMediaCardMiuix(
                         }
                     },
                     update = { imageView ->
+                        val bindKey = "${item.id}#${targetWidthPx}#${item.isVideo}"
+                        val lastKey = imageView.getTag(R.id.tag_media_bind_key) as? String
+                        if (lastKey == bindKey && imageView.drawable != null) {
+                            (imageView.drawable as? android.graphics.drawable.Animatable)?.start()
+                            return@AndroidView
+                        }
+                        imageView.setTag(R.id.tag_media_bind_key, bindKey)
+
                         if (item.isVideo) {
                             if (item.isLocal) {
                                 WebDavImageLoader.loadLocalVideoThumbnail(
@@ -352,7 +360,10 @@ private fun WaterfallMediaCardMiuix(
                             }
                         }
                     },
-                    onRelease = WebDavImageLoader::clear,
+                    onRelease = { imageView ->
+                        imageView.setTag(R.id.tag_media_bind_key, null)
+                        WebDavImageLoader.clear(imageView)
+                    },
                 )
 
                 // Video Badge: translucent pill at bottom-start
@@ -380,6 +391,22 @@ private fun WaterfallMediaCardMiuix(
                                 style = COUITheme.textStyles.footnote1.copy(fontSize = 11.sp),
                             )
                         }
+                    }
+                } else if (item.isGif) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(6.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0x99000000))
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = "GIF",
+                            color = Color.White,
+                            style = COUITheme.textStyles.footnote1.copy(fontSize = 11.sp),
+                        )
                     }
                 }
 

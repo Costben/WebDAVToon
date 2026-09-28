@@ -50,6 +50,13 @@ fun detectMediaTypeByUri(uri: Uri): MediaType? {
 
 fun isSupportedMediaName(name: String): Boolean = detectMediaTypeByName(name) != null
 
+fun isGifMedia(nameOrUri: String): Boolean {
+    val clean = nameOrUri.substringBefore('?').substringBefore('#').trim().lowercase(Locale.ROOT)
+    return clean.endsWith(".gif")
+}
+
+fun Photo.isGif(): Boolean = isGifMedia(title) || isGifMedia(imageUri.toString())
+
 fun detectVideoMimeType(nameOrUri: String): String? {
     val extension = videoExtensionOf(nameOrUri) ?: return null
     return videoMimeTypes[extension]

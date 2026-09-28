@@ -269,8 +269,13 @@ fun ZoomableImage(
                 }
             },
             update = { imageView ->
-                @Suppress("UNUSED_EXPRESSION")
-                retryTrigger
+                val bindKey = "${photo.id}#${retryTrigger}"
+                val lastKey = imageView.getTag(erl.webdavtoon.R.id.tag_media_bind_key) as? String
+                if (lastKey == bindKey && imageView.drawable != null) {
+                    (imageView.drawable as? android.graphics.drawable.Animatable)?.start()
+                    return@AndroidView
+                }
+                imageView.setTag(erl.webdavtoon.R.id.tag_media_bind_key, bindKey)
 
                 if (photo.isLocal) {
                     WebDavImageLoader.loadLocalImage(
@@ -302,7 +307,10 @@ fun ZoomableImage(
                     )
                 }
             },
-            onRelease = WebDavImageLoader::clear
+            onRelease = { imageView ->
+                imageView.setTag(erl.webdavtoon.R.id.tag_media_bind_key, null)
+                WebDavImageLoader.clear(imageView)
+            }
         )
 
         if (isLoading && !isError) {

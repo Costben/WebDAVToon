@@ -147,6 +147,14 @@ private fun WebtoonImageItem(
                 }
             },
             update = { imageView ->
+                val bindKey = photo.id
+                val lastKey = imageView.getTag(erl.webdavtoon.R.id.tag_media_bind_key) as? String
+                if (lastKey == bindKey && imageView.drawable != null) {
+                    (imageView.drawable as? android.graphics.drawable.Animatable)?.start()
+                    return@AndroidView
+                }
+                imageView.setTag(erl.webdavtoon.R.id.tag_media_bind_key, bindKey)
+
                 val onDimensionsReady: (Int, Int) -> Unit = { width, height ->
                     if (width > 0 && height > 0) {
                         resolvedAspectRatio = width.toFloat() / height.toFloat()
@@ -178,7 +186,10 @@ private fun WebtoonImageItem(
                     )
                 }
             },
-            onRelease = WebDavImageLoader::clear
+            onRelease = { imageView ->
+                imageView.setTag(erl.webdavtoon.R.id.tag_media_bind_key, null)
+                WebDavImageLoader.clear(imageView)
+            }
         )
     }
 }
