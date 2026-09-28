@@ -90,7 +90,7 @@ class RustWebDavPhotoRepository(
         val sortOrder = settingsManager.getPhotoSortOrder()
         val accountKey = previewCacheAccountKey()
 
-        if (!recursive && !forceRefresh && RemoteFolderPreviewMemoryCache.hasKnownEmptyDirectMedia(accountKey, folderPath)) {
+        if (!recursive && !forceRefresh && runCatching { RemoteFolderPreviewMemoryCache.hasKnownEmptyDirectMedia(accountKey, folderPath) }.getOrDefault(false)) {
             Log.i("RustWebDavPhotoRepo", "getPhotos emptyDirectMediaCacheHit path=$folderPath")
             return@withContext emptyList()
         }
@@ -104,11 +104,13 @@ class RustWebDavPhotoRepository(
                 recursive = recursive
             )
             if (!recursive) {
-                RemoteFolderPreviewMemoryCache.recordDirectMediaResult(
-                    accountKey = accountKey,
-                    path = folderPath,
-                    isEmpty = photos.isEmpty()
-                )
+                runCatching {
+                    RemoteFolderPreviewMemoryCache.recordDirectMediaResult(
+                        accountKey = accountKey,
+                        path = folderPath,
+                        isEmpty = photos.isEmpty()
+                    )
+                }
             }
             photos
         } catch (e: Exception) {
@@ -150,7 +152,9 @@ class RustWebDavPhotoRepository(
                     )
                 }
                 .map { folder ->
-                    val cached = RemoteFolderPreviewMemoryCache.get(accountKey, sortOrder, folder.path)
+                    val cached = runCatching {
+                        RemoteFolderPreviewMemoryCache.get(accountKey, sortOrder, folder.path)
+                    }.getOrNull()
                     when {
                         cached != null -> {
                             folder.copy(
@@ -291,7 +295,7 @@ class RustWebDavPhotoRepository(
         initializeWebDavIfNeeded(repo, isPreviewRepo = repo !== rustRepo)
         val accountKey = previewCacheAccountKey()
         if (!forceRefresh) {
-            RemoteFolderPreviewMemoryCache.get(accountKey, sortOrder, folderPath)?.let { cached ->
+            runCatching { RemoteFolderPreviewMemoryCache.get(accountKey, sortOrder, folderPath) }.getOrNull()?.let { cached ->
                 Log.i(
                     "RustWebDavPhotoRepo",
                     "inspectFolder cacheHit path=$folderPath sortOrder=$sortOrder previews=${cached.previewUriStrings.size} hasSubFolders=${cached.hasSubFolders}"

@@ -19,6 +19,9 @@
 -keep class erl.webdavtoon.FavoritePhotoDao { *; }
 -keep class erl.webdavtoon.FavoritePhotoDao_Impl { *; }
 -keep class erl.webdavtoon.FavoritePhotoEntity { *; }
+-keep class erl.webdavtoon.FavoriteFolderDao { *; }
+-keep class erl.webdavtoon.FavoriteFolderDao_Impl { *; }
+-keep class erl.webdavtoon.FavoriteFolderEntity { *; }
 
 # Glide generated API surface.
 -keep public class * extends com.bumptech.glide.module.AppGlideModule
@@ -35,3 +38,6 @@
 -keep class erl.webdavtoon.Photo { *; }
 -keep class erl.webdavtoon.WebDavSlotConfig { *; }
 -keep class erl.webdavtoon.LegacyWebDavSlotConfig { *; }
+-keep class erl.webdavtoon.RemoteFolderPreviewMemoryCache$PersistedFolderEntry { *; }
+-keep class erl.webdavtoon.ReaderGestureControlConfig { *; }
+-keep class erl.webdavtoon.GestureZoneConfig { *; }

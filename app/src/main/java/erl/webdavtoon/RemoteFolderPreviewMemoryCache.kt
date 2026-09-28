@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
 import com.google.gson.Gson
+import com.google.gson.annotations.SerializedName
 import java.security.MessageDigest
 
 object RemoteFolderPreviewMemoryCache {
@@ -27,15 +28,16 @@ object RemoteFolderPreviewMemoryCache {
     )
 
     private data class PersistedFolderEntry(
-        val accountHash: String = "",
-        val path: String = "/",
-        val hasSubFolders: Boolean = false,
-        val previewUriStringsBySortOrder: Map<String, List<String>> = emptyMap(),
-        val emptyDirectMediaCheckedAtMs: Long = 0L,
-        val updatedAtMs: Long = 0L
+        @SerializedName("accountHash") val accountHash: String? = null,
+        @SerializedName("path") val path: String? = null,
+        @SerializedName("hasSubFolders") val hasSubFolders: Boolean = false,
+        @SerializedName("previewUriStringsBySortOrder") val previewUriStringsBySortOrder: Map<String, List<String>>? = null,
+        @SerializedName("emptyDirectMediaCheckedAtMs") val emptyDirectMediaCheckedAtMs: Long = 0L,
+        @SerializedName("updatedAtMs") val updatedAtMs: Long = 0L
     )
 
-    private const val PREFS_NAME = "remote_folder_preview_cache_v1"
+    private const val LEGACY_PREFS_NAME = "remote_folder_preview_cache_v1"
+    private const val PREFS_NAME = "remote_folder_preview_cache_v2"
     private const val STORAGE_KEY_PREFIX = "folder_"
     private const val MAX_MEMORY_ENTRIES = 4096
     private const val MAX_PERSISTED_FOLDERS = 1024
@@ -58,7 +60,14 @@ object RemoteFolderPreviewMemoryCache {
     }
 
     fun initialize(context: Context) {
-        preferences = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val appContext = context.applicationContext
+        preferences = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        runCatching {
+            val legacy = appContext.getSharedPreferences(LEGACY_PREFS_NAME, Context.MODE_PRIVATE)
+            if (legacy.all.isNotEmpty()) {
+                legacy.edit().clear().apply()
+            }
+        }
     }
 
     @Synchronized
@@ -66,8 +75,8 @@ object RemoteFolderPreviewMemoryCache {
         val key = Key(accountKey, sortOrder, normalizePath(path))
         entries[key]?.let { return it }
 
-        val persisted = readPersistedFolder(accountKey, key.path) ?: return null
-        persisted.previewUriStringsBySortOrder.forEach { (persistedSortOrder, previewUriStrings) ->
+        val persisted = runCatching { readPersistedFolder(accountKey, key.path) }.getOrNull() ?: return null
+        persisted.previewUriStringsBySortOrder?.forEach { (persistedSortOrder, previewUriStrings) ->
             persistedSortOrder.toIntOrNull()?.let { order ->
                 entries[Key(accountKey, order, key.path)] = Entry(
                     hasSubFolders = persisted.hasSubFolders,
@@ -191,10 +200,15 @@ object RemoteFolderPreviewMemoryCache {
         val prefs = preferences ?: return
         val editor = prefs.edit()
         prefs.all.forEach { (storageKey, rawValue) ->
-            val persisted = parsePersistedFolder(rawValue as? String) ?: return@forEach
+            val persisted = parsePersistedFolder(rawValue as? String)
+            if (persisted == null) {
+                editor.remove(storageKey)
+                return@forEach
+            }
+            val path = persisted.path
             if (
                 persisted.accountHash == accountHash &&
-                (normalizedRoot == "/" || persisted.path == normalizedRoot || persisted.path.startsWith(normalizedRoot))
+                (normalizedRoot == "/" || path == normalizedRoot || (path != null && path.startsWith(normalizedRoot)))
             ) {
                 editor.remove(storageKey)
             }
@@ -216,10 +230,16 @@ object RemoteFolderPreviewMemoryCache {
 
     private fun readPersistedFolder(accountKey: String, normalizedPath: String): PersistedFolderEntry? {
         val prefs = preferences ?: return null
-        val persisted = parsePersistedFolder(prefs.getString(storageKey(accountKey, normalizedPath), null))
-            ?: return null
+        val storageKey = storageKey(accountKey, normalizedPath)
+        val raw = runCatching { prefs.getString(storageKey, null) }.getOrNull() ?: return null
+        val persisted = parsePersistedFolder(raw)
+        if (persisted == null) {
+            runCatching { prefs.edit().remove(storageKey).apply() }
+            return null
+        }
+        val expectedHash = sha256(accountKey)
         return persisted.takeIf {
-            it.accountHash == sha256(accountKey) && it.path == normalizedPath
+            it.accountHash == expectedHash && it.path == normalizedPath
         }
     }
 
@@ -239,10 +259,12 @@ object RemoteFolderPreviewMemoryCache {
             emptyDirectMediaCheckedAtMs = emptyDirectMediaCheckedAtMs,
             updatedAtMs = System.currentTimeMillis()
         )
-        prefs.edit()
-            .putString(storageKey(accountKey, normalizedPath), gson.toJson(persisted))
-            .commit()
-        trimPersistentCacheIfNeeded(prefs)
+        runCatching {
+            prefs.edit()
+                .putString(storageKey(accountKey, normalizedPath), gson.toJson(persisted))
+                .commit()
+            trimPersistentCacheIfNeeded(prefs)
+        }
     }
 
     private fun trimPersistentCacheIfNeeded(prefs: SharedPreferences) {
@@ -263,7 +285,12 @@ object RemoteFolderPreviewMemoryCache {
     private fun parsePersistedFolder(rawValue: String?): PersistedFolderEntry? {
         if (rawValue.isNullOrBlank()) return null
         return runCatching {
-            gson.fromJson(rawValue, PersistedFolderEntry::class.java)
+            val entry = gson.fromJson(rawValue, PersistedFolderEntry::class.java) ?: return null
+            if (entry.accountHash.isNullOrBlank() || entry.path.isNullOrBlank()) {
+                null
+            } else {
+                entry
+            }
         }.getOrNull()
     }
 
