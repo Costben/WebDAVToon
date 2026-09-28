@@ -579,14 +579,14 @@ private fun <T> SingleChoiceDialog(
                                 },
                                 role = Role.RadioButton,
                             )
-                            .padding(vertical = 12.dp, horizontal = 8.dp),
+                            .padding(horizontal = 24.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         RadioButton(
                             selected = (value == selectedItem),
                             onClick = null,
                         )
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(16.dp))
                         Text(text = label)
                     }
                 }
@@ -609,7 +609,11 @@ private fun InputDialog(
         title = title,
         onDismissRequest = onDismiss,
         content = {
-            Column(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 8.dp),
+            ) {
                 TextField(
                     value = text,
                     onValueChange = { text = it },
@@ -694,7 +698,7 @@ private fun LocalFolderPickerDialog(
                     text = stringResource(R.string.current_directory_label, currentDisplayName),
                     style = COUITheme.textStyles.footnote1,
                     color = COUITheme.colorScheme.onSurfaceVariantSummary,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 6.dp),
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 LazyColumn(
@@ -710,7 +714,7 @@ private fun LocalFolderPickerDialog(
                                     .clickable {
                                         currentPath = parentPathOf(currentPath)
                                     }
-                                    .padding(vertical = 12.dp, horizontal = 8.dp),
+                                    .padding(horizontal = 24.dp, vertical = 14.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Icon(
@@ -718,14 +722,14 @@ private fun LocalFolderPickerDialog(
                                     contentDescription = null,
                                     tint = COUITheme.colorScheme.primary,
                                 )
-                                Spacer(modifier = Modifier.width(12.dp))
+                                Spacer(modifier = Modifier.width(16.dp))
                                 Text(
                                     text = stringResource(R.string.parent_directory),
                                     style = COUITheme.textStyles.body1,
                                     color = COUITheme.colorScheme.primary,
                                 )
                             }
-                            HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp))
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp))
                         }
                     }
 
@@ -763,7 +767,7 @@ private fun LocalFolderPickerDialog(
                                     .clickable {
                                         currentPath = folder.path
                                     }
-                                    .padding(vertical = 12.dp, horizontal = 8.dp),
+                                    .padding(horizontal = 24.dp, vertical = 14.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Icon(
@@ -771,13 +775,14 @@ private fun LocalFolderPickerDialog(
                                     contentDescription = null,
                                     tint = COUITheme.colorScheme.primary,
                                 )
-                                Spacer(modifier = Modifier.width(12.dp))
+                                Spacer(modifier = Modifier.width(16.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = folder.name,
                                         style = COUITheme.textStyles.body1,
                                     )
                                     if (folder.photoCount > 0) {
+                                        Spacer(modifier = Modifier.height(2.dp))
                                         Text(
                                             text = "${folder.photoCount} 项",
                                             style = COUITheme.textStyles.footnote2,
@@ -785,6 +790,7 @@ private fun LocalFolderPickerDialog(
                                         )
                                     }
                                 }
+                                Spacer(modifier = Modifier.width(12.dp))
                                 Icon(
                                     imageVector = COUIIcons.Light.ChevronForward,
                                     contentDescription = null,
@@ -798,7 +804,9 @@ private fun LocalFolderPickerDialog(
                 if (currentPath.isNotEmpty() || initialPath.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp),
                         horizontalArrangement = Arrangement.Center,
                     ) {
                         TextButton(
