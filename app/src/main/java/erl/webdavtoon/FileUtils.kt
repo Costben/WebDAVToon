@@ -18,10 +18,10 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
-import java.net.HttpURLConnection
-import java.net.URL
 import java.net.URLDecoder
 import java.net.URLEncoder
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 object FileUtils {
     private const val TAG = "FileUtils"
@@ -63,6 +63,11 @@ object FileUtils {
      * 下载图片到本地
      */
     suspend fun downloadImage(context: Context, photo: Photo): Boolean {
+        // Fetching and writing both block, so they must stay off the main thread.
+        return withContext(Dispatchers.IO) { downloadImageBlocking(context, photo) }
+    }
+
+    private fun downloadImageBlocking(context: Context, photo: Photo): Boolean {
         return try {
             val inputStream: InputStream = if (photo.isLocal) {
                 // 本地图片：直接获取输入流
@@ -70,17 +75,27 @@ object FileUtils {
             } else {
                 // 远程图片：通过网络请求获取（smb/ftp 走本地回环代理）
                 val uriString = photo.imageUri.toString()
-                val fetchUrl = RemoteMediaUrlResolver.resolveForHttp(SettingsManager(context), uriString)
+                val settingsManager = SettingsManager(context)
+                val fetchUrl = RemoteMediaUrlResolver.resolveForHttp(settingsManager, uriString)
                     ?: throw IOException("当前服务器无法访问该媒体: $uriString")
-                val url = URL(fetchUrl)
-                val connection = url.openConnection() as HttpURLConnection
-                connection.connectTimeout = 30000
-                connection.readTimeout = 30000
-                connection.connect()
-                if (connection.responseCode != HttpURLConnection.HTTP_OK) {
-                    throw IOException("HTTP ${connection.responseCode}: ${connection.responseMessage}")
+                val requestBuilder = okhttp3.Request.Builder().url(fetchUrl)
+                // Only direct WebDAV URLs carry credentials; the loopback proxy
+                // authenticates with its own token and rejects the header.
+                if (RemoteMediaUrlResolver.needsBasicAuth(uriString)) {
+                    requestBuilder.addHeader(
+                        "Authorization",
+                        okhttp3.Credentials.basic(
+                            settingsManager.getWebDavUsername(),
+                            settingsManager.getWebDavPassword()
+                        )
+                    )
                 }
-                connection.inputStream
+                val response = okhttp3.OkHttpClient().newCall(requestBuilder.build()).execute()
+                if (!response.isSuccessful) {
+                    response.close()
+                    throw IOException("HTTP ${response.code}: ${response.message}")
+                }
+                response.body?.byteStream() ?: throw IOException("响应内容为空")
             }
             
             val bitmap = BitmapFactory.decodeStream(inputStream)
