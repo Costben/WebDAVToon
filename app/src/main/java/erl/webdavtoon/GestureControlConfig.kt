@@ -88,3 +88,24 @@ fun ReaderGestureControlConfig.normalize(): ReaderGestureControlConfig {
     }
     return copy(version = ReaderGestureControlConfig.CURRENT_VERSION, zones = normalizedZones)
 }
+
+/**
+ * Maps a tap position, given as fractions of the reader viewport, onto the 3x3 zone grid.
+ * Mirrors the layout the gesture panel draws, so what the user taps in the panel is what
+ * they get in the reader.
+ */
+fun ReaderGestureControlConfig.zoneAt(xFraction: Float, yFraction: Float): GestureZone {
+    val column = (xFraction.coerceIn(0f, 0.9999f) * 3).toInt().coerceIn(0, 2)
+    val row = (yFraction.coerceIn(0f, 0.9999f) * 3).toInt().coerceIn(0, 2)
+    return GestureZone.fromGridPosition(row, column)
+}
+
+/** The action configured for [zone] and [type], or [GestureAction.NONE] when unset. */
+fun ReaderGestureControlConfig.actionFor(zone: GestureZone, type: GestureType): GestureAction {
+    val zoneConfig = zones.firstOrNull { it.zone == zone.code } ?: return GestureAction.NONE
+    return when (type) {
+        GestureType.SINGLE_TAP -> GestureAction.fromCode(zoneConfig.singleTapAction)
+        GestureType.DOUBLE_TAP -> GestureAction.fromCode(zoneConfig.doubleTapAction)
+        GestureType.LONG_PRESS -> GestureAction.fromCode(zoneConfig.longPressAction)
+    }
+}

@@ -19,7 +19,8 @@ fun CardReader(
     photos: List<Photo>,
     currentIndex: Int,
     onPageChanged: (Int) -> Unit,
-    onSingleTap: () -> Unit,
+    onTapAt: (xFraction: Float, yFraction: Float) -> Unit,
+    onLongPressAt: ((xFraction: Float, yFraction: Float) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     if (photos.isEmpty()) {
@@ -56,7 +57,8 @@ fun CardReader(
             ZoomableImage(
                 photo = photo,
                 isCurrentPage = (page == pagerState.currentPage),
-                onSingleTap = onSingleTap
+                onTapAt = onTapAt,
+                onLongPressAt = onLongPressAt
             )
         }
     }

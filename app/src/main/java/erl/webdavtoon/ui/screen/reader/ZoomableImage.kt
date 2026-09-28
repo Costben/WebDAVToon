@@ -59,7 +59,8 @@ fun ZoomableImage(
     photo: Photo,
     modifier: Modifier = Modifier,
     maxScale: Float = 4.0f,
-    onSingleTap: () -> Unit = {},
+    onTapAt: (xFraction: Float, yFraction: Float) -> Unit = { _, _ -> },
+    onLongPressAt: ((xFraction: Float, yFraction: Float) -> Unit)? = null,
     onDoubleTap: (() -> Unit)? = null,
     isCurrentPage: Boolean = true
 ) {
@@ -163,8 +164,17 @@ fun ZoomableImage(
                         animateTo(targetScale, targetOffset)
                         onDoubleTap?.invoke()
                     },
-                    onTap = {
-                        onSingleTap()
+                    onTap = { tapOffset ->
+                        onTapAt(
+                            tapOffset.x / containerSize.width.toFloat().coerceAtLeast(1f),
+                            tapOffset.y / containerSize.height.toFloat().coerceAtLeast(1f)
+                        )
+                    },
+                    onLongPress = { pressOffset ->
+                        onLongPressAt?.invoke(
+                            pressOffset.x / containerSize.width.toFloat().coerceAtLeast(1f),
+                            pressOffset.y / containerSize.height.toFloat().coerceAtLeast(1f)
+                        )
                     }
                 )
             }

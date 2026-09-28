@@ -23,6 +23,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import erl.webdavtoon.FileUtils
+import erl.webdavtoon.GestureType
 import erl.webdavtoon.MediaShareHelper
 import erl.webdavtoon.R
 import erl.webdavtoon.SettingsManager
@@ -102,6 +103,8 @@ fun ReaderScreen(
         }
     }
 
+    val modalOverlayVisible = uiState.isGesturePanelVisible || uiState.isPhotoInfoVisible
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -113,7 +116,26 @@ fun ReaderScreen(
                     photos = uiState.photos,
                     currentIndex = uiState.currentIndex,
                     onPageChanged = { viewModel.updateCurrentIndex(it) },
-                    onSingleTap = { viewModel.toggleImmersive() }
+                    // Gesture zones only exist in card mode, matching the pre-Compose reader.
+                    // An unconfigured zone falls through to the default tap behaviour.
+                    // A modal overlay swallows the gesture entirely: its scrim already
+                    // handled the tap by closing itself, and forwarding it would also
+                    // toggle immersive mode behind the panel.
+                    onTapAt = { xFraction, yFraction ->
+                        if (!modalOverlayVisible) {
+                            val handled = viewModel.dispatchGesture(
+                                GestureType.SINGLE_TAP,
+                                xFraction,
+                                yFraction
+                            )
+                            if (!handled) viewModel.toggleImmersive()
+                        }
+                    },
+                    onLongPressAt = { xFraction, yFraction ->
+                        if (!modalOverlayVisible) {
+                            viewModel.dispatchGesture(GestureType.LONG_PRESS, xFraction, yFraction)
+                        }
+                    }
                 )
             }
             ReadingMode.WEBTOON -> {
@@ -144,8 +166,33 @@ fun ReaderScreen(
             onToggleOrientationLock = { viewModel.toggleOrientationLock() },
             onToggleFavorite = { viewModel.toggleFavorite() },
             onSaveImage = onSaveImage,
+            onOpenGestureControl = { viewModel.setGesturePanelVisible(true) },
             onShare = onShare,
         )
+
+        if (uiState.isGesturePanelVisible) {
+            GestureControlOverlay(
+                config = uiState.gestureControl,
+                onEnabledChange = { viewModel.setGestureControlEnabled(it) },
+                onActionChange = { zone, type, action ->
+                    viewModel.updateGestureAction(zone, type, action)
+                },
+                onDismiss = { viewModel.setGesturePanelVisible(false) },
+            )
+        }
+
+        if (uiState.isPhotoInfoVisible) {
+            currentPhoto?.let { photo ->
+                PhotoInfoOverlay(
+                    photo = photo,
+                    onDismiss = { viewModel.setPhotoInfoVisible(false) },
+                )
+            }
+        }
+
+        // Hosts the COUI dropdown surfaces. Without it the bottom bar's "more" menu has
+        // nowhere to render and its trigger looks dead.
+        io.github.suqi8.coui.kmp.utils.COUIPopupUtils.COUIPopupHost()
     }
 }
 

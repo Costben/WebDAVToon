@@ -67,16 +67,22 @@ class PhotoViewActivity : ComponentActivity() {
         }
 
         setContent {
-            val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-            val settings = erl.webdavtoon.SettingsManager(this)
-            WebDAVToonTheme(
-                themeId = settings.getThemeId(),
-                useCouiDefaultColors = settings.useCouiDefaultColors(),
+            val navOwner =
+                androidx.navigationevent.compose.rememberNavigationEventDispatcherOwner(parent = null)
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner provides navOwner,
             ) {
-                ReaderScreen(
-                    viewModel = viewModel,
-                    onBack = { finish() }
-                )
+                val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+                val settings = erl.webdavtoon.SettingsManager(this)
+                WebDAVToonTheme(
+                    themeId = settings.getThemeId(),
+                    useCouiDefaultColors = settings.useCouiDefaultColors(),
+                ) {
+                    ReaderScreen(
+                        viewModel = viewModel,
+                        onBack = { finish() }
+                    )
+                }
             }
         }
     }

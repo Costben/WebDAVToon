@@ -7,11 +7,17 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import erl.webdavtoon.AppSettingsStore
 import erl.webdavtoon.FavoritePhotoStore
+import erl.webdavtoon.GestureAction
+import erl.webdavtoon.GestureType
+import erl.webdavtoon.GestureZone
 import erl.webdavtoon.Photo
 import erl.webdavtoon.PhotoCache
 import erl.webdavtoon.ReaderSessions
 import erl.webdavtoon.SettingsManager
 import erl.webdavtoon.WebDavImageLoader
+import erl.webdavtoon.actionFor
+import erl.webdavtoon.normalize
+import erl.webdavtoon.zoneAt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -31,7 +37,8 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     private val _uiState = MutableStateFlow(
             ReaderUiState(
                 isOrientationLocked = settingsManager.isRotationLocked(),
-            readingMode = resolveDefaultReadingMode()
+            readingMode = resolveDefaultReadingMode(),
+            gestureControl = settingsManager.getReaderGestureControlConfig().normalize()
         )
     )
     val uiState: StateFlow<ReaderUiState> = _uiState.asStateFlow()
@@ -291,6 +298,74 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         _uiState.update { it.copy(isOrientationLocked = locked) }
     }
 
+    fun setGesturePanelVisible(visible: Boolean) {
+        _uiState.update {
+            it.copy(
+                isGesturePanelVisible = visible,
+                // The panel is a full-screen overlay; leaving the reader bars up behind it
+                // only adds noise.
+                isImmersive = if (visible) true else it.isImmersive
+            )
+        }
+    }
+
+    fun setPhotoInfoVisible(visible: Boolean) {
+        _uiState.update { it.copy(isPhotoInfoVisible = visible) }
+    }
+
+    fun setGestureControlEnabled(enabled: Boolean) {
+        settingsManager.setReaderGestureControlEnabled(enabled)
+        _uiState.update {
+            it.copy(gestureControl = settingsManager.getReaderGestureControlConfig().normalize())
+        }
+    }
+
+    fun updateGestureAction(zone: GestureZone, type: GestureType, action: GestureAction) {
+        settingsManager.updateReaderGestureAction(zone, type, action)
+        _uiState.update {
+            it.copy(gestureControl = settingsManager.getReaderGestureControlConfig().normalize())
+        }
+    }
+
+    /**
+     * Runs the action configured for the zone the tap landed in.
+     *
+     * Returns false when nothing was configured (or gesture control is off), so the caller
+     * can fall back to its default tap behaviour.
+     */
+    fun dispatchGesture(type: GestureType, xFraction: Float, yFraction: Float): Boolean {
+        val state = _uiState.value
+        val config = state.gestureControl.normalize()
+        if (!config.enabled) return false
+
+        val action = config.actionFor(config.zoneAt(xFraction, yFraction), type)
+        if (action == GestureAction.NONE) return false
+
+        return when (action) {
+            GestureAction.NONE -> false
+            GestureAction.PHOTO_INFO -> {
+                setPhotoInfoVisible(true)
+                true
+            }
+            GestureAction.TOGGLE_IMMERSIVE -> {
+                toggleImmersive()
+                true
+            }
+            GestureAction.START_SLIDESHOW -> {
+                toggleSlideshow()
+                true
+            }
+            GestureAction.PREVIOUS_PAGE -> {
+                updateCurrentIndex(state.currentIndex - 1)
+                true
+            }
+            GestureAction.NEXT_PAGE -> {
+                updateCurrentIndex(state.currentIndex + 1)
+                true
+            }
+        }
+    }
+
     fun preloadAdjacentPhotos(currentIndex: Int, window: Int = 3, width: Int? = null, height: Int? = null) {
         val state = _uiState.value
         val photos = state.photos
@@ -370,7 +445,8 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         explicitModeSet = false
         _uiState.value = ReaderUiState(
             isOrientationLocked = settingsManager.isRotationLocked(),
-            readingMode = resolveDefaultReadingMode()
+            readingMode = resolveDefaultReadingMode(),
+            gestureControl = settingsManager.getReaderGestureControlConfig().normalize()
         )
     }
 

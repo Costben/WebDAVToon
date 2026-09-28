@@ -3,6 +3,7 @@
 package erl.webdavtoon.ui.screen.reader
 
 import erl.webdavtoon.Photo
+import erl.webdavtoon.ReaderGestureControlConfig
 
 enum class ReadingMode {
     CARD,
@@ -20,7 +21,10 @@ data class ReaderUiState(
     val isFavorite: Boolean = false,
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
-    val sessionId: String? = null
+    val sessionId: String? = null,
+    val gestureControl: ReaderGestureControlConfig = ReaderGestureControlConfig.defaultConfig(),
+    val isGesturePanelVisible: Boolean = false,
+    val isPhotoInfoVisible: Boolean = false
 ) {
     val currentPhoto: Photo? get() = photos.getOrNull(currentIndex)
     val totalCount: Int get() = photos.size

@@ -6,6 +6,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -47,53 +48,74 @@ fun CouiCascadingMenu(
     content: @Composable () -> Unit,
 ) {
     var show by remember { mutableStateOf(false) }
-    var expandedItem by remember { mutableStateOf<DropdownItem?>(null) }
 
     Box(modifier = modifier) {
         IconButton(
-            onClick = {
-                expandedItem = null
-                show = true
-            },
+            onClick = { show = true },
             holdDownState = show,
             content = content,
         )
 
-        OverlayListPopup(
+        CouiCascadingMenuPopup(
             show = show,
-            alignment = PopupPositionProvider.Align.End,
+            entries = entries,
             onDismissRequest = { show = false },
-            onDismissFinished = { expandedItem = null },
-        ) {
-            // `OverlayListPopup` dismisses on ANY tap inside the popup surface, because the COUI
-            // popup rows deliberately do not consume pointer events (the row gesture host observes
-            // in the Initial pass and leaves the event unconsumed). That is fine for a flat menu,
-            // but it would close this menu before a second level could ever show. Consuming the UP
-            // here — strictly above `ListPopupColumn`, never between it and `DropdownImpl`, which
-            // would break the row parent data again — keeps the popup open for row taps while
-            // still letting an outside tap and the back gesture dismiss it.
-            Box(modifier = Modifier.consumeTapUp()) {
-                ListPopupColumn {
-                    val expanded = expandedItem
-                    if (expanded == null) {
-                        PrimaryRows(entries) { item, children ->
-                            if (children != null) {
-                                expandedItem = item
-                            } else {
-                                item.onClick?.invoke()
-                                show = false
-                            }
+        )
+    }
+}
+
+/**
+ * The popup half of [CouiCascadingMenu], for callers that own their own trigger.
+ *
+ * The popup anchors to the nearest enclosing `Box`, exactly as [CouiCascadingMenu] does, so a
+ * caller places this next to its trigger inside one `Box`.
+ */
+@Composable
+fun CouiCascadingMenuPopup(
+    show: Boolean,
+    entries: List<DropdownEntry>,
+    onDismissRequest: () -> Unit,
+) {
+    var expandedItem by remember { mutableStateOf<DropdownItem?>(null) }
+
+    LaunchedEffect(show) {
+        if (show) expandedItem = null
+    }
+
+    OverlayListPopup(
+        show = show,
+        alignment = PopupPositionProvider.Align.End,
+        onDismissRequest = onDismissRequest,
+        onDismissFinished = { expandedItem = null },
+    ) {
+        // `OverlayListPopup` dismisses on ANY tap inside the popup surface, because the COUI
+        // popup rows deliberately do not consume pointer events (the row gesture host observes
+        // in the Initial pass and leaves the event unconsumed). That is fine for a flat menu,
+        // but it would close this menu before a second level could ever show. Consuming the UP
+        // here — strictly above `ListPopupColumn`, never between it and `DropdownImpl`, which
+        // would break the row parent data again — keeps the popup open for row taps while
+        // still letting an outside tap and the back gesture dismiss it.
+        Box(modifier = Modifier.consumeTapUp()) {
+            ListPopupColumn {
+                val expanded = expandedItem
+                if (expanded == null) {
+                    PrimaryRows(entries) { item, children ->
+                        if (children != null) {
+                            expandedItem = item
+                        } else {
+                            item.onClick?.invoke()
+                            onDismissRequest()
                         }
-                    } else {
-                        SecondaryRows(
-                            parent = expanded,
-                            onBack = { expandedItem = null },
-                            onLeafClick = { item ->
-                                item.onClick?.invoke()
-                                show = false
-                            },
-                        )
                     }
+                } else {
+                    SecondaryRows(
+                        parent = expanded,
+                        onBack = { expandedItem = null },
+                        onLeafClick = { item ->
+                            item.onClick?.invoke()
+                            onDismissRequest()
+                        },
+                    )
                 }
             }
         }
