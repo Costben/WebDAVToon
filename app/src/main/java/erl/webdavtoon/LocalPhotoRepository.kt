@@ -236,15 +236,58 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
                     dateModified = candidate.dateModified,
                     mediaType = candidate.mediaType,
                     isBlankLike = candidate.mediaType == MediaType.IMAGE && (
-                        candidate.sizeBytes in 1 until tinyPreviewImageBytes ||
-                            WebDavImageLoader.isLikelyBlankLocalImagePreview(context, candidate.uri)
-                        ),
+                        candidate.sizeBytes in 1 until tinyPreviewImageBytes
+                    ),
                     sourceOrder = index
                 )
             },
             sortOrder = sortOrder,
             preferUsableMedia = true
         )
+    }
+
+    fun hasChildFolders(folderPath: String): Boolean {
+        if (folderPath.isEmpty()) {
+            return true
+        }
+        val normalized = folderPath.trimEnd('/')
+
+        runCatching {
+            val dir = File(normalized)
+            if (dir.exists() && dir.isDirectory) {
+                val subDirs = dir.listFiles { f -> f.isDirectory && !f.name.startsWith(".") }
+                if (!subDirs.isNullOrEmpty()) {
+                    return true
+                }
+            }
+        }
+
+        return runCatching {
+            val projection = arrayOf(MediaStore.Files.FileColumns.DATA)
+            val selection = "(${MediaStore.Files.FileColumns.MEDIA_TYPE} = ? OR ${MediaStore.Files.FileColumns.MEDIA_TYPE} = ?) AND ${MediaStore.Files.FileColumns.DATA} LIKE ?"
+            val selectionArgs = arrayOf(
+                MediaStore.Files.FileColumns.MEDIA_TYPE_IMAGE.toString(),
+                MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO.toString(),
+                "$normalized/%/%"
+            )
+            context.contentResolver.query(
+                mediaCollection,
+                projection,
+                selection,
+                selectionArgs,
+                null
+            )?.use { cursor ->
+                val dataCol = cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATA)
+                while (cursor.moveToNext()) {
+                    val path = cursor.getString(dataCol) ?: continue
+                    if (path.contains("/.") || path.contains("/dev-dump/")) continue
+                    val name = path.substringAfterLast('/')
+                    if (name.startsWith(".") || !isSupportedMediaName(name)) continue
+                    return@use true
+                }
+                false
+            } ?: false
+        }.getOrDefault(false)
     }
 
     override suspend fun queryMediaPage(
@@ -343,6 +386,7 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
         forceRefresh: Boolean,
         sortOrder: Int
     ): List<Folder> = withContext(Dispatchers.IO) {
+        val startMs = System.currentTimeMillis()
         val storageRoots = getStorageRoots()
         val primaryRoot = storageRoots.firstOrNull() ?: "/storage/emulated/0"
         val normalizedRootPath = rootPath.trimEnd('/')
@@ -396,18 +440,10 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
                 if (path.contains("/.") || name.startsWith(".") || path.contains("/dev-dump/")) continue
                 if (!isSupportedMediaName(name)) continue
 
-                val file = File(path)
-                val parent = file.parentFile ?: continue
-                val parentPath = parent.absolutePath.trimEnd('/')
-
-                val id = cursor.getLong(idCol)
+                val lastSlash = path.lastIndexOf('/')
+                if (lastSlash <= 0) continue
+                val parentPath = path.substring(0, lastSlash)
                 val dateModified = cursor.getLong(dateCol)
-                val sizeBytes = cursor.getLong(sizeCol)
-                val mediaType = when (cursor.getInt(mediaTypeCol)) {
-                    MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO -> MediaType.VIDEO
-                    else -> MediaType.IMAGE
-                }
-                val uri = toContentUri(id, mediaType)
 
                 val folderKey: String
                 val folderName: String
@@ -416,34 +452,52 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
                 if (normalizedRootPath.isNotEmpty()) {
                     if (parentPath == normalizedRootPath) {
                         directRootCount++
-                        registerPreviewCandidate(directRootPreviewCandidates, uri, name, dateModified, mediaType, sizeBytes)
+                        if (directRootPreviewCandidates.size < maxFolderPreviewCandidates) {
+                            val id = cursor.getLong(idCol)
+                            val sizeBytes = cursor.getLong(sizeCol)
+                            val mediaType = when (cursor.getInt(mediaTypeCol)) {
+                                MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO -> MediaType.VIDEO
+                                else -> MediaType.IMAGE
+                            }
+                            registerPreviewCandidate(directRootPreviewCandidates, toContentUri(id, mediaType), name, dateModified, mediaType, sizeBytes)
+                        }
                         directRootDateModified = maxOf(directRootDateModified, dateModified)
                         continue
                     }
                     if (!parentPath.startsWith("$normalizedRootPath/")) continue
-                    val relative = parentPath.removePrefix(normalizedRootPath).trimStart(File.separatorChar)
-                    if (relative.isBlank()) continue
-                    val first = relative.substringBefore(File.separator)
-                    val directChildPath = File(normalizedRootPath, first).absolutePath
+                    val relative = parentPath.substring(normalizedRootPath.length + 1)
+                    if (relative.isEmpty()) continue
+                    val slashIdx = relative.indexOf('/')
+                    val first = if (slashIdx >= 0) relative.substring(0, slashIdx) else relative
+                    val directChildPath = "$normalizedRootPath/$first"
                     folderKey = directChildPath
                     folderName = localizeFolderName(first)
-                    hasSubFolders = parentPath != directChildPath
+                    hasSubFolders = slashIdx >= 0
                 } else {
                     val matchedStorageRoot = storageRoots.firstOrNull { parentPath == it || parentPath.startsWith("$it/") } ?: primaryRoot
                     if (parentPath == matchedStorageRoot) {
                         directRootCount++
-                        registerPreviewCandidate(directRootPreviewCandidates, uri, name, dateModified, mediaType, sizeBytes)
+                        if (directRootPreviewCandidates.size < maxFolderPreviewCandidates) {
+                            val id = cursor.getLong(idCol)
+                            val sizeBytes = cursor.getLong(sizeCol)
+                            val mediaType = when (cursor.getInt(mediaTypeCol)) {
+                                MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO -> MediaType.VIDEO
+                                else -> MediaType.IMAGE
+                            }
+                            registerPreviewCandidate(directRootPreviewCandidates, toContentUri(id, mediaType), name, dateModified, mediaType, sizeBytes)
+                        }
                         directRootDateModified = maxOf(directRootDateModified, dateModified)
                         continue
                     }
                     if (matchedStorageRoot == primaryRoot || storageRoots.size == 1) {
-                        val relative = parentPath.removePrefix(matchedStorageRoot).trimStart(File.separatorChar)
+                        val relative = parentPath.removePrefix(matchedStorageRoot).trimStart('/')
                         if (relative.isBlank()) continue
-                        val first = relative.substringBefore(File.separator)
-                        val directChildPath = File(matchedStorageRoot, first).absolutePath
+                        val slashIdx = relative.indexOf('/')
+                        val first = if (slashIdx >= 0) relative.substring(0, slashIdx) else relative
+                        val directChildPath = "$matchedStorageRoot/$first"
                         folderKey = directChildPath
                         folderName = localizeFolderName(first)
-                        hasSubFolders = parentPath != directChildPath
+                        hasSubFolders = slashIdx >= 0
                     } else {
                         folderKey = matchedStorageRoot
                         folderName = File(matchedStorageRoot).name
@@ -453,7 +507,15 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
 
                 val existing = foldersMap[folderKey]
                 val previewCandidates = previewCandidatesByFolder.getOrPut(folderKey) { mutableListOf() }
-                registerPreviewCandidate(previewCandidates, uri, name, dateModified, mediaType, sizeBytes)
+                if (previewCandidates.size < maxFolderPreviewCandidates) {
+                    val id = cursor.getLong(idCol)
+                    val sizeBytes = cursor.getLong(sizeCol)
+                    val mediaType = when (cursor.getInt(mediaTypeCol)) {
+                        MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO -> MediaType.VIDEO
+                        else -> MediaType.IMAGE
+                    }
+                    registerPreviewCandidate(previewCandidates, toContentUri(id, mediaType), name, dateModified, mediaType, sizeBytes)
+                }
                 if (existing == null) {
                     foldersMap[folderKey] = Folder(
                         path = folderKey,
@@ -489,11 +551,16 @@ class LocalPhotoRepository(private val context: Context) : PhotoRepository {
             }
         }
 
-        foldersMap.values.map { folder ->
+        val result = foldersMap.values.map { folder ->
             folder.copy(
                 previewUris = selectPreviewUris(previewCandidatesByFolder[folder.path].orEmpty(), sortOrder)
             )
         }
+        android.util.Log.i(
+            "LocalPhotoRepo",
+            "getFolders rootPath=$normalizedRootPath count=${result.size} elapsedMs=${System.currentTimeMillis() - startMs}"
+        )
+        result
     }
 
     override suspend fun deletePhoto(photo: Photo): Boolean = withContext(Dispatchers.IO) {

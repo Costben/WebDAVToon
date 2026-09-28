@@ -20,16 +20,33 @@ object FolderNavigationResolver {
         context: Context,
         folderPath: String,
         isWebDav: Boolean,
-        forceRefresh: Boolean = false
-    ): Target = resolve(context, SettingsManager(context), folderPath, isWebDav, forceRefresh)
+        forceRefresh: Boolean = false,
+        knownHasSubFolders: Boolean? = null
+    ): Target = resolve(context, SettingsManager(context), folderPath, isWebDav, forceRefresh, knownHasSubFolders)
 
     suspend fun resolve(
         context: Context,
         settingsManager: SettingsManager,
         folderPath: String,
         isWebDav: Boolean,
-        forceRefresh: Boolean = false
+        forceRefresh: Boolean = false,
+        knownHasSubFolders: Boolean? = null
     ): Target = withContext(Dispatchers.IO) {
+        val startMs = System.currentTimeMillis()
+        if (!isWebDav) {
+            val hasChildFolders = knownHasSubFolders ?: LocalPhotoRepository(context).hasChildFolders(folderPath)
+            val target = if (hasChildFolders) {
+                Target.FolderGrid(folderPath, isWebDav = false)
+            } else {
+                Target.MediaWaterfall(folderPath, isWebDav = false)
+            }
+            android.util.Log.i(
+                "FolderNavResolver",
+                "resolvedLocal path=$folderPath known=$knownHasSubFolders target=${target.javaClass.simpleName} elapsedMs=${System.currentTimeMillis() - startMs}"
+            )
+            return@withContext target
+        }
+
         val repository: PhotoRepository = if (isWebDav) {
             RustWebDavPhotoRepository(settingsManager)
         } else {

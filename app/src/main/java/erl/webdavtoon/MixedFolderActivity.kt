@@ -123,7 +123,8 @@ class MixedFolderActivity : ComponentActivity() {
                                             val target = FolderNavigationResolver.resolveTarget(
                                                 this@MixedFolderActivity,
                                                 item.folder.path,
-                                                !item.folder.isLocal
+                                                !item.folder.isLocal,
+                                                knownHasSubFolders = item.folder.hasSubFolders
                                             )
                                             FolderNavigationResolver.start(this@MixedFolderActivity, target)
                                         } catch (e: Exception) {

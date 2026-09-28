@@ -122,7 +122,8 @@ class SubFolderActivity : ComponentActivity() {
                                             val target = FolderNavigationResolver.resolveTarget(
                                                 this@SubFolderActivity,
                                                 item.folder.path,
-                                                !item.folder.isLocal
+                                                !item.folder.isLocal,
+                                                knownHasSubFolders = item.folder.hasSubFolders
                                             )
                                             FolderNavigationResolver.start(this@SubFolderActivity, target)
                                         } catch (e: Exception) {

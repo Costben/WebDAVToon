@@ -520,7 +520,8 @@ class FolderViewActivity : FragmentActivity() {
                             val target = FolderNavigationResolver.resolveTarget(
                                 this@FolderViewActivity,
                                 item.folder.path,
-                                isWebDav = false
+                                isWebDav = false,
+                                knownHasSubFolders = item.folder.hasSubFolders
                             )
                             FolderNavigationResolver.start(this@FolderViewActivity, target)
                         } catch (e: Exception) {
