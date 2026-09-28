@@ -108,6 +108,13 @@ class FollowZoomGridState(
     var isZooming: Boolean by mutableStateOf(false)
         private set
 
+    var isSettling: Boolean by mutableStateOf(false)
+        private set
+
+    /** True while the user is actively pinching or the grid is animating to the settled column count. */
+    val isZoomActive: Boolean
+        get() = isZooming || isSettling
+
     internal var committedColumns: Int = initialColumns.coerceIn(minColumns, maxColumns)
     internal var onColumnsChanged: (Int) -> Unit = {}
 
@@ -131,7 +138,6 @@ class FollowZoomGridState(
     private var gestureScale = 1f
     private var settleJob: Job? = null
     private var scope: CoroutineScope? = null
-    private var isSettling = false
 
     internal fun attachScope(scope: CoroutineScope) {
         this.scope = scope

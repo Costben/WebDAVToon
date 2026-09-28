@@ -66,6 +66,7 @@ fun ZoomableImage(
     var scale by remember { mutableFloatStateOf(1.0f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     var containerSize by remember { mutableStateOf(IntSize.Zero) }
+    var isScaling by remember { mutableStateOf(false) }
 
     val coroutineScope = rememberCoroutineScope()
     var animationJob: Job? by remember { mutableStateOf(null) }
@@ -73,18 +74,23 @@ fun ZoomableImage(
     fun animateTo(targetScale: Float, targetOffset: Offset) {
         animationJob?.cancel()
         animationJob = coroutineScope.launch {
-            val startScale = scale
-            val startOffset = offset
-            animate(
-                initialValue = 0f,
-                targetValue = 1f,
-                animationSpec = tween(durationMillis = 250)
-            ) { frac, _ ->
-                scale = startScale + (targetScale - startScale) * frac
-                offset = Offset(
-                    x = startOffset.x + (targetOffset.x - startOffset.x) * frac,
-                    y = startOffset.y + (targetOffset.y - startOffset.y) * frac
-                )
+            isScaling = true
+            try {
+                val startScale = scale
+                val startOffset = offset
+                animate(
+                    initialValue = 0f,
+                    targetValue = 1f,
+                    animationSpec = tween(durationMillis = 250)
+                ) { frac, _ ->
+                    scale = startScale + (targetScale - startScale) * frac
+                    offset = Offset(
+                        x = startOffset.x + (targetOffset.x - startOffset.x) * frac,
+                        y = startOffset.y + (targetOffset.y - startOffset.y) * frac
+                    )
+                }
+            } finally {
+                isScaling = false
             }
         }
     }
@@ -192,6 +198,7 @@ fun ZoomableImage(
                             }
 
                             if (pastTouchSlop) {
+                                isScaling = true
                                 val containerWidth = containerSize.width.toFloat().coerceAtLeast(1f)
                                 val containerHeight = containerSize.height.toFloat().coerceAtLeast(1f)
                                 val newScale = calculatePinchScale(scale, zoomChange, maxScale)
@@ -226,6 +233,7 @@ fun ZoomableImage(
                                 }
 
                                 if (pastTouchSlop) {
+                                    isScaling = true
                                     val containerWidth = containerSize.width.toFloat().coerceAtLeast(1f)
                                     val containerHeight = containerSize.height.toFloat().coerceAtLeast(1f)
                                     offset = calculateClampedOffset(
@@ -245,6 +253,7 @@ fun ZoomableImage(
                         }
                     } while (event.changes.any { it.pressed })
 
+                    isScaling = false
                     if (scale <= 1.05f) {
                         scale = 1.0f
                         offset = Offset.Zero
@@ -269,10 +278,20 @@ fun ZoomableImage(
                 }
             },
             update = { imageView ->
+                if (isScaling) {
+                    WebDavImageLoader.freezeGifToFirstFrame(imageView)
+                    if (imageView.drawable != null) {
+                        imageView.setTag(erl.webdavtoon.R.id.tag_media_bind_key, "zoom_frozen#${photo.id}")
+                        return@AndroidView
+                    }
+                }
+
                 val bindKey = "${photo.id}#${retryTrigger}"
                 val lastKey = imageView.getTag(erl.webdavtoon.R.id.tag_media_bind_key) as? String
                 if (lastKey == bindKey && imageView.drawable != null) {
-                    (imageView.drawable as? android.graphics.drawable.Animatable)?.start()
+                    if (!isScaling && isCurrentPage) {
+                        (imageView.drawable as? android.graphics.drawable.Animatable)?.start()
+                    }
                     return@AndroidView
                 }
                 imageView.setTag(erl.webdavtoon.R.id.tag_media_bind_key, bindKey)
@@ -285,6 +304,7 @@ fun ZoomableImage(
                         progressBar = progressProxy,
                         limitSize = false,
                         isWebtoonReader = true,
+                        preserveCurrentDrawable = true,
                         onDimensionsReady = { _, _ ->
                             isLoaded = true
                             isLoading = false
@@ -299,6 +319,7 @@ fun ZoomableImage(
                         progressBar = progressProxy,
                         limitSize = false,
                         isWebtoonReader = true,
+                        preserveCurrentDrawable = true,
                         onDimensionsReady = { _, _ ->
                             isLoaded = true
                             isLoading = false

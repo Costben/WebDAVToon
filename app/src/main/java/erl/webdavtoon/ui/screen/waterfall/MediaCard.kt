@@ -68,6 +68,7 @@ fun MediaCardMiuix(
     targetHeightPx: Int = 0,
     modifier: Modifier = Modifier,
     fillHeight: Boolean = false,
+    isZooming: Boolean = false,
 ) {
     when (item) {
         is MixedWaterfallItemUi.MediaItem -> {
@@ -82,6 +83,7 @@ fun MediaCardMiuix(
                 targetHeightPx = targetHeightPx,
                 modifier = modifier,
                 fillHeight = fillHeight,
+                isZooming = isZooming,
             )
         }
         is MixedWaterfallItemUi.FolderItem -> {
@@ -257,6 +259,7 @@ private fun WaterfallMediaCardMiuix(
     targetHeightPx: Int = 0,
     modifier: Modifier = Modifier,
     fillHeight: Boolean = false,
+    isZooming: Boolean = false,
 ) {
     val cardShape = RoundedCornerShape(12.dp)
     val innerShape = RoundedCornerShape(12.dp)
@@ -303,10 +306,24 @@ private fun WaterfallMediaCardMiuix(
                         }
                     },
                     update = { imageView ->
+                        if (isZooming) {
+                            if (item.isGif) {
+                                WebDavImageLoader.freezeGifToFirstFrame(imageView)
+                            } else {
+                                (imageView.drawable as? android.graphics.drawable.Animatable)?.stop()
+                            }
+                            if (imageView.drawable != null) {
+                                imageView.setTag(R.id.tag_media_bind_key, "zoom_frozen#${item.id}")
+                                return@AndroidView
+                            }
+                        }
+
                         val bindKey = "${item.id}#${targetWidthPx}#${item.isVideo}"
                         val lastKey = imageView.getTag(R.id.tag_media_bind_key) as? String
                         if (lastKey == bindKey && imageView.drawable != null) {
-                            (imageView.drawable as? android.graphics.drawable.Animatable)?.start()
+                            if (!isZooming) {
+                                (imageView.drawable as? android.graphics.drawable.Animatable)?.start()
+                            }
                             return@AndroidView
                         }
                         imageView.setTag(R.id.tag_media_bind_key, bindKey)

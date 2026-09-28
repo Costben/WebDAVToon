@@ -191,6 +191,7 @@ fun MixedWaterfallScreen(
                                 fillHeight = true,
                                 targetWidthPx = widthPx,
                                 targetHeightPx = heightPx,
+                                isZooming = zoomState.isZoomActive,
                             )
                         }
                     }
@@ -238,6 +239,7 @@ private fun MixedWaterfallCard(
     fillHeight: Boolean = false,
     targetWidthPx: Int = 0,
     targetHeightPx: Int = 0,
+    isZooming: Boolean = false,
 ) {
     val onFolderVisibilityChanged: (Folder, Boolean) -> Unit = { folder, visible ->
         actions.onFolderVisibilityChanged(folder, visible)
@@ -255,6 +257,7 @@ private fun MixedWaterfallCard(
         targetHeightPx = targetHeightPx,
         modifier = modifier,
         fillHeight = fillHeight,
+        isZooming = isZooming,
     )
 }
 

@@ -109,13 +109,9 @@ object WebDavImageLoader {
                 )
             )
         if (preserveCurrentDrawable && imageView.drawable != null) {
-            val current = imageView.drawable
-            val placeholder = if (current is com.bumptech.glide.load.resource.gif.GifDrawable) {
-                BitmapDrawable(imageView.resources, current.firstFrame)
-            } else {
-                current
+            safePlaceholderFrom(imageView)?.let { placeholder ->
+                request = request.placeholder(placeholder)
             }
-            request = request.placeholder(placeholder)
         }
         if (crossFadeDurationMs > 0) {
             request = request.transition(DrawableTransitionOptions.withCrossFade(crossFadeDurationMs))
@@ -276,13 +272,9 @@ object WebDavImageLoader {
                 )
             )
         if (preserveCurrentDrawable && imageView.drawable != null) {
-            val current = imageView.drawable
-            val placeholder = if (current is com.bumptech.glide.load.resource.gif.GifDrawable) {
-                BitmapDrawable(imageView.resources, current.firstFrame)
-            } else {
-                current
+            safePlaceholderFrom(imageView)?.let { placeholder ->
+                request = request.placeholder(placeholder)
             }
-            request = request.placeholder(placeholder)
         }
         if (crossFadeDurationMs > 0) {
             request = request.transition(DrawableTransitionOptions.withCrossFade(crossFadeDurationMs))
@@ -377,6 +369,60 @@ object WebDavImageLoader {
 
     fun clearDrawableTarget(context: Context, target: Target<Drawable>) {
         Glide.with(context).clear(target)
+    }
+
+    /**
+     * Replaces an active [com.bumptech.glide.load.resource.gif.GifDrawable] on [imageView]
+     * with an independent [BitmapDrawable] copy of its initial frame (`firstFrame`) and clears
+     * the Glide target so the heavy GIF frame loader is stopped and released during pinch-zoom.
+     */
+    fun freezeGifToFirstFrame(imageView: ImageView) {
+        val current = imageView.drawable ?: return
+        if (current is com.bumptech.glide.load.resource.gif.GifDrawable) {
+            val safeDrawable = try {
+                current.stop()
+                val frame = current.firstFrame
+                if (frame != null && !frame.isRecycled) {
+                    val config = frame.config ?: Bitmap.Config.ARGB_8888
+                    val safeCopy = frame.copy(config, false)
+                    if (safeCopy != null) BitmapDrawable(imageView.resources, safeCopy) else null
+                } else null
+            } catch (_: Throwable) {
+                null
+            }
+            clear(imageView)
+            if (safeDrawable != null) {
+                imageView.setImageDrawable(safeDrawable)
+            }
+        } else if (current is android.graphics.drawable.Animatable) {
+            current.stop()
+        }
+    }
+
+    private fun safePlaceholderFrom(imageView: ImageView): Drawable? {
+        val current = imageView.drawable ?: return null
+        return if (current is com.bumptech.glide.load.resource.gif.GifDrawable) {
+            try {
+                current.stop()
+                val frame = current.firstFrame
+                if (frame != null && !frame.isRecycled) {
+                    val config = frame.config ?: Bitmap.Config.ARGB_8888
+                    val safeCopy = frame.copy(config, false)
+                    if (safeCopy != null) BitmapDrawable(imageView.resources, safeCopy) else null
+                } else null
+            } catch (_: Throwable) {
+                null
+            }
+        } else if (current is BitmapDrawable) {
+            val bmp = current.bitmap
+            if (bmp != null && !bmp.isRecycled) {
+                val config = bmp.config ?: Bitmap.Config.ARGB_8888
+                val safeCopy = try { bmp.copy(config, false) } catch (_: Throwable) { null }
+                if (safeCopy != null) BitmapDrawable(imageView.resources, safeCopy) else null
+            } else null
+        } else {
+            current
+        }
     }
 
     fun loadLocalVideoThumbnail(

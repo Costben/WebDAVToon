@@ -221,6 +221,7 @@ fun MediaWaterfallScreen(
                                 targetWidthPx = widthPx,
                                 targetHeightPx = heightPx,
                                 fillHeight = true,
+                                isZooming = zoomState.isZoomActive,
                             )
                         }
                     }
