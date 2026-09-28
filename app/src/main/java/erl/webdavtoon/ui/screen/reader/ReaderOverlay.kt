@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,6 +42,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import erl.webdavtoon.R
+import erl.webdavtoon.ui.theme.LocalDarkTheme
 import io.github.suqi8.coui.kmp.basic.FloatingToolbar
 import io.github.suqi8.coui.kmp.basic.Icon
 import io.github.suqi8.coui.kmp.basic.IconButton
@@ -100,6 +102,12 @@ fun ReaderOverlayMiuix(
         currentIndex.coerceIn(0, maxOf(totalCount - 1, 0))
     }
     val pageDisplay = if (totalCount <= 0) "0 / 0" else "${displayIndex + 1} / $totalCount"
+    val isDark = LocalDarkTheme.current || isSystemInDarkTheme()
+    val toolbarBackgroundColor = if (isDark) {
+        Color(0xF51C1C1E)
+    } else {
+        Color(0xF5F5F5F7)
+    }
 
     Box(
         modifier = modifier
@@ -121,8 +129,9 @@ fun ReaderOverlayMiuix(
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 600.dp),
+                color = toolbarBackgroundColor,
                 outSidePadding = PaddingValues(0.dp),
-                shadowElevation = 0.dp,
+                shadowElevation = 6.dp,
             ) {
                 Row(
                     modifier = Modifier
@@ -195,8 +204,9 @@ fun ReaderOverlayMiuix(
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 600.dp),
+                color = toolbarBackgroundColor,
                 outSidePadding = PaddingValues(0.dp),
-                shadowElevation = 0.dp,
+                shadowElevation = 6.dp,
             ) {
                 Column(
                     modifier = Modifier
@@ -253,7 +263,7 @@ fun ReaderOverlayMiuix(
                         // 2. Slideshow
                         MiuixBottomActionItem(
                             icon = if (isSlideshowPlaying) COUIIcons.Light.Pause else COUIIcons.Light.Play,
-                            label = if (isSlideshowPlaying) "鏆傚仠" else stringResource(R.string.slideshow),
+                            label = if (isSlideshowPlaying) "暂停" else stringResource(R.string.slideshow),
                             tint = if (isSlideshowPlaying) COUITheme.colorScheme.primary else COUITheme.colorScheme.onSurface,
                             onClick = onToggleSlideshow,
                         )

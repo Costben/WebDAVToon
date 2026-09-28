@@ -3,6 +3,7 @@
 package erl.webdavtoon.ui.screen.waterfall
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import erl.webdavtoon.R
 import erl.webdavtoon.ui.component.rememberStrongHaptic
 import erl.webdavtoon.ui.component.rememberTapHaptic
+import erl.webdavtoon.ui.theme.LocalDarkTheme
 import io.github.suqi8.coui.kmp.basic.FloatingToolbar
 import io.github.suqi8.coui.kmp.basic.Icon
 import io.github.suqi8.coui.kmp.basic.Text
@@ -61,6 +63,12 @@ fun SelectionBottomBarMiuix(
     val errorColor = COUITheme.colorScheme.error
     val tapHaptic = rememberTapHaptic()
     val strongHaptic = rememberStrongHaptic()
+    val isDark = LocalDarkTheme.current || isSystemInDarkTheme()
+    val toolbarBackgroundColor = if (isDark) {
+        Color(0xF51C1C1E)
+    } else {
+        Color(0xF5F5F5F7)
+    }
 
     Box(
         modifier = modifier
@@ -73,8 +81,9 @@ fun SelectionBottomBarMiuix(
             modifier = Modifier
                 .fillMaxWidth()
                 .widthIn(max = 520.dp),
+            color = toolbarBackgroundColor,
             outSidePadding = PaddingValues(0.dp),
-            shadowElevation = 0.dp,
+            shadowElevation = 6.dp,
         ) {
             Row(
                 modifier = Modifier

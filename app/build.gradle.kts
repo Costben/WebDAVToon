@@ -66,7 +66,10 @@ android {
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // Safely assign signing config
-            if (signingConfigs.findByName("release") != null) {
+            val useDebugSigning = project.findProperty("useDebugSigningForRelease") == "true"
+            if (useDebugSigning) {
+                signingConfig = signingConfigs.getByName("debug")
+            } else if (signingConfigs.findByName("release") != null) {
                 signingConfig = signingConfigs.getByName("release")
             }
         }
