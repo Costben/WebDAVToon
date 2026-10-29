@@ -33,7 +33,10 @@ import erl.webdavtoon.R
 import erl.webdavtoon.SettingsManager
 import erl.webdavtoon.ui.component.AnimatedSearchField
 import erl.webdavtoon.ui.component.AppAdaptiveNavigationScaffold
+import erl.webdavtoon.ui.component.GalleryTopAppBar
 import erl.webdavtoon.ui.component.GlassTopBarScaffold
+import erl.webdavtoon.ui.component.rememberGalleryScrollBehavior
+import erl.webdavtoon.ui.component.rememberGalleryTopBarScrollConnection
 import erl.webdavtoon.ui.component.HighlightedTopBarAction
 import erl.webdavtoon.ui.component.ServerSheetActions
 import erl.webdavtoon.ui.screen.waterfall.MediaCardMiuix
@@ -47,12 +50,9 @@ import io.github.suqi8.coui.kmp.basic.PullToRefresh
 import io.github.suqi8.coui.kmp.basic.DropdownEntry
 import io.github.suqi8.coui.kmp.basic.DropdownItem
 import io.github.suqi8.coui.kmp.basic.Icon as MiuixIcon
-import io.github.suqi8.coui.kmp.basic.COUIScrollBehavior
 import io.github.suqi8.coui.kmp.basic.ScrollBehavior
 import io.github.suqi8.coui.kmp.basic.Text as MiuixText
-import io.github.suqi8.coui.kmp.basic.TopAppBar as MiuixTopAppBar
 import io.github.suqi8.coui.kmp.basic.couiGlassHeader
-import io.github.suqi8.coui.kmp.basic.rememberTopAppBarState
 import io.github.suqi8.coui.kmp.blur.LocalBackdrop
 import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.extended.ChevronBackward
@@ -137,9 +137,10 @@ fun MediaWaterfallScreen(
         else List(visibleItems.size) { MediaCardExtraHeight }
     }
     // Pins the title to the toolbar row while scrolled down and expands only at the list's top.
-    val topAppBarScrollBehavior = COUIScrollBehavior(
-        state = rememberTopAppBarState(),
-        expandOnContentScroll = false,
+    val topAppBarScrollBehavior = rememberGalleryScrollBehavior()
+    val topAppBarScrollConnection = rememberGalleryTopBarScrollConnection(
+        scrollBehavior = topAppBarScrollBehavior,
+        atTop = { zoomState.scrollOffset == 0 },
     )
 
     LaunchedEffect(zoomState, visibleItems.size) {
@@ -216,7 +217,7 @@ fun MediaWaterfallScreen(
                             itemHorizontalPadding = MediaCardImageMargin,
                             modifier = Modifier
                                 .fillMaxSize()
-                                .nestedScroll(topAppBarScrollBehavior.nestedScrollConnection),
+                                .nestedScroll(topAppBarScrollConnection),
                         ) { index, widthPx, heightPx ->
                             // A filtered list can shrink while a stale subcomposition is still
                             // alive, so guard the index instead of crashing the composer.
@@ -285,11 +286,9 @@ private fun MediaTopBarMiuix(
     }
 
     Column {
-        MiuixTopAppBar(
+        GalleryTopAppBar(
             title = titleText,
             scrollBehavior = scrollBehavior,
-            gradientGlass = true,
-            showDivider = false,
             navigationIcon = {
                 // Selection mode's "close" is a cancel/back action, and COUI reserves the top-left
                 // slot for exactly that. Outside selection mode the slot stays empty.

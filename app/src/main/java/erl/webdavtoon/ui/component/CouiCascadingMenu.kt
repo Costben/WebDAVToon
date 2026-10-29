@@ -6,69 +6,35 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import io.github.suqi8.coui.kmp.basic.DropdownEntry
 import io.github.suqi8.coui.kmp.basic.DropdownImpl
 import io.github.suqi8.coui.kmp.basic.DropdownItem
-import io.github.suqi8.coui.kmp.basic.HorizontalDivider
-import io.github.suqi8.coui.kmp.basic.IconButton
 import io.github.suqi8.coui.kmp.basic.ListPopupColumn
 import io.github.suqi8.coui.kmp.basic.PopupPositionProvider
+import io.github.suqi8.coui.kmp.overlay.OverlayCascadingListPopup
 import io.github.suqi8.coui.kmp.overlay.OverlayListPopup
 
 /**
- * COUI dropdown menu with a second level, built only from public COUI building blocks.
+ * COUI's own cascading dropdown, for the overflow entries that carry a second level.
  *
- * COUI 1.1.0's own `WindowIconCascadingDropdownMenu` / `OverlayIconCascadingDropdownMenu` are
- * unusable: `CascadingPrimaryRow` and `CascadingSecondaryColumn` wrap `DropdownImpl` in an extra
- * `Box`, so the `Modifier.popupListItem` parent data never reaches `ListPopupColumn`'s measure
- * policy. Rows are then never registered with `PopupListGestureHost`, and every row click (and
- * drag-select) is silently swallowed by the surrounding dismiss gesture.
+ * COUI 1.2 ships the whole cascade in [OverlayCascadingListPopup]: the primary panel shrinks
+ * toward its top-right corner and dims while the secondary card grows out of the tapped row's
+ * band, on the `SmallScreenAnimationController` springs — the motion ColorOS Gallery runs when
+ * "sort order" is expanded.
  *
- * This component keeps `DropdownImpl` a *direct* child of `ListPopupColumn` (no layout wrapper in
- * between) so the row registration works, and owns the expansion state itself so the second level
- * can be a drill-down inside the same popup.
+ * Building the drill-down by hand (swap the row list inside one `ListPopupColumn`) can only ever
+ * hard-cut: the rows must stay the column's *direct* children for its gesture host to register
+ * them, so no layout node can sit between the two levels and carry a transition.
  *
- * @param entries Grouped entries. Items with non-empty [DropdownItem.children] open the second
- *   level; every other item invokes its own `onClick`.
- * @param modifier Modifier applied to the anchor box.
- * @param content The anchor content, hosted in a COUI [IconButton].
- */
-@Composable
-fun CouiCascadingMenu(
-    entries: List<DropdownEntry>,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit,
-) {
-    var show by remember { mutableStateOf(false) }
-
-    Box(modifier = modifier) {
-        IconButton(
-            onClick = { show = true },
-            holdDownState = show,
-            content = content,
-        )
-
-        CouiCascadingMenuPopup(
-            show = show,
-            entries = entries,
-            onDismissRequest = { show = false },
-        )
-    }
-}
-
-/**
- * The popup half of [CouiCascadingMenu], for callers that own their own trigger.
- *
- * The popup anchors to the nearest enclosing `Box`, exactly as [CouiCascadingMenu] does, so a
+ * The popup anchors to the nearest enclosing `Box`, exactly as [OverlayListPopup] does, so a
  * caller places this next to its trigger inside one `Box`.
+ *
+ * @param show whether the popup is shown.
+ * @param entries grouped entries; items with non-empty [DropdownItem.children] open the second level.
+ * @param onDismissRequest invoked when the popup wants to be dismissed.
  */
 @Composable
 fun CouiCascadingMenuPopup(
@@ -76,55 +42,16 @@ fun CouiCascadingMenuPopup(
     entries: List<DropdownEntry>,
     onDismissRequest: () -> Unit,
 ) {
-    var expandedItem by remember { mutableStateOf<DropdownItem?>(null) }
-
-    LaunchedEffect(show) {
-        if (show) expandedItem = null
-    }
-
-    OverlayListPopup(
+    OverlayCascadingListPopup(
         show = show,
-        alignment = PopupPositionProvider.Align.End,
+        entries = entries,
         onDismissRequest = onDismissRequest,
-        onDismissFinished = { expandedItem = null },
-    ) {
-        // `OverlayListPopup` dismisses on ANY tap inside the popup surface, because the COUI
-        // popup rows deliberately do not consume pointer events (the row gesture host observes
-        // in the Initial pass and leaves the event unconsumed). That is fine for a flat menu,
-        // but it would close this menu before a second level could ever show. Consuming the UP
-        // here — strictly above `ListPopupColumn`, never between it and `DropdownImpl`, which
-        // would break the row parent data again — keeps the popup open for row taps while
-        // still letting an outside tap and the back gesture dismiss it.
-        Box(modifier = Modifier.consumeTapUp()) {
-            ListPopupColumn {
-                val expanded = expandedItem
-                if (expanded == null) {
-                    PrimaryRows(entries) { item, children ->
-                        if (children != null) {
-                            expandedItem = item
-                        } else {
-                            item.onClick?.invoke()
-                            onDismissRequest()
-                        }
-                    }
-                } else {
-                    SecondaryRows(
-                        parent = expanded,
-                        onBack = { expandedItem = null },
-                        onLeafClick = { item ->
-                            item.onClick?.invoke()
-                            onDismissRequest()
-                        },
-                    )
-                }
-            }
-        }
-    }
+        alignment = PopupPositionProvider.Align.End,
+    )
 }
 
 /**
- * Single-level COUI dropdown, for callers that own their own trigger (for example a
- * `TextButton`). Shares the row registration and dismiss handling of [CouiCascadingMenu].
+ * Single-level COUI dropdown, for callers that own their own trigger (for example a `TextButton`).
  */
 @Composable
 fun CouiFlatMenu(
@@ -163,7 +90,17 @@ private fun Modifier.consumeTapUp(): Modifier = pointerInput(Unit) {
     }
 }
 
-/** Top level: every item of every entry, in order, separated by group dividers. */
+/**
+ * The group every row of a flat menu declares.
+ *
+ * `ListPopupColumn` reserves a 12dp divider band between any two adjacent rows whose group key
+ * differs, and a `null` key never equals another `null` — so leaving it unset drew a hairline
+ * between *every* pair of rows. One shared key keeps the whole menu a single group, which is what
+ * ColorOS shows: a flat menu has no separators inside it.
+ */
+private val FlatMenuGroup = Any()
+
+/** Top level: every item of every entry, in order. */
 @Composable
 private fun PrimaryRows(
     entries: List<DropdownEntry>,
@@ -171,7 +108,7 @@ private fun PrimaryRows(
 ) {
     val rowCount = entries.sumOf { it.items.size }
     var index = 0
-    entries.forEachIndexed { entryIndex, entry ->
+    entries.forEach { entry ->
         entry.items.forEach { item ->
             key(item) {
                 val children = item.children?.takeIf { it.isNotEmpty() }
@@ -184,61 +121,11 @@ private fun PrimaryRows(
                     hasSubmenu = children != null,
                     isFirst = index == 0,
                     isLast = index == rowCount - 1,
+                    groupKey = FlatMenuGroup,
                     onSelectedIndexChange = { onItemSelected(item, children) },
                 )
             }
             index++
-        }
-        if (entryIndex != entries.lastIndex) {
-            key("groupDivider", entry) {
-                HorizontalDivider()
-            }
-        }
-    }
-}
-
-/**
- * Second level: the parent row doubles as the header (tapping it returns to the top level),
- * followed by the children. Mirrors COUI's cloned submenu header.
- */
-@Composable
-private fun SecondaryRows(
-    parent: DropdownItem,
-    onBack: () -> Unit,
-    onLeafClick: (DropdownItem) -> Unit,
-) {
-    val children = parent.children.orEmpty()
-    val rowCount = children.size + 1
-
-    key("header", parent) {
-        DropdownImpl(
-            item = parent,
-            optionSize = rowCount,
-            isSelected = false,
-            index = 0,
-            enabled = true,
-            hasSubmenu = true,
-            isFirst = true,
-            isLast = false,
-            onSelectedIndexChange = { onBack() },
-        )
-    }
-    key("headerDivider", parent) {
-        HorizontalDivider()
-    }
-    children.forEachIndexed { childIndex, child ->
-        key(child) {
-            DropdownImpl(
-                item = child,
-                optionSize = rowCount,
-                isSelected = child.selected,
-                index = childIndex + 1,
-                enabled = child.enabled,
-                hasSubmenu = false,
-                isFirst = false,
-                isLast = childIndex == children.lastIndex,
-                onSelectedIndexChange = { onLeafClick(child) },
-            )
         }
     }
 }

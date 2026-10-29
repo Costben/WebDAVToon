@@ -15,6 +15,7 @@ import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.extended.Filter
 import io.github.suqi8.coui.kmp.icon.extended.Layers
 import io.github.suqi8.coui.kmp.icon.extended.MoreCircle
+import io.github.suqi8.coui.kmp.theme.LocalContentColor
 
 /**
  * The single row of top-bar action icons shared by every screen.
@@ -30,11 +31,12 @@ import io.github.suqi8.coui.kmp.icon.extended.MoreCircle
  */
 object TopBarIcons {
     /**
-     * The glyph size inside the 40dp halo. COUI's own default is 24dp, which fills 60% of the
-     * circle; the system gallery on the same device draws an 18.6dp glyph in a 36dp circle, i.e.
-     * 52%. 20dp keeps that proportion without dropping the touch target.
+     * The glyph box inside the 40dp halo, at COUI's own 24dp. ColorOS 17's gallery measures 84px
+     * for this box on the PKT110 — 24dp at the gallery's 3.5 px/dp — and the glyph inside covers
+     * roughly 86% of it, so a 24dp box is what puts our ink on the same weight as the key beside
+     * it. The 20dp this used to be compared against a 36dp circle the gallery no longer draws.
      */
-    val Size = 20.dp
+    val Size = 24.dp
 
     /** Opens the server panel (a bottom sheet, hence the stacked-drawer glyph). */
     val Panel = COUIIcons.Light.Layers
@@ -51,7 +53,7 @@ fun TopBarActionIcon(
     icon: ImageVector,
     contentDescription: String?,
     modifier: Modifier = Modifier,
-    tint: Color = Color.Unspecified,
+    tint: Color = LocalContentColor.current,
 ) {
     Icon(
         imageVector = icon,
@@ -68,6 +70,10 @@ fun TopBarActionIcon(
  * COUI's [HighlightedIconButton] draws the halo itself, so the 40dp action slot is the only
  * thing the caller has to supply. Wrapping it in [io.github.suqi8.coui.kmp.basic.IconButton]
  * would hand the halo a 48dp rounded-square ripple instead.
+ *
+ * [iconTint] is resolved inside the button, because that is where [HighlightedIconButton]
+ * publishes the colour the glyph is meant to wear (`onBackground` lightened toward white while
+ * pressed). Reading it at the call site would only ever see the colour outside the halo.
  */
 @Composable
 fun HighlightedTopBarAction(
@@ -75,12 +81,12 @@ fun HighlightedTopBarAction(
     contentDescription: String?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    iconTint: Color = Color.Unspecified,
+    iconTint: Color? = null,
 ) {
     HighlightedIconButton(
         onClick = onClick,
         modifier = modifier.couiTopAppBarActionItem(),
     ) {
-        TopBarActionIcon(icon, contentDescription, tint = iconTint)
+        TopBarActionIcon(icon, contentDescription, tint = iconTint ?: LocalContentColor.current)
     }
 }

@@ -18,8 +18,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -43,10 +41,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import erl.webdavtoon.R
 import erl.webdavtoon.ui.component.CouiCascadingMenuPopup
+import erl.webdavtoon.ui.component.GalleryBottomCapsule
+import erl.webdavtoon.ui.component.GalleryFloatingToolbar
 import erl.webdavtoon.ui.theme.LocalDarkTheme
 import io.github.suqi8.coui.kmp.basic.DropdownEntry
 import io.github.suqi8.coui.kmp.basic.DropdownItem
-import io.github.suqi8.coui.kmp.basic.FloatingToolbar
 import io.github.suqi8.coui.kmp.basic.Icon
 import io.github.suqi8.coui.kmp.basic.IconButton
 import io.github.suqi8.coui.kmp.basic.Slider
@@ -69,13 +68,15 @@ import io.github.suqi8.coui.kmp.theme.COUITheme
 import kotlin.math.roundToInt
 
 // Fixed skeleton for every bottom-bar slot. These are the only values the four function
-// buttons are allowed to differ in, and they differ in none of them.
+// buttons are allowed to differ in, and they differ in none of them. The slot, icon box and
+// label follow the gallery's tab row — 48dp, 24dp and 10sp — so the island's buttons measure
+// the same as the ones on the gallery's own bottom bar.
 private val BottomActionRowInset = 8.dp
-private val BottomActionSlotHeight = 46.dp
-private val BottomActionIconSize = 22.dp
-private val BottomActionIconLabelGap = 3.dp
-private val BottomActionLabelSize = 11.sp
-private val BottomActionLabelLineHeight = 13.sp
+private val BottomActionSlotHeight = 48.dp
+private val BottomActionIconSize = 24.dp
+private val BottomActionIconLabelGap = 2.dp
+private val BottomActionLabelSize = 10.sp
+private val BottomActionLabelLineHeight = 12.sp
 
 /**
  * HyperOS / Miuix styled floating translucent overlay for the immersive reader.
@@ -128,8 +129,9 @@ fun ReaderOverlayMiuix(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .statusBarsPadding()
-            .navigationBarsPadding(),
+            // The bottom island carries the gallery's own 8dp/36dp navigation padding itself
+            // (see GalleryBottomCapsule), so the raw inset must not be added on top of it.
+            .statusBarsPadding(),
     ) {
         // Top Bar
         AnimatedVisibility(
@@ -141,13 +143,11 @@ fun ReaderOverlayMiuix(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp),
         ) {
-            FloatingToolbar(
+            GalleryFloatingToolbar(
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 600.dp),
                 color = toolbarBackgroundColor,
-                outSidePadding = PaddingValues(0.dp),
-                shadowElevation = 6.dp,
             ) {
                 Row(
                     modifier = Modifier
@@ -155,7 +155,11 @@ fun ReaderOverlayMiuix(
                         .padding(horizontal = 8.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    IconButton(onClick = onBack) {
+                    IconButton(
+                        onClick = onBack,
+                        minWidth = 40.dp,
+                        minHeight = 40.dp,
+                    ) {
                         Icon(
                             imageVector = COUIIcons.Light.Back,
                             contentDescription = stringResource(R.string.back),
@@ -185,21 +189,29 @@ fun ReaderOverlayMiuix(
                         )
                     }
 
-                    IconButton(onClick = onToggleFavorite) {
+                    IconButton(
+                        onClick = onToggleFavorite,
+                        minWidth = 40.dp,
+                        minHeight = 40.dp,
+                    ) {
                         Icon(
                             imageVector = if (isFavorite) COUIIcons.Light.FavoritesFill else COUIIcons.Light.Favorites,
                             contentDescription = stringResource(R.string.favorite),
                             tint = if (isFavorite) Color(0xFFFFB300) else COUITheme.colorScheme.onSurface,
-                            modifier = Modifier.size(22.dp),
+                            modifier = Modifier.size(24.dp),
                         )
                     }
 
-                    IconButton(onClick = onShare) {
+                    IconButton(
+                        onClick = onShare,
+                        minWidth = 40.dp,
+                        minHeight = 40.dp,
+                    ) {
                         Icon(
                             imageVector = COUIIcons.Light.Share,
                             contentDescription = stringResource(R.string.share),
                             tint = COUITheme.colorScheme.onSurface,
-                            modifier = Modifier.size(22.dp),
+                            modifier = Modifier.size(24.dp),
                         )
                     }
                 }
@@ -213,16 +225,13 @@ fun ReaderOverlayMiuix(
             exit = fadeOut() + slideOutVertically { it },
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .fillMaxWidth(),
         ) {
-            FloatingToolbar(
+            GalleryBottomCapsule(
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 600.dp),
                 color = toolbarBackgroundColor,
-                outSidePadding = PaddingValues(0.dp),
-                shadowElevation = 6.dp,
             ) {
                 Column(
                     modifier = Modifier

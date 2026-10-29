@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
@@ -24,14 +25,18 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import erl.webdavtoon.R
+import erl.webdavtoon.ui.component.GalleryTopAppBar
 import erl.webdavtoon.ui.component.GlassTopBarScaffold
 import erl.webdavtoon.ui.component.HighlightedTopBarAction
+import erl.webdavtoon.ui.component.rememberGalleryScrollBehavior
+import erl.webdavtoon.ui.component.rememberGalleryTopBarScrollConnection
 import io.github.suqi8.coui.kmp.basic.BasicComponent
 import io.github.suqi8.coui.kmp.basic.Card
 import io.github.suqi8.coui.kmp.basic.CircularProgressIndicator
@@ -40,7 +45,6 @@ import io.github.suqi8.coui.kmp.basic.IconButton
 import io.github.suqi8.coui.kmp.basic.Scaffold
 import io.github.suqi8.coui.kmp.basic.SmallTitle
 import io.github.suqi8.coui.kmp.basic.Text
-import io.github.suqi8.coui.kmp.basic.TopAppBar
 import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.extended.Back
 import io.github.suqi8.coui.kmp.icon.extended.ExpandLess
@@ -57,13 +61,21 @@ fun LicensesScreen(
     viewModel: LicensesViewModel,
     modifier: Modifier = Modifier,
 ) {
+    // Same collapsing header as the settings list it is reached from.
+    val topAppBarScrollBehavior = rememberGalleryScrollBehavior()
+    val listState = rememberLazyListState()
+    val scrollConnection = rememberGalleryTopBarScrollConnection(
+        scrollBehavior = topAppBarScrollBehavior,
+        atTop = {
+            listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
+        },
+    )
     GlassTopBarScaffold(
         modifier = modifier,
         topBar = {
-            TopAppBar(
+            GalleryTopAppBar(
                 title = stringResource(R.string.oss_licenses),
-                gradientGlass = true,
-                showDivider = false,
+                scrollBehavior = topAppBarScrollBehavior,
                 navigationIcon = {
                     HighlightedTopBarAction(
                         icon = COUIIcons.Light.Back,
@@ -75,7 +87,8 @@ fun LicensesScreen(
         },
     ) { paddingValues ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().nestedScroll(scrollConnection),
+            state = listState,
             contentPadding = PaddingValues(
                 top = paddingValues.calculateTopPadding() + 12.dp,
                 bottom = paddingValues.calculateBottomPadding(),

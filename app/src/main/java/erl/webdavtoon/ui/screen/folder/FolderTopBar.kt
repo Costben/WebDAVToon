@@ -20,6 +20,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import erl.webdavtoon.ui.component.AnimatedSearchField
 import erl.webdavtoon.ui.component.CouiCascadingMenuPopup
+import erl.webdavtoon.ui.component.GalleryTopAppBar
 import erl.webdavtoon.ui.component.HighlightedTopBarAction
 import erl.webdavtoon.ui.component.TopBarIcons
 import erl.webdavtoon.ui.component.rememberStrongHaptic
@@ -31,7 +32,6 @@ import io.github.suqi8.coui.kmp.basic.DropdownItem
 import io.github.suqi8.coui.kmp.basic.Icon
 import io.github.suqi8.coui.kmp.basic.ScrollBehavior
 import io.github.suqi8.coui.kmp.basic.Text as MiuixText
-import io.github.suqi8.coui.kmp.basic.TopAppBar as MiuixTopAppBar
 import io.github.suqi8.coui.kmp.basic.couiGlassHeader
 import io.github.suqi8.coui.kmp.blur.LocalBackdrop
 import io.github.suqi8.coui.kmp.icon.COUIIcons
@@ -117,13 +117,9 @@ fun FolderTopBarMiuix(
                 )
             }
         } else {
-            MiuixTopAppBar(
+            GalleryTopAppBar(
                 title = stringResource(R.string.app_name),
                 scrollBehavior = scrollBehavior,
-                // ColorOS 17's gradient glass: the bar blurs what scrolls under it and lets the
-                // material dissolve instead of ending on the hairline.
-                gradientGlass = true,
-                showDivider = false,
                 actions = {
                     // COUI keeps the top-left slot for back/cancel only; a root page leaves it empty
                     // and puts every action in the top-right group (see the COUI example app's

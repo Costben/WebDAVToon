@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -32,15 +31,13 @@ import erl.webdavtoon.Folder
 import erl.webdavtoon.R
 import erl.webdavtoon.SettingsManager
 import erl.webdavtoon.ui.component.AnimatedSearchField
+import io.github.suqi8.coui.kmp.basic.BottomFloatingNavigationBarDefaults
 import io.github.suqi8.coui.kmp.basic.CircularProgressIndicator as MiuixCircularProgressIndicator
 import io.github.suqi8.coui.kmp.basic.Icon as MiuixIcon
 import io.github.suqi8.coui.kmp.basic.PullToRefresh
-import io.github.suqi8.coui.kmp.basic.COUIScrollBehavior
 import io.github.suqi8.coui.kmp.basic.ScrollBehavior
 import io.github.suqi8.coui.kmp.basic.Text as MiuixText
-import io.github.suqi8.coui.kmp.basic.TopAppBar as MiuixTopAppBar
 import io.github.suqi8.coui.kmp.basic.couiGlassHeader
-import io.github.suqi8.coui.kmp.basic.rememberTopAppBarState
 import io.github.suqi8.coui.kmp.basic.DropdownEntry
 import io.github.suqi8.coui.kmp.basic.DropdownItem
 import io.github.suqi8.coui.kmp.blur.LocalBackdrop
@@ -58,7 +55,11 @@ import io.github.suqi8.coui.kmp.icon.extended.Settings
 import io.github.suqi8.coui.kmp.icon.extended.Sort
 import erl.webdavtoon.ui.component.CouiCascadingMenuPopup
 import erl.webdavtoon.ui.component.CouiFloatingBall
+import erl.webdavtoon.ui.component.GalleryChrome
+import erl.webdavtoon.ui.component.GalleryTopAppBar
 import erl.webdavtoon.ui.component.GlassTopBarScaffold
+import erl.webdavtoon.ui.component.rememberGalleryScrollBehavior
+import erl.webdavtoon.ui.component.rememberGalleryTopBarScrollConnection
 import erl.webdavtoon.ui.component.HighlightedTopBarAction
 import erl.webdavtoon.ui.component.TopBarIcons
 import erl.webdavtoon.ui.component.rememberTapHaptic
@@ -117,9 +118,10 @@ fun MixedWaterfallScreen(
     }
 
     // Pins the title to the toolbar row while scrolled down and expands only at the list's top.
-    val topAppBarScrollBehavior = COUIScrollBehavior(
-        state = rememberTopAppBarState(),
-        expandOnContentScroll = false,
+    val topAppBarScrollBehavior = rememberGalleryScrollBehavior()
+    val topAppBarScrollConnection = rememberGalleryTopBarScrollConnection(
+        scrollBehavior = topAppBarScrollBehavior,
+        atTop = { zoomState.scrollOffset == 0 },
     )
 
     GlassTopBarScaffold(
@@ -186,7 +188,7 @@ fun MixedWaterfallScreen(
                             itemHorizontalPadding = MediaCardImageMargin,
                             modifier = Modifier
                                 .fillMaxSize()
-                                .nestedScroll(topAppBarScrollBehavior.nestedScrollConnection),
+                                .nestedScroll(topAppBarScrollConnection),
                         ) { index, widthPx, heightPx ->
                             // A filtered list can shrink while a stale subcomposition is still
                             // alive, so guard the index instead of crashing the composer.
@@ -206,14 +208,21 @@ fun MixedWaterfallScreen(
             }
 
             if (!uiState.isSelectionMode && !uiState.isFavorites) {
-                CouiFloatingBall(
-                    onClick = actions.onOpenRecursiveBrowser,
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .navigationBarsPadding()
-                        .padding(20.dp),
-                ) {
-                    MiuixIcon(COUIIcons.Light.Add, contentDescription = null)
+                val ballModifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    // Same 16dp / 24dp placement as the gallery's accessory ball, measured on the
+                    // PKT110 as 56px and 84px at the gallery's 3.5 px/dp.
+                    .padding(
+                        end = 16.dp,
+                        bottom = BottomFloatingNavigationBarDefaults.navigationBarPadding() + 16.dp,
+                    )
+                GalleryChrome {
+                    CouiFloatingBall(
+                        onClick = actions.onOpenRecursiveBrowser,
+                        modifier = ballModifier,
+                    ) {
+                        MiuixIcon(COUIIcons.Light.Add, contentDescription = null)
+                    }
                 }
             }
 
@@ -297,11 +306,9 @@ private fun MixedWaterfallTopBarMiuix(
     }
 
     Column(modifier = modifier) {
-        MiuixTopAppBar(
+        GalleryTopAppBar(
             title = titleText,
             scrollBehavior = scrollBehavior,
-            gradientGlass = true,
-            showDivider = false,
             navigationIcon = {
                 HighlightedTopBarAction(
                     icon = when {

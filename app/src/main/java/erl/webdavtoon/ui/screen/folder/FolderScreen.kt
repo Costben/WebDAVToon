@@ -25,19 +25,21 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import erl.webdavtoon.ui.component.AppAdaptiveNavigationScaffold
 import erl.webdavtoon.ui.component.CouiFloatingBall
+import erl.webdavtoon.ui.component.GalleryChrome
 import erl.webdavtoon.ui.component.GlassTopBarScaffold
 import erl.webdavtoon.ui.component.ServerSheetActions
+import erl.webdavtoon.ui.component.rememberGalleryScrollBehavior
+import erl.webdavtoon.ui.component.rememberGalleryTopBarScrollConnection
 import erl.webdavtoon.ui.screen.waterfall.FolderCardExtraHeight
 import erl.webdavtoon.ui.screen.waterfall.FollowZoomWaterfallLayout
 import erl.webdavtoon.ui.screen.waterfall.MediaCardImageMargin
 import erl.webdavtoon.ui.screen.waterfall.rememberFollowZoomGridState
-import io.github.suqi8.coui.kmp.basic.COUIScrollBehavior
+import io.github.suqi8.coui.kmp.basic.BottomFloatingNavigationBarDefaults
 import io.github.suqi8.coui.kmp.basic.CircularProgressIndicator as MiuixCircularProgressIndicator
 import io.github.suqi8.coui.kmp.basic.Icon as MiuixIcon
 import io.github.suqi8.coui.kmp.basic.PullToRefresh
 import io.github.suqi8.coui.kmp.basic.ScrollBehavior
 import io.github.suqi8.coui.kmp.basic.Text as MiuixText
-import io.github.suqi8.coui.kmp.basic.rememberTopAppBarState
 import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.extended.Add
 import io.github.suqi8.coui.kmp.theme.COUITheme
@@ -112,10 +114,7 @@ fun FolderScreen(
 
     // Pins the title to the toolbar row while scrolled down and expands back into the large-title
     // row only when reaching the top of the list, matching native ColorOS headers.
-    val topAppBarScrollBehavior = COUIScrollBehavior(
-        state = rememberTopAppBarState(),
-        expandOnContentScroll = false,
-    )
+    val topAppBarScrollBehavior = rememberGalleryScrollBehavior()
 
     AppAdaptiveNavigationScaffold(
         showServerSheet = showServerSheet,
@@ -157,14 +156,23 @@ fun FolderScreen(
                         )
                     }
                 }
-                CouiFloatingBall(
-                    onClick = actions.onOpenRecursiveBrowser,
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .navigationBarsPadding()
-                        .padding(20.dp),
-                ) {
-                    MiuixIcon(COUIIcons.Light.Add, contentDescription = null)
+                val ballModifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    // The gallery's accessory ball sits 16dp off the right edge and 24dp off the
+                    // bottom: the host's 8dp under gesture navigation plus the 16dp it is centred
+                    // by inside the bar's 88dp box. The density scope below turns those into the
+                    // gallery's own pixels.
+                    .padding(
+                        end = 16.dp,
+                        bottom = BottomFloatingNavigationBarDefaults.navigationBarPadding() + 16.dp,
+                    )
+                GalleryChrome {
+                    CouiFloatingBall(
+                        onClick = actions.onOpenRecursiveBrowser,
+                        modifier = ballModifier,
+                    ) {
+                        MiuixIcon(COUIIcons.Light.Add, contentDescription = null)
+                    }
                 }
             }
         }
@@ -188,6 +196,11 @@ private fun FolderGrid(
     )
     val aspectRatios = remember(folders) { List(folders.size) { 1f } }
     val extraHeights = remember(folders) { List(folders.size) { FolderCardExtraHeight } }
+    val scrollConnection = if (scrollBehavior != null) {
+        rememberGalleryTopBarScrollConnection(scrollBehavior) { zoomState.scrollOffset == 0 }
+    } else {
+        null
+    }
     when {
         uiState.loading -> Box(
             modifier.padding(top = topContentPadding),
@@ -225,8 +238,8 @@ private fun FolderGrid(
             modifier = modifier
                 .navigationBarsPadding()
                 .then(
-                    if (scrollBehavior != null) {
-                        Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
+                    if (scrollConnection != null) {
+                        Modifier.nestedScroll(scrollConnection)
                     } else {
                         Modifier
                     }

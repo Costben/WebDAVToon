@@ -11,9 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -29,10 +27,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import erl.webdavtoon.R
+import erl.webdavtoon.ui.component.GalleryBottomCapsule
 import erl.webdavtoon.ui.component.rememberStrongHaptic
 import erl.webdavtoon.ui.component.rememberTapHaptic
 import erl.webdavtoon.ui.theme.LocalDarkTheme
-import io.github.suqi8.coui.kmp.basic.FloatingToolbar
 import io.github.suqi8.coui.kmp.basic.Icon
 import io.github.suqi8.coui.kmp.basic.Text
 import io.github.suqi8.coui.kmp.icon.COUIIcons
@@ -71,24 +69,21 @@ fun SelectionBottomBarMiuix(
     }
 
     Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+        modifier = modifier.fillMaxWidth(),
         contentAlignment = Alignment.Center,
     ) {
-        FloatingToolbar(
+        GalleryBottomCapsule(
             modifier = Modifier
                 .fillMaxWidth()
                 .widthIn(max = 520.dp),
             color = toolbarBackgroundColor,
-            outSidePadding = PaddingValues(0.dp),
-            shadowElevation = 6.dp,
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                    // 48dp slots inside a 56dp capsule, as the gallery's tab row: the 4dp here
+                    // and the 48dp in MiuixActionItem add up to the capsule's 56dp.
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -169,25 +164,28 @@ private fun RowScope.MiuixActionItem(
     Column(
         modifier = Modifier
             .weight(1f)
+            // The gallery's tab slot measures 168px — 48dp at its 3.5 px/dp — with a 24dp icon
+            // box and a 10sp label.
+            .height(48.dp)
             .clip(RoundedCornerShape(16.dp))
             .clickable(
                 enabled = enabled,
                 onClick = onClick,
             )
-            .padding(vertical = 6.dp, horizontal = 2.dp),
+            .padding(horizontal = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
         Icon(
             imageVector = icon,
             contentDescription = label,
-            modifier = Modifier.size(22.dp),
+            modifier = Modifier.size(24.dp),
             tint = tint,
         )
-        Spacer(modifier = Modifier.height(3.dp))
+        Spacer(modifier = Modifier.height(2.dp))
         Text(
             text = label,
-            style = COUITheme.textStyles.footnote2.copy(fontSize = 11.sp),
+            style = COUITheme.textStyles.footnote2.copy(fontSize = 10.sp),
             color = tint,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
