@@ -8,7 +8,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -17,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,17 +33,17 @@ import erl.webdavtoon.R
 import erl.webdavtoon.SettingsManager
 import erl.webdavtoon.ui.component.AnimatedSearchField
 import io.github.suqi8.coui.kmp.basic.CircularProgressIndicator as MiuixCircularProgressIndicator
-import io.github.suqi8.coui.kmp.basic.FloatingActionButton as MiuixFloatingActionButton
 import io.github.suqi8.coui.kmp.basic.Icon as MiuixIcon
-import io.github.suqi8.coui.kmp.basic.IconButton as MiuixIconButton
 import io.github.suqi8.coui.kmp.basic.PullToRefresh
 import io.github.suqi8.coui.kmp.basic.COUIScrollBehavior
 import io.github.suqi8.coui.kmp.basic.ScrollBehavior
 import io.github.suqi8.coui.kmp.basic.Text as MiuixText
 import io.github.suqi8.coui.kmp.basic.TopAppBar as MiuixTopAppBar
+import io.github.suqi8.coui.kmp.basic.couiGlassHeader
 import io.github.suqi8.coui.kmp.basic.rememberTopAppBarState
 import io.github.suqi8.coui.kmp.basic.DropdownEntry
 import io.github.suqi8.coui.kmp.basic.DropdownItem
+import io.github.suqi8.coui.kmp.blur.LocalBackdrop
 import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.extended.Add
 import io.github.suqi8.coui.kmp.icon.extended.Back
@@ -58,8 +56,10 @@ import io.github.suqi8.coui.kmp.icon.extended.Ok
 import io.github.suqi8.coui.kmp.icon.extended.Refresh
 import io.github.suqi8.coui.kmp.icon.extended.Settings
 import io.github.suqi8.coui.kmp.icon.extended.Sort
-import erl.webdavtoon.ui.component.CouiCascadingMenu
-import erl.webdavtoon.ui.component.TopBarActionIcon
+import erl.webdavtoon.ui.component.CouiCascadingMenuPopup
+import erl.webdavtoon.ui.component.CouiFloatingBall
+import erl.webdavtoon.ui.component.GlassTopBarScaffold
+import erl.webdavtoon.ui.component.HighlightedTopBarAction
 import erl.webdavtoon.ui.component.TopBarIcons
 import erl.webdavtoon.ui.component.rememberTapHaptic
 import io.github.suqi8.coui.kmp.theme.COUITheme
@@ -116,24 +116,23 @@ fun MixedWaterfallScreen(
         }
     }
 
-    val topAppBarScrollBehavior = COUIScrollBehavior(rememberTopAppBarState())
+    // See FolderScreen: the bar follows a downward drag anywhere, not only at the list's top.
+    val topAppBarScrollBehavior = COUIScrollBehavior(
+        state = rememberTopAppBarState(),
+        expandOnContentScroll = true,
+    )
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(COUITheme.colorScheme.surface)
-    ) {
-        MixedWaterfallTopBarMiuix(
-            uiState = uiState,
-            actions = actions,
-            scrollBehavior = topAppBarScrollBehavior,
-        )
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .weight(1f)
-        ) {
+    GlassTopBarScaffold(
+        modifier = modifier,
+        topBar = {
+            MixedWaterfallTopBarMiuix(
+                uiState = uiState,
+                actions = actions,
+                scrollBehavior = topAppBarScrollBehavior,
+            )
+        },
+    ) { padding ->
+        Box(modifier = Modifier.fillMaxSize()) {
             PullToRefresh(
                 isRefreshing = uiState.isRefreshing,
                 onRefresh = actions.onRefresh,
@@ -152,6 +151,7 @@ fun MixedWaterfallScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
+                                .padding(top = padding.calculateTopPadding())
                                 .padding(24.dp),
                             contentAlignment = Alignment.Center,
                         ) {
@@ -173,7 +173,14 @@ fun MixedWaterfallScreen(
                             maxColumns = 4,
                             onColumnsChanged = actions.onColumnsChange,
                             spacing = 12.dp,
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                            // The top inset is the app bar's height: the grid starts below the bar
+                            // and slides under its glass while scrolling.
+                            contentPadding = PaddingValues(
+                                start = 16.dp,
+                                top = padding.calculateTopPadding() + 12.dp,
+                                end = 16.dp,
+                                bottom = 12.dp,
+                            ),
                             state = zoomState,
                             itemExtraHeights = extraHeights,
                             itemHorizontalPadding = MediaCardImageMargin,
@@ -199,7 +206,7 @@ fun MixedWaterfallScreen(
             }
 
             if (!uiState.isSelectionMode && !uiState.isFavorites) {
-                MiuixFloatingActionButton(
+                CouiFloatingBall(
                     onClick = actions.onOpenRecursiveBrowser,
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
@@ -289,52 +296,52 @@ private fun MixedWaterfallTopBarMiuix(
         }
     }
 
-    Column(modifier = modifier.statusBarsPadding()) {
+    Column(modifier = modifier) {
         MiuixTopAppBar(
             title = titleText,
             scrollBehavior = scrollBehavior,
+            gradientGlass = true,
+            showDivider = false,
             navigationIcon = {
-                MiuixIconButton(onClick = onNavClick) {
-                    if (uiState.isSelectionMode) {
-                        MiuixIcon(
-                            COUIIcons.Light.Close,
-                            contentDescription = stringResource(R.string.cancel),
-                        )
-                    } else if (uiState.isRootPage && actions.onOpenDrawer != null) {
-                        TopBarActionIcon(
-                            TopBarIcons.Panel,
-                            contentDescription = stringResource(R.string.navigation_drawer_open),
-                        )
-                    } else {
-                        MiuixIcon(
-                            COUIIcons.Light.Back,
-                            contentDescription = stringResource(R.string.back),
-                        )
-                    }
-                }
+                HighlightedTopBarAction(
+                    icon = when {
+                        uiState.isSelectionMode -> COUIIcons.Light.Close
+                        uiState.isRootPage && actions.onOpenDrawer != null -> TopBarIcons.Panel
+                        else -> COUIIcons.Light.Back
+                    },
+                    contentDescription = when {
+                        uiState.isSelectionMode -> stringResource(R.string.cancel)
+                        uiState.isRootPage && actions.onOpenDrawer != null ->
+                            stringResource(R.string.navigation_drawer_open)
+                        else -> stringResource(R.string.back)
+                    },
+                    onClick = onNavClick,
+                )
             },
             actions = {
                 if (!uiState.isSelectionMode) {
-                    MiuixIconButton(onClick = { searchExpanded = true }) {
-                        TopBarActionIcon(
-                            TopBarIcons.Filter,
-                            contentDescription = stringResource(R.string.filter),
-                        )
-                    }
+                    HighlightedTopBarAction(
+                        icon = TopBarIcons.Filter,
+                        contentDescription = stringResource(R.string.filter),
+                        onClick = { searchExpanded = true },
+                    )
                     MixedWaterfallMiuixMenuButton(uiState = uiState, actions = actions)
                 }
             },
         )
-        AnimatedSearchField(
-            value = uiState.searchKeyword,
-            onValueChange = actions.onSearchQueryChange,
+        // The expanded search band wears the same glass as the bar above it.
+        Column(modifier = Modifier.couiGlassHeader(LocalBackdrop.current, COUITheme.colorScheme.surface)) {
+            AnimatedSearchField(
+                value = uiState.searchKeyword,
+                onValueChange = actions.onSearchQueryChange,
                 placeholder = stringResource(R.string.search_photos),
                 visible = !uiState.isSelectionMode && searchExpanded,
-            onClose = {
-                actions.onClearSearch()
-                searchExpanded = false
-            },
-        )
+                onClose = {
+                    actions.onClearSearch()
+                    searchExpanded = false
+                },
+            )
+        }
     }
 }
 
@@ -347,6 +354,7 @@ private fun MixedWaterfallMiuixMenuButton(
     uiState: MixedWaterfallUiState,
     actions: MixedWaterfallActions,
 ) {
+    var showMenu by remember { mutableStateOf(false) }
     val sortItems = mixedSortItems().map { (order, label) ->
         DropdownItem(
             text = label,
@@ -410,14 +418,21 @@ private fun MixedWaterfallMiuixMenuButton(
         )
     }
 
-    CouiCascadingMenu(
-        entries = listOf(
-            DropdownEntry(
-                items = menuItems,
+    Box {
+        HighlightedTopBarAction(
+            icon = TopBarIcons.More,
+            contentDescription = stringResource(R.string.more),
+            onClick = { showMenu = true },
+        )
+        CouiCascadingMenuPopup(
+            show = showMenu,
+            entries = listOf(
+                DropdownEntry(
+                    items = menuItems,
+                ),
             ),
-        ),
-    ) {
-        TopBarActionIcon(TopBarIcons.More, contentDescription = stringResource(R.string.more))
+            onDismissRequest = { showMenu = false },
+        )
     }
 }
 

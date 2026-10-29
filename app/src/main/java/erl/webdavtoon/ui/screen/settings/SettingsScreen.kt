@@ -28,6 +28,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import erl.webdavtoon.BuildConfig
 import erl.webdavtoon.R
+import erl.webdavtoon.ui.component.GlassTopBarScaffold
+import erl.webdavtoon.ui.component.HighlightedTopBarAction
 import io.github.suqi8.coui.kmp.basic.BasicComponent
 import io.github.suqi8.coui.kmp.basic.Card
 import io.github.suqi8.coui.kmp.basic.DropdownItem
@@ -87,19 +89,22 @@ fun SettingsScreen(
     actions: SettingsActions,
     modifier: Modifier = Modifier,
 ) {
-    Scaffold(
+    GlassTopBarScaffold(
         modifier = modifier,
         topBar = {
             TopAppBar(
                 title = stringResource(R.string.settings),
+                gradientGlass = true,
+                showDivider = false,
                 navigationIcon = {
-                    IconButton(onClick = actions.onBack) {
-                        Icon(COUIIcons.Light.Back, contentDescription = stringResource(R.string.back))
-                    }
+                    HighlightedTopBarAction(
+                        icon = COUIIcons.Light.Back,
+                        contentDescription = stringResource(R.string.back),
+                        onClick = actions.onBack,
+                    )
                 },
             )
         },
-        containerColor = COUITheme.colorScheme.surface,
     ) { paddingValues ->
         if (uiState.loading) {
             Box(

@@ -2,7 +2,7 @@
 // Copyright (C) 2026 Rin Shibuya
 package erl.webdavtoon.ui.screen.folder
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,8 +19,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import erl.webdavtoon.ui.component.AnimatedSearchField
-import erl.webdavtoon.ui.component.CouiCascadingMenu
-import erl.webdavtoon.ui.component.TopBarActionIcon
+import erl.webdavtoon.ui.component.CouiCascadingMenuPopup
+import erl.webdavtoon.ui.component.HighlightedTopBarAction
 import erl.webdavtoon.ui.component.TopBarIcons
 import erl.webdavtoon.ui.component.rememberStrongHaptic
 import erl.webdavtoon.ui.component.rememberTapHaptic
@@ -29,10 +29,11 @@ import erl.webdavtoon.SettingsManager
 import io.github.suqi8.coui.kmp.basic.DropdownEntry
 import io.github.suqi8.coui.kmp.basic.DropdownItem
 import io.github.suqi8.coui.kmp.basic.Icon
-import io.github.suqi8.coui.kmp.basic.IconButton
 import io.github.suqi8.coui.kmp.basic.ScrollBehavior
 import io.github.suqi8.coui.kmp.basic.Text as MiuixText
 import io.github.suqi8.coui.kmp.basic.TopAppBar as MiuixTopAppBar
+import io.github.suqi8.coui.kmp.basic.couiGlassHeader
+import io.github.suqi8.coui.kmp.blur.LocalBackdrop
 import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.extended.Close
 import io.github.suqi8.coui.kmp.icon.extended.Delete
@@ -72,18 +73,23 @@ fun FolderTopBarMiuix(
     val tapHaptic = rememberTapHaptic()
     val strongHaptic = rememberStrongHaptic()
 
-    Column(modifier = modifier.background(COUITheme.colorScheme.surface).statusBarsPadding()) {
+    Column(modifier = modifier) {
         if (uiState.isSelectionMode) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = {
-                    tapHaptic()
-                    actions.onClearSelection()
-                }) {
-                    Icon(COUIIcons.Light.Close, contentDescription = stringResource(R.string.cancel))
-                }
+                HighlightedTopBarAction(
+                    icon = COUIIcons.Light.Close,
+                    contentDescription = stringResource(R.string.cancel),
+                    onClick = {
+                        tapHaptic()
+                        actions.onClearSelection()
+                    },
+                )
                 MiuixText(
                     text = stringResource(R.string.selected_count, uiState.selectedCount),
                     modifier = Modifier.weight(1f),
@@ -92,51 +98,68 @@ fun FolderTopBarMiuix(
                     overflow = TextOverflow.Ellipsis,
                     softWrap = false,
                 )
-                IconButton(onClick = {
-                    tapHaptic()
-                    actions.onSelectAll()
-                }) {
-                    Icon(COUIIcons.Light.SelectAll, contentDescription = "Select all")
-                }
-                IconButton(onClick = {
-                    strongHaptic()
-                    actions.onDeleteSelected()
-                }) {
-                    Icon(COUIIcons.Light.Delete, contentDescription = stringResource(R.string.delete), tint = COUITheme.colorScheme.error)
-                }
+                HighlightedTopBarAction(
+                    icon = COUIIcons.Light.SelectAll,
+                    contentDescription = "Select all",
+                    onClick = {
+                        tapHaptic()
+                        actions.onSelectAll()
+                    },
+                )
+                HighlightedTopBarAction(
+                    icon = COUIIcons.Light.Delete,
+                    contentDescription = stringResource(R.string.delete),
+                    onClick = {
+                        strongHaptic()
+                        actions.onDeleteSelected()
+                    },
+                    iconTint = COUITheme.colorScheme.error,
+                )
             }
         } else {
             MiuixTopAppBar(
                 title = stringResource(R.string.app_name),
                 scrollBehavior = scrollBehavior,
+                // ColorOS 17's gradient glass: the bar blurs what scrolls under it and lets the
+                // material dissolve instead of ending on the hairline.
+                gradientGlass = true,
+                showDivider = false,
                 actions = {
                     // COUI keeps the top-left slot for back/cancel only; a root page leaves it empty
                     // and puts every action in the top-right group (see the COUI example app's
                     // Home page). The server-panel switcher is an action, so it lives here.
-                    IconButton(onClick = actions.onOpenDrawer) {
-                        TopBarActionIcon(TopBarIcons.Panel, contentDescription = stringResource(R.string.navigation_drawer_open))
-                    }
-                    IconButton(onClick = {
-                        searchExpanded = true
-                        actions.onToggleSearch()
-                    }) {
-                        TopBarActionIcon(TopBarIcons.Filter, contentDescription = stringResource(R.string.filter))
-                    }
+                    HighlightedTopBarAction(
+                        icon = TopBarIcons.Panel,
+                        contentDescription = stringResource(R.string.navigation_drawer_open),
+                        onClick = actions.onOpenDrawer,
+                    )
+                    HighlightedTopBarAction(
+                        icon = TopBarIcons.Filter,
+                        contentDescription = stringResource(R.string.filter),
+                        onClick = {
+                            searchExpanded = true
+                            actions.onToggleSearch()
+                        },
+                    )
                     FolderMiuixMenuButton(uiState = uiState, actions = actions)
                 },
             )
         }
-        AnimatedSearchField(
-            value = uiState.searchKeyword,
-            onValueChange = actions.onSearchQueryChange,
-            placeholder = stringResource(R.string.search_folders),
-            visible = !uiState.isSelectionMode && searchExpanded,
-            onClose = {
-                actions.onClearSearch()
-                actions.onSearchQueryChange("")
-                searchExpanded = false
-            },
-        )
+        // The expanded search band is part of the bar, so it wears the same glass instead of
+        // letting the list show through the gap around the field.
+        Column(modifier = Modifier.couiGlassHeader(LocalBackdrop.current, COUITheme.colorScheme.surface)) {
+            AnimatedSearchField(
+                value = uiState.searchKeyword,
+                onValueChange = actions.onSearchQueryChange,
+                placeholder = stringResource(R.string.search_folders),
+                visible = !uiState.isSelectionMode && searchExpanded,
+                onClose = {
+                    actions.onClearSearch()
+                    actions.onSearchQueryChange("")
+                    searchExpanded = false
+                },
+            )
+        }
     }
 }
 
@@ -150,6 +173,7 @@ private fun FolderMiuixMenuButton(
     uiState: FolderUiState,
     actions: FolderTopBarActions,
 ) {
+    var showMenu by remember { mutableStateOf(false) }
     val sortItems = folderSortItems().map { (order, label) ->
         DropdownItem(
             text = label,
@@ -165,41 +189,48 @@ private fun FolderMiuixMenuButton(
         )
     }
 
-    CouiCascadingMenu(
-        entries = listOf(
-            DropdownEntry(
-                items = listOf(
-                    DropdownItem(
-                        text = stringResource(R.string.sort_order),
-                        icon = { modifier -> Icon(COUIIcons.Light.Sort, null, modifier) },
-                        children = sortItems,
-                    ),
-                    DropdownItem(
-                        text = stringResource(R.string.grid_columns),
-                        icon = { modifier -> Icon(COUIIcons.Light.GridView, null, modifier) },
-                        children = columnItems,
-                    ),
-                    DropdownItem(
-                        text = stringResource(R.string.refresh),
-                        icon = { modifier -> Icon(COUIIcons.Light.Refresh, null, modifier) },
-                        onClick = actions.onRefresh,
-                    ),
-                    DropdownItem(
-                        text = stringResource(R.string.settings),
-                        icon = { modifier -> Icon(COUIIcons.Light.Settings, null, modifier) },
-                        onClick = actions.onOpenSettings,
-                    ),
-                    DropdownItem(
-                        text = stringResource(R.string.rotation_lock),
-                        summary = if (uiState.rotationLocked) "On" else "Off",
-                        icon = { modifier -> Icon(COUIIcons.Light.Lock, null, modifier) },
-                        onClick = actions.onToggleRotationLock,
+    Box {
+        HighlightedTopBarAction(
+            icon = TopBarIcons.More,
+            contentDescription = stringResource(R.string.more),
+            onClick = { showMenu = true },
+        )
+        CouiCascadingMenuPopup(
+            show = showMenu,
+            entries = listOf(
+                DropdownEntry(
+                    items = listOf(
+                        DropdownItem(
+                            text = stringResource(R.string.sort_order),
+                            icon = { modifier -> Icon(COUIIcons.Light.Sort, null, modifier) },
+                            children = sortItems,
+                        ),
+                        DropdownItem(
+                            text = stringResource(R.string.grid_columns),
+                            icon = { modifier -> Icon(COUIIcons.Light.GridView, null, modifier) },
+                            children = columnItems,
+                        ),
+                        DropdownItem(
+                            text = stringResource(R.string.refresh),
+                            icon = { modifier -> Icon(COUIIcons.Light.Refresh, null, modifier) },
+                            onClick = actions.onRefresh,
+                        ),
+                        DropdownItem(
+                            text = stringResource(R.string.settings),
+                            icon = { modifier -> Icon(COUIIcons.Light.Settings, null, modifier) },
+                            onClick = actions.onOpenSettings,
+                        ),
+                        DropdownItem(
+                            text = stringResource(R.string.rotation_lock),
+                            summary = if (uiState.rotationLocked) "On" else "Off",
+                            icon = { modifier -> Icon(COUIIcons.Light.Lock, null, modifier) },
+                            onClick = actions.onToggleRotationLock,
+                        ),
                     ),
                 ),
             ),
-        ),
-    ) {
-        TopBarActionIcon(TopBarIcons.More, contentDescription = stringResource(R.string.more))
+            onDismissRequest = { showMenu = false },
+        )
     }
 }
 

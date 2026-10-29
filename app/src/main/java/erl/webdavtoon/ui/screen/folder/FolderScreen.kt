@@ -21,8 +21,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import erl.webdavtoon.ui.component.AppAdaptiveNavigationScaffold
+import erl.webdavtoon.ui.component.CouiFloatingBall
+import erl.webdavtoon.ui.component.GlassTopBarScaffold
 import erl.webdavtoon.ui.component.ServerSheetActions
 import erl.webdavtoon.ui.screen.waterfall.FolderCardExtraHeight
 import erl.webdavtoon.ui.screen.waterfall.FollowZoomWaterfallLayout
@@ -30,7 +33,6 @@ import erl.webdavtoon.ui.screen.waterfall.MediaCardImageMargin
 import erl.webdavtoon.ui.screen.waterfall.rememberFollowZoomGridState
 import io.github.suqi8.coui.kmp.basic.COUIScrollBehavior
 import io.github.suqi8.coui.kmp.basic.CircularProgressIndicator as MiuixCircularProgressIndicator
-import io.github.suqi8.coui.kmp.basic.FloatingActionButton as MiuixFloatingActionButton
 import io.github.suqi8.coui.kmp.basic.Icon as MiuixIcon
 import io.github.suqi8.coui.kmp.basic.PullToRefresh
 import io.github.suqi8.coui.kmp.basic.ScrollBehavior
@@ -108,7 +110,13 @@ fun FolderScreen(
         if (uiState.isSelectionMode) actions.onClearSelection() else actions.onBack()
     }
 
-    val topAppBarScrollBehavior = COUIScrollBehavior(rememberTopAppBarState())
+    // COUI 1.2.0 snaps the large title back only once the list reaches its top. The bar is meant to
+    // follow a downward drag anywhere in the list, so a reader can pull it back without scrolling up
+    // to the first row.
+    val topAppBarScrollBehavior = COUIScrollBehavior(
+        state = rememberTopAppBarState(),
+        expandOnContentScroll = true,
+    )
 
     AppAdaptiveNavigationScaffold(
         showServerSheet = showServerSheet,
@@ -119,37 +127,46 @@ fun FolderScreen(
         isLocalMode = uiState.isLocalMode,
         modifier = modifier,
     ) {
-        Box(modifier = Modifier.fillMaxSize().background(COUITheme.colorScheme.surface)) {
-            Column(modifier = Modifier.fillMaxSize()) {
+        GlassTopBarScaffold(
+            topBar = {
                 FolderTopBarMiuix(
                     uiState = uiState,
                     actions = topBarActions,
                     scrollBehavior = topAppBarScrollBehavior,
                 )
-                uiState.remoteError?.let { message ->
-                    RemoteErrorBanner(message = message)
+            },
+        ) { padding ->
+            Box(modifier = Modifier.fillMaxSize()) {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    uiState.remoteError?.let { message ->
+                        RemoteErrorBanner(
+                            message = message,
+                            modifier = Modifier.padding(top = padding.calculateTopPadding()),
+                        )
+                    }
+                    PullToRefresh(
+                        isRefreshing = uiState.isRefreshing,
+                        onRefresh = actions.onRefresh,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        FolderGrid(
+                            uiState = uiState,
+                            actions = actions,
+                            scrollBehavior = topAppBarScrollBehavior,
+                            topContentPadding = padding.calculateTopPadding(),
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
                 }
-                PullToRefresh(
-                    isRefreshing = uiState.isRefreshing,
-                    onRefresh = actions.onRefresh,
-                    modifier = Modifier.weight(1f),
+                CouiFloatingBall(
+                    onClick = actions.onOpenRecursiveBrowser,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .navigationBarsPadding()
+                        .padding(20.dp),
                 ) {
-                    FolderGrid(
-                        uiState = uiState,
-                        actions = actions,
-                        scrollBehavior = topAppBarScrollBehavior,
-                        modifier = Modifier.fillMaxSize(),
-                    )
+                    MiuixIcon(COUIIcons.Light.Add, contentDescription = null)
                 }
-            }
-            MiuixFloatingActionButton(
-                onClick = actions.onOpenRecursiveBrowser,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .navigationBarsPadding()
-                    .padding(20.dp),
-            ) {
-                MiuixIcon(COUIIcons.Light.Add, contentDescription = null)
             }
         }
     }
@@ -160,6 +177,7 @@ private fun FolderGrid(
     uiState: FolderUiState,
     actions: FolderScreenActions,
     scrollBehavior: ScrollBehavior? = null,
+    topContentPadding: Dp = 0.dp,
     modifier: Modifier = Modifier,
 ) {
     val folders = uiState.folders
@@ -172,16 +190,19 @@ private fun FolderGrid(
     val aspectRatios = remember(folders) { List(folders.size) { 1f } }
     val extraHeights = remember(folders) { List(folders.size) { FolderCardExtraHeight } }
     when {
-        uiState.loading -> Box(modifier, contentAlignment = Alignment.Center) {
+        uiState.loading -> Box(
+            modifier.padding(top = topContentPadding),
+            contentAlignment = Alignment.Center,
+        ) {
             MiuixCircularProgressIndicator()
         }
         uiState.error != null -> FolderMessage(
             text = uiState.error,
-            modifier = modifier,
+            modifier = modifier.padding(top = topContentPadding),
         )
         uiState.folders.isEmpty() -> FolderMessage(
             text = "No folders found",
-            modifier = modifier,
+            modifier = modifier.padding(top = topContentPadding),
         )
         else -> FollowZoomWaterfallLayout(
             itemCount = folders.size,
@@ -191,7 +212,14 @@ private fun FolderGrid(
             maxColumns = 4,
             onColumnsChanged = actions.onSetGridColumns,
             spacing = 12.dp,
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+            // The top inset is the app bar's height: the grid starts below the bar and slides
+            // under its glass while scrolling, which is what the blur samples.
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                top = topContentPadding + 12.dp,
+                end = 16.dp,
+                bottom = 12.dp,
+            ),
             state = zoomState,
             itemExtraHeights = extraHeights,
             itemHorizontalPadding = MediaCardImageMargin,

@@ -17,6 +17,29 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+        // COUI 1.2.0 is not on Maven Central. The fork (Costben/coui17) publishes a rolling
+        // `1.2.0-SNAPSHOT` to its own build/repository/local via .githooks/publish-rolling-snapshot.sh;
+        // other machines resolve the same coordinate from GitHub Packages, which needs a token.
+        val couiLocalRepo = providers.gradleProperty("couiLocalRepo").orNull
+            ?: System.getenv("COUI_LOCAL_REPO")
+            ?: rootDir.parentFile.resolve("coui17/build/repository/local")
+                .takeIf { it.isDirectory }
+                ?.absolutePath
+        if (couiLocalRepo != null) {
+            maven {
+                name = "couiLocal"
+                url = uri(couiLocalRepo)
+            }
+        }
+        maven {
+            name = "couiGitHubPackages"
+            url = uri("https://maven.pkg.github.com/Costben/coui17")
+            credentials {
+                username = providers.gradleProperty("gpr.user").orNull ?: System.getenv("GITHUB_ACTOR")
+                password = providers.gradleProperty("gpr.key").orNull ?: System.getenv("GITHUB_TOKEN")
+            }
+            content { includeGroup("io.github.suqi8.coui.kmp") }
+        }
         if (System.getenv("CI") != "true") {
             maven { url = uri("https://maven.aliyun.com/repository/google") }
             maven { url = uri("https://maven.aliyun.com/repository/public") }

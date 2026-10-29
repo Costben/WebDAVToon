@@ -8,7 +8,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -16,7 +15,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -35,6 +33,8 @@ import erl.webdavtoon.R
 import erl.webdavtoon.SettingsManager
 import erl.webdavtoon.ui.component.AnimatedSearchField
 import erl.webdavtoon.ui.component.AppAdaptiveNavigationScaffold
+import erl.webdavtoon.ui.component.GlassTopBarScaffold
+import erl.webdavtoon.ui.component.HighlightedTopBarAction
 import erl.webdavtoon.ui.component.ServerSheetActions
 import erl.webdavtoon.ui.screen.waterfall.MediaCardMiuix
 import erl.webdavtoon.ui.screen.waterfall.MediaCardExtraHeight
@@ -47,12 +47,13 @@ import io.github.suqi8.coui.kmp.basic.PullToRefresh
 import io.github.suqi8.coui.kmp.basic.DropdownEntry
 import io.github.suqi8.coui.kmp.basic.DropdownItem
 import io.github.suqi8.coui.kmp.basic.Icon as MiuixIcon
-import io.github.suqi8.coui.kmp.basic.IconButton as MiuixIconButton
 import io.github.suqi8.coui.kmp.basic.COUIScrollBehavior
 import io.github.suqi8.coui.kmp.basic.ScrollBehavior
 import io.github.suqi8.coui.kmp.basic.Text as MiuixText
 import io.github.suqi8.coui.kmp.basic.TopAppBar as MiuixTopAppBar
+import io.github.suqi8.coui.kmp.basic.couiGlassHeader
 import io.github.suqi8.coui.kmp.basic.rememberTopAppBarState
+import io.github.suqi8.coui.kmp.blur.LocalBackdrop
 import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.extended.ChevronBackward
 import io.github.suqi8.coui.kmp.icon.extended.ChevronForward
@@ -65,8 +66,7 @@ import io.github.suqi8.coui.kmp.icon.extended.Ok
 import io.github.suqi8.coui.kmp.icon.extended.Refresh
 import io.github.suqi8.coui.kmp.icon.extended.Settings
 import io.github.suqi8.coui.kmp.icon.extended.Sort
-import erl.webdavtoon.ui.component.CouiCascadingMenu
-import erl.webdavtoon.ui.component.TopBarActionIcon
+import erl.webdavtoon.ui.component.CouiCascadingMenuPopup
 import erl.webdavtoon.ui.component.TopBarIcons
 import erl.webdavtoon.ui.component.rememberTapHaptic
 import io.github.suqi8.coui.kmp.theme.COUITheme
@@ -136,7 +136,11 @@ fun MediaWaterfallScreen(
         if (!uiState.showFilenames) List(visibleItems.size) { MediaCardImageMargin * 2 }
         else List(visibleItems.size) { MediaCardExtraHeight }
     }
-    val topAppBarScrollBehavior = COUIScrollBehavior(rememberTopAppBarState())
+    // See FolderScreen: the bar follows a downward drag anywhere, not only at the list's top.
+    val topAppBarScrollBehavior = COUIScrollBehavior(
+        state = rememberTopAppBarState(),
+        expandOnContentScroll = true,
+    )
 
     LaunchedEffect(zoomState, visibleItems.size) {
         snapshotFlow { zoomState.scrollOffset }.collect {
@@ -153,23 +157,21 @@ fun MediaWaterfallScreen(
         actions = serverSheetActions,
         modifier = modifier,
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(COUITheme.colorScheme.surface)
-        ) {
-            Column(modifier = Modifier.fillMaxSize()) {
+        GlassTopBarScaffold(
+            topBar = {
                 MediaTopBarMiuix(
                     uiState = uiState,
                     actions = actions,
                     scrollBehavior = topAppBarScrollBehavior,
                     onOpenDrawer = { showServerSheet = true },
                 )
-
+            },
+        ) { padding ->
+            Box(modifier = Modifier.fillMaxSize()) {
                 PullToRefresh(
                     isRefreshing = uiState.isRefreshing,
                     onRefresh = actions.onRefresh,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxSize(),
                 ) {
                     when {
                         uiState.loading && uiState.items.isEmpty() -> Box(
@@ -181,6 +183,7 @@ fun MediaWaterfallScreen(
                         !uiState.loading && uiState.visibleItems.isEmpty() -> Box(
                             modifier = Modifier
                                 .fillMaxSize()
+                                .padding(top = padding.calculateTopPadding())
                                 .padding(24.dp),
                             contentAlignment = Alignment.Center,
                         ) {
@@ -200,7 +203,14 @@ fun MediaWaterfallScreen(
                             maxColumns = 4,
                             onColumnsChanged = actions.onColumnsChange,
                             spacing = 12.dp,
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                            // The top inset is the app bar's height: the grid starts below the bar
+                            // and slides under its glass while scrolling.
+                            contentPadding = PaddingValues(
+                                start = 16.dp,
+                                top = padding.calculateTopPadding() + 12.dp,
+                                end = 16.dp,
+                                bottom = 12.dp,
+                            ),
                             state = zoomState,
                             itemExtraHeights = extraHeights,
                             itemHorizontalPadding = MediaCardImageMargin,
@@ -226,23 +236,23 @@ fun MediaWaterfallScreen(
                         }
                     }
                 }
-            }
 
-            AnimatedVisibility(
-                visible = uiState.isSelectionMode,
-                enter = slideInVertically { it } + fadeIn(),
-                exit = slideOutVertically { it } + fadeOut(),
-                modifier = Modifier.align(Alignment.BottomCenter),
-            ) {
-                SelectionBottomBarMiuix(
-                    selectedCount = uiState.selectedCount,
-                    isAllSelected = uiState.isAllSelected,
-                    onToggleSelectAll = actions.onToggleSelectAll,
-                    onToggleFavorite = actions.onToggleFavorite,
-                    onDelete = actions.onDeleteClick,
-                    onShare = actions.onShareClick,
-                    onDismiss = actions.onExitSelectionMode,
-                )
+                AnimatedVisibility(
+                    visible = uiState.isSelectionMode,
+                    enter = slideInVertically { it } + fadeIn(),
+                    exit = slideOutVertically { it } + fadeOut(),
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                ) {
+                    SelectionBottomBarMiuix(
+                        selectedCount = uiState.selectedCount,
+                        isAllSelected = uiState.isAllSelected,
+                        onToggleSelectAll = actions.onToggleSelectAll,
+                        onToggleFavorite = actions.onToggleFavorite,
+                        onDelete = actions.onDeleteClick,
+                        onShare = actions.onShareClick,
+                        onDismiss = actions.onExitSelectionMode,
+                    )
+                }
             }
         }
     }
@@ -274,58 +284,74 @@ private fun MediaTopBarMiuix(
         uiState.title.ifEmpty { stringResource(R.string.app_name) }
     }
 
-    Column(modifier = Modifier.statusBarsPadding()) {
+    Column {
         MiuixTopAppBar(
             title = titleText,
             scrollBehavior = scrollBehavior,
+            gradientGlass = true,
+            showDivider = false,
             navigationIcon = {
                 // Selection mode's "close" is a cancel/back action, and COUI reserves the top-left
                 // slot for exactly that. Outside selection mode the slot stays empty.
                 if (uiState.isSelectionMode) {
-                    MiuixIconButton(onClick = {
-                        tapHaptic()
-                        actions.onExitSelectionMode()
-                    }) {
-                        MiuixIcon(COUIIcons.Light.Close, contentDescription = stringResource(R.string.cancel))
-                    }
+                    HighlightedTopBarAction(
+                        icon = COUIIcons.Light.Close,
+                        contentDescription = stringResource(R.string.cancel),
+                        onClick = {
+                            tapHaptic()
+                            actions.onExitSelectionMode()
+                        },
+                    )
                 }
             },
             actions = {
                 if (uiState.isSelectionMode) {
-                    MiuixIconButton(onClick = actions.onInfoClick) {
-                        MiuixIcon(COUIIcons.Light.Info, contentDescription = stringResource(R.string.photo_details))
-                    }
-                    MiuixIconButton(onClick = actions.onEditClick) {
-                        MiuixIcon(COUIIcons.Light.Edit, contentDescription = stringResource(R.string.edit))
-                    }
+                    HighlightedTopBarAction(
+                        icon = COUIIcons.Light.Info,
+                        contentDescription = stringResource(R.string.photo_details),
+                        onClick = actions.onInfoClick,
+                    )
+                    HighlightedTopBarAction(
+                        icon = COUIIcons.Light.Edit,
+                        contentDescription = stringResource(R.string.edit),
+                        onClick = actions.onEditClick,
+                    )
                 } else {
                     // COUI keeps the top-left slot for back/cancel only; root pages put every action
                     // in the top-right group (see the COUI example app's Home page).
-                    MiuixIconButton(onClick = onOpenDrawer) {
-                        TopBarActionIcon(TopBarIcons.Panel, contentDescription = stringResource(R.string.navigation_drawer_open))
-                    }
-                    MiuixIconButton(onClick = { searchExpanded = true }) {
-                        TopBarActionIcon(TopBarIcons.Filter, contentDescription = stringResource(R.string.filter))
-                    }
+                    HighlightedTopBarAction(
+                        icon = TopBarIcons.Panel,
+                        contentDescription = stringResource(R.string.navigation_drawer_open),
+                        onClick = onOpenDrawer,
+                    )
+                    HighlightedTopBarAction(
+                        icon = TopBarIcons.Filter,
+                        contentDescription = stringResource(R.string.filter),
+                        onClick = { searchExpanded = true },
+                    )
                     MediaMiuixMenuButton(uiState = uiState, actions = actions)
                 }
             },
         )
-        AnimatedSearchField(
-            value = uiState.searchKeyword,
-            onValueChange = actions.onSearchQueryChange,
+        // The expanded search band wears the same glass as the bar above it.
+        Column(modifier = Modifier.couiGlassHeader(LocalBackdrop.current, COUITheme.colorScheme.surface)) {
+            AnimatedSearchField(
+                value = uiState.searchKeyword,
+                onValueChange = actions.onSearchQueryChange,
                 placeholder = stringResource(R.string.search_photos),
                 visible = !uiState.isSelectionMode && searchExpanded,
-            onClose = {
-                actions.onClearSearch()
-                searchExpanded = false
-            },
-        )
+                onClose = {
+                    actions.onClearSearch()
+                    searchExpanded = false
+                },
+            )
+        }
     }
 }
 
 @Composable
 private fun MediaMiuixMenuButton(uiState: MediaWaterfallUiState, actions: MediaWaterfallActions) {
+    var showMenu by remember { mutableStateOf(false) }
     val shuffleAllPhotos = uiState.sortOrder == SettingsManager.SORT_RANDOM_PHOTOS
     val sortItems = mediaSortItems().map { (order, label) ->
         DropdownItem(text = label, selected = uiState.sortOrder == order, onClick = { actions.onSetSortOrder(order) })
@@ -394,13 +420,20 @@ private fun MediaMiuixMenuButton(uiState: MediaWaterfallUiState, actions: MediaW
         )
     }
 
-    CouiCascadingMenu(
-        entries = listOf(
-            DropdownEntry(
-                items = menuItems,
+    Box {
+        HighlightedTopBarAction(
+            icon = TopBarIcons.More,
+            contentDescription = stringResource(R.string.more),
+            onClick = { showMenu = true },
+        )
+        CouiCascadingMenuPopup(
+            show = showMenu,
+            entries = listOf(
+                DropdownEntry(
+                    items = menuItems,
+                ),
             ),
-        ),
-    ) {
-        TopBarActionIcon(TopBarIcons.More, contentDescription = stringResource(R.string.more))
+            onDismissRequest = { showMenu = false },
+        )
     }
 }

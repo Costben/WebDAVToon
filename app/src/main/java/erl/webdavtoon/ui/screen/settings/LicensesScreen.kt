@@ -30,6 +30,8 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import erl.webdavtoon.R
+import erl.webdavtoon.ui.component.GlassTopBarScaffold
+import erl.webdavtoon.ui.component.HighlightedTopBarAction
 import io.github.suqi8.coui.kmp.basic.BasicComponent
 import io.github.suqi8.coui.kmp.basic.Card
 import io.github.suqi8.coui.kmp.basic.CircularProgressIndicator
@@ -55,19 +57,22 @@ fun LicensesScreen(
     viewModel: LicensesViewModel,
     modifier: Modifier = Modifier,
 ) {
-    Scaffold(
+    GlassTopBarScaffold(
         modifier = modifier,
         topBar = {
             TopAppBar(
                 title = stringResource(R.string.oss_licenses),
+                gradientGlass = true,
+                showDivider = false,
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(COUIIcons.Light.Back, contentDescription = stringResource(R.string.back))
-                    }
+                    HighlightedTopBarAction(
+                        icon = COUIIcons.Light.Back,
+                        contentDescription = stringResource(R.string.back),
+                        onClick = onBack,
+                    )
                 },
             )
         },
-        containerColor = COUITheme.colorScheme.surface,
     ) { paddingValues ->
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
