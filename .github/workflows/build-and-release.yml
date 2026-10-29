@@ -20,6 +20,11 @@ jobs:
 
     permissions:
       contents: write
+      packages: read
+
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_ACTOR: ${{ github.actor }}
 
     steps:
       - name: Checkout code
@@ -93,6 +98,9 @@ jobs:
         run: chmod +x gradlew
 
       - name: Run Quality Gates
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
         run: |
           export ANDROID_NDK_HOME=$ANDROID_NDK_HOME
           cargo test --manifest-path rust-core/Cargo.toml
@@ -100,6 +108,8 @@ jobs:
 
       - name: Build APK
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
           SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
           SIGNING_KEY_B64: ${{ secrets.SIGNING_KEY }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}

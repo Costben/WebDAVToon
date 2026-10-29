@@ -35,7 +35,7 @@ dependencyResolutionManagement {
             name = "couiGitHubPackages"
             url = uri("https://maven.pkg.github.com/Costben/coui17")
             credentials {
-                username = providers.gradleProperty("gpr.user").orNull ?: System.getenv("GITHUB_ACTOR")
+                username = providers.gradleProperty("gpr.user").orNull ?: System.getenv("GITHUB_ACTOR") ?: "Costben"
                 password = providers.gradleProperty("gpr.key").orNull ?: System.getenv("GITHUB_TOKEN")
             }
             content { includeGroup("io.github.suqi8.coui.kmp") }
