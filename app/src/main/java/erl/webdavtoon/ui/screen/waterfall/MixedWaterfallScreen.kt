@@ -116,10 +116,10 @@ fun MixedWaterfallScreen(
         }
     }
 
-    // See FolderScreen: the bar follows a downward drag anywhere, not only at the list's top.
+    // Pins the title to the toolbar row while scrolled down and expands only at the list's top.
     val topAppBarScrollBehavior = COUIScrollBehavior(
         state = rememberTopAppBarState(),
-        expandOnContentScroll = true,
+        expandOnContentScroll = false,
     )
 
     GlassTopBarScaffold(

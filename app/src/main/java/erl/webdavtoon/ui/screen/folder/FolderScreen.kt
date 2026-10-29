@@ -110,12 +110,11 @@ fun FolderScreen(
         if (uiState.isSelectionMode) actions.onClearSelection() else actions.onBack()
     }
 
-    // COUI 1.2.0 snaps the large title back only once the list reaches its top. The bar is meant to
-    // follow a downward drag anywhere in the list, so a reader can pull it back without scrolling up
-    // to the first row.
+    // Pins the title to the toolbar row while scrolled down and expands back into the large-title
+    // row only when reaching the top of the list, matching native ColorOS headers.
     val topAppBarScrollBehavior = COUIScrollBehavior(
         state = rememberTopAppBarState(),
-        expandOnContentScroll = true,
+        expandOnContentScroll = false,
     )
 
     AppAdaptiveNavigationScaffold(
