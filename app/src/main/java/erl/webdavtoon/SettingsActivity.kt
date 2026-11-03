@@ -232,7 +232,7 @@ class SettingsActivity : ComponentActivity() {
                         InputDialog(
                             title = stringResource(R.string.comfyui_server),
                             initialValue = uiState.autoWorkflowUrl,
-                            hint = "http://192.168.1.x:8188",
+                            hint = stringResource(R.string.comfyui_server_url_hint),
                             onConfirm = { viewModel.setAutoWorkflowUrl(it) },
                             onDismiss = { showAutoWorkflowUrlDialog = false },
                         )

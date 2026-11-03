@@ -28,8 +28,9 @@ import io.github.suqi8.coui.kmp.basic.CircularProgressIndicator
 import io.github.suqi8.coui.kmp.basic.DropdownEntry
 import io.github.suqi8.coui.kmp.basic.DropdownItem
 import io.github.suqi8.coui.kmp.basic.Text
-import io.github.suqi8.coui.kmp.basic.TextButton
 import io.github.suqi8.coui.kmp.basic.TextField
+import io.github.suqi8.coui.kmp.layout.DialogButtonBar
+import io.github.suqi8.coui.kmp.layout.DialogButtonBarAction
 import io.github.suqi8.coui.kmp.overlay.OverlayDialog
 import io.github.suqi8.coui.kmp.theme.COUITheme
 
@@ -52,15 +53,27 @@ fun ComfyUiEditDialog(
             title = stringResource(R.string.comfyui_edit_title),
             onDismissRequest = onDismiss,
             content = {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                // A dialog wraps its content, so a bare progress row would leave it a two-line
+                // strip. Hold the loading state at the height of the form it turns into, with the
+                // row centred inside it.
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 180.dp)
+                        .padding(horizontal = 24.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    CircularProgressIndicator(size = 20.dp)
-                    Text(
-                        text = stringResource(R.string.comfyui_loading_config),
-                        style = COUITheme.textStyles.body2,
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        CircularProgressIndicator(size = 20.dp)
+                        Text(
+                            text = stringResource(R.string.comfyui_loading_config),
+                            style = COUITheme.textStyles.body2,
+                        )
+                    }
                 }
             },
         )
@@ -68,26 +81,24 @@ fun ComfyUiEditDialog(
         is EditDialogHelper.DialogState.Failure -> OverlayDialog(
             show = true,
             title = stringResource(R.string.comfyui_connect_failed),
+            // The dialog pads and aligns its own summary; drawing the text as raw content left it
+            // flush against the panel edges.
+            summary = stringResource(
+                R.string.comfyui_connect_failed_detail,
+                state.baseUrl,
+                state.message,
+            ),
             onDismissRequest = onDismiss,
             content = {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    Text(
-                        text = stringResource(
-                            R.string.comfyui_connect_failed_detail,
-                            state.baseUrl,
-                            state.message,
-                        ),
-                        style = COUITheme.textStyles.body2,
-                    )
-                    TextButton(
+                // A single action gets the bar's stacked layout: one full-width capsule, inset by
+                // the bar's own margins, instead of a text button pinned to the corner.
+                DialogButtonBar(
+                    negative = null,
+                    positive = DialogButtonBarAction(
                         text = stringResource(R.string.ok),
                         onClick = onDismiss,
-                        modifier = Modifier.align(Alignment.End),
-                    )
-                }
+                    ),
+                )
             },
         )
 
@@ -119,94 +130,97 @@ private fun ComfyUiEditForm(
         title = stringResource(R.string.comfyui_edit_title),
         onDismissRequest = onDismiss,
         content = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 420.dp)
-                    .verticalScroll(rememberScrollState())
-                    .padding(vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                // Workflow picker (was an ExposedDropdownMenu + AutoCompleteTextView).
-                DropdownField(
-                    value = workflow,
-                    label = stringResource(R.string.comfyui_workflow),
-                    expanded = workflowExpanded,
-                    onExpand = { workflowExpanded = true },
-                    onDismissRequest = { workflowExpanded = false },
-                    items = workflows.map { name ->
-                        DropdownItem(
-                            text = name,
-                            selected = name == workflow,
-                            onClick = {
-                                workflow = name
-                                workflowExpanded = false
-                            },
-                        )
-                    },
-                )
-
-                // Preset picker: choosing one fills the prompt field.
-                DropdownField(
-                    value = presetLabel,
-                    label = stringResource(R.string.comfyui_preset),
-                    expanded = presetExpanded,
-                    onExpand = { presetExpanded = true },
-                    onDismissRequest = { presetExpanded = false },
-                    items = buildList {
-                        add(
+            Column {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 420.dp)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 24.dp)
+                        .padding(vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    // Workflow picker (was an ExposedDropdownMenu + AutoCompleteTextView).
+                    DropdownField(
+                        value = workflow,
+                        label = stringResource(R.string.comfyui_workflow),
+                        expanded = workflowExpanded,
+                        onExpand = { workflowExpanded = true },
+                        onDismissRequest = { workflowExpanded = false },
+                        items = workflows.map { name ->
                             DropdownItem(
-                                text = noPreset,
-                                selected = presetLabel == noPreset,
+                                text = name,
+                                selected = name == workflow,
                                 onClick = {
-                                    presetLabel = noPreset
-                                    presetExpanded = false
+                                    workflow = name
+                                    workflowExpanded = false
                                 },
                             )
-                        )
-                        presets.forEach { preset ->
+                        },
+                    )
+
+                    // Preset picker: choosing one fills the prompt field.
+                    DropdownField(
+                        value = presetLabel,
+                        label = stringResource(R.string.comfyui_preset),
+                        expanded = presetExpanded,
+                        onExpand = { presetExpanded = true },
+                        onDismissRequest = { presetExpanded = false },
+                        items = buildList {
                             add(
                                 DropdownItem(
-                                    text = preset.name,
-                                    selected = presetLabel == preset.name,
+                                    text = noPreset,
+                                    selected = presetLabel == noPreset,
                                     onClick = {
-                                        presetLabel = preset.name
-                                        prompt = preset.content
-                                        promptError = false
+                                        presetLabel = noPreset
                                         presetExpanded = false
                                     },
                                 )
                             )
-                        }
-                    },
-                )
-
-                TextField(
-                    value = prompt,
-                    onValueChange = { value ->
-                        prompt = value
-                        if (value.isNotBlank()) promptError = false
-                    },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 96.dp),
-                    label = stringResource(R.string.comfyui_prompt_hint),
-                    singleLine = false,
-                )
-                if (promptError) {
-                    Text(
-                        text = stringResource(R.string.comfyui_prompt_required),
-                        style = COUITheme.textStyles.footnote1,
-                        color = COUITheme.colorScheme.error,
+                            presets.forEach { preset ->
+                                add(
+                                    DropdownItem(
+                                        text = preset.name,
+                                        selected = presetLabel == preset.name,
+                                        onClick = {
+                                            presetLabel = preset.name
+                                            prompt = preset.content
+                                            promptError = false
+                                            presetExpanded = false
+                                        },
+                                    )
+                                )
+                            }
+                        },
                     )
+
+                    TextField(
+                        value = prompt,
+                        onValueChange = { value ->
+                            prompt = value
+                            if (value.isNotBlank()) promptError = false
+                        },
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 96.dp),
+                        label = stringResource(R.string.comfyui_prompt_hint),
+                        singleLine = false,
+                    )
+                    if (promptError) {
+                        Text(
+                            text = stringResource(R.string.comfyui_prompt_required),
+                            style = COUITheme.textStyles.footnote1,
+                            color = COUITheme.colorScheme.error,
+                        )
+                    }
                 }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    TextButton(text = stringResource(R.string.cancel), onClick = onDismiss)
-                    TextButton(
+                DialogButtonBar(
+                    negative = DialogButtonBarAction(
+                        text = stringResource(R.string.cancel),
+                        onClick = onDismiss,
+                    ),
+                    positive = DialogButtonBarAction(
                         text = stringResource(R.string.comfyui_submit),
+                        recommended = true,
                         onClick = {
                             if (prompt.isBlank()) {
                                 promptError = true
@@ -214,8 +228,8 @@ private fun ComfyUiEditForm(
                                 onSubmit(workflow, prompt)
                             }
                         },
-                    )
-                }
+                    ),
+                )
             }
         },
     )
