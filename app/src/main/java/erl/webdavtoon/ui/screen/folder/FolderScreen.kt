@@ -146,6 +146,8 @@ fun FolderScreen(
                         isRefreshing = uiState.isRefreshing,
                         onRefresh = actions.onRefresh,
                         modifier = Modifier.weight(1f),
+                        // Drops the loading ring below the glass top bar instead of the status bar.
+                        contentPadding = PaddingValues(top = padding.calculateTopPadding()),
                     ) {
                         FolderGrid(
                             uiState = uiState,

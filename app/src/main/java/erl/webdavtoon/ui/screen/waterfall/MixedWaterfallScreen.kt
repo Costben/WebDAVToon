@@ -139,6 +139,8 @@ fun MixedWaterfallScreen(
                 isRefreshing = uiState.isRefreshing,
                 onRefresh = actions.onRefresh,
                 modifier = Modifier.fillMaxSize(),
+                // Drops the loading ring below the glass top bar instead of the status bar.
+                contentPadding = PaddingValues(top = padding.calculateTopPadding()),
             ) {
                 when {
                     uiState.loading && uiState.items.isEmpty() -> {
