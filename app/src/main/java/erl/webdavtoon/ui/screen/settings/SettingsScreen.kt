@@ -22,7 +22,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -33,8 +32,6 @@ import erl.webdavtoon.R
 import erl.webdavtoon.ui.component.GalleryTopAppBar
 import erl.webdavtoon.ui.component.GlassTopBarScaffold
 import erl.webdavtoon.ui.component.HighlightedTopBarAction
-import erl.webdavtoon.ui.component.rememberGalleryScrollBehavior
-import erl.webdavtoon.ui.component.rememberGalleryTopBarScrollConnection
 import io.github.suqi8.coui.kmp.basic.BasicComponent
 import io.github.suqi8.coui.kmp.basic.Card
 import io.github.suqi8.coui.kmp.basic.DropdownItem
@@ -42,7 +39,6 @@ import io.github.suqi8.coui.kmp.basic.HorizontalDivider
 import io.github.suqi8.coui.kmp.basic.Icon
 import io.github.suqi8.coui.kmp.basic.IconButton
 import io.github.suqi8.coui.kmp.basic.Scaffold
-import io.github.suqi8.coui.kmp.basic.ScrollBehavior
 import io.github.suqi8.coui.kmp.basic.SmallTitle
 import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.extended.AddCircle
@@ -94,15 +90,11 @@ fun SettingsScreen(
     actions: SettingsActions,
     modifier: Modifier = Modifier,
 ) {
-    // The settings list collapses its title into the toolbar row on scroll and brings it back only
-    // at the top, the same snap every other gallery header in the app uses.
-    val topAppBarScrollBehavior = rememberGalleryScrollBehavior()
     GlassTopBarScaffold(
         modifier = modifier,
         topBar = {
             GalleryTopAppBar(
                 title = stringResource(R.string.settings),
-                scrollBehavior = topAppBarScrollBehavior,
                 navigationIcon = {
                     HighlightedTopBarAction(
                         icon = COUIIcons.Light.Back,
@@ -121,7 +113,7 @@ fun SettingsScreen(
                 CircularProgressIndicator()
             }
         } else {
-            SettingsContent(uiState, actions, paddingValues, topAppBarScrollBehavior)
+            SettingsContent(uiState, actions, paddingValues)
         }
     }
 }
@@ -131,7 +123,6 @@ private fun SettingsContent(
     uiState: SettingsUiState,
     actions: SettingsActions,
     paddingValues: PaddingValues,
-    scrollBehavior: ScrollBehavior,
 ) {
     val gridItems = (1..4).map { count ->
         DropdownItem(text = stringResource(R.string.columns_suffix, count))
@@ -176,15 +167,9 @@ private fun SettingsContent(
     val memoryCacheItems = memoryCacheValues.map { DropdownItem(stringResource(R.string.screens_suffix, it)) }
 
     val listState = rememberLazyListState()
-    val scrollConnection = rememberGalleryTopBarScrollConnection(
-        scrollBehavior = scrollBehavior,
-        atTop = {
-            listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
-        },
-    )
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize().nestedScroll(scrollConnection),
+        modifier = Modifier.fillMaxSize(),
         state = listState,
         contentPadding = PaddingValues(
             top = paddingValues.calculateTopPadding() + 12.dp,

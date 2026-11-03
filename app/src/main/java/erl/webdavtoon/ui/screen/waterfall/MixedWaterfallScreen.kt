@@ -18,7 +18,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -30,7 +29,6 @@ import io.github.suqi8.coui.kmp.basic.BottomFloatingNavigationBarDefaults
 import io.github.suqi8.coui.kmp.basic.CircularProgressIndicator as MiuixCircularProgressIndicator
 import io.github.suqi8.coui.kmp.basic.Icon as MiuixIcon
 import io.github.suqi8.coui.kmp.basic.PullToRefresh
-import io.github.suqi8.coui.kmp.basic.ScrollBehavior
 import io.github.suqi8.coui.kmp.basic.Text as MiuixText
 import io.github.suqi8.coui.kmp.basic.couiGlassHeader
 import io.github.suqi8.coui.kmp.basic.DropdownEntry
@@ -53,8 +51,6 @@ import erl.webdavtoon.ui.component.CouiFloatingBall
 import erl.webdavtoon.ui.component.GalleryChrome
 import erl.webdavtoon.ui.component.GalleryTopAppBar
 import erl.webdavtoon.ui.component.GlassTopBarScaffold
-import erl.webdavtoon.ui.component.rememberGalleryScrollBehavior
-import erl.webdavtoon.ui.component.rememberGalleryTopBarScrollConnection
 import erl.webdavtoon.ui.component.HighlightedTopBarAction
 import erl.webdavtoon.ui.component.TopBarIcons
 import erl.webdavtoon.ui.component.rememberTapHaptic
@@ -113,20 +109,12 @@ fun MixedWaterfallScreen(
         }
     }
 
-    // Pins the title to the toolbar row while scrolled down and expands only at the list's top.
-    val topAppBarScrollBehavior = rememberGalleryScrollBehavior()
-    val topAppBarScrollConnection = rememberGalleryTopBarScrollConnection(
-        scrollBehavior = topAppBarScrollBehavior,
-        atTop = { zoomState.scrollOffset == 0 },
-    )
-
     GlassTopBarScaffold(
         modifier = modifier,
         topBar = {
             MixedWaterfallTopBarMiuix(
                 uiState = uiState,
                 actions = actions,
-                scrollBehavior = topAppBarScrollBehavior,
             )
         },
         bottomBar = {
@@ -197,9 +185,7 @@ fun MixedWaterfallScreen(
                             state = zoomState,
                             itemExtraHeights = extraHeights,
                             itemHorizontalPadding = MediaCardImageMargin,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .nestedScroll(topAppBarScrollConnection),
+                            modifier = Modifier.fillMaxSize(),
                         ) { index, widthPx, heightPx ->
                             // A filtered list can shrink while a stale subcomposition is still
                             // alive, so guard the index instead of crashing the composer.
@@ -275,7 +261,6 @@ private fun MixedWaterfallCard(
 private fun MixedWaterfallTopBarMiuix(
     uiState: MixedWaterfallUiState,
     actions: MixedWaterfallActions,
-    scrollBehavior: ScrollBehavior? = null,
     modifier: Modifier = Modifier,
 ) {
     var searchExpanded by remember { mutableStateOf(uiState.isSearching) }
@@ -302,7 +287,6 @@ private fun MixedWaterfallTopBarMiuix(
     Column(modifier = modifier) {
         GalleryTopAppBar(
             title = titleText,
-            scrollBehavior = scrollBehavior,
             navigationIcon = {
                 HighlightedTopBarAction(
                     icon = when {

@@ -25,7 +25,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -35,8 +34,6 @@ import erl.webdavtoon.R
 import erl.webdavtoon.ui.component.GalleryTopAppBar
 import erl.webdavtoon.ui.component.GlassTopBarScaffold
 import erl.webdavtoon.ui.component.HighlightedTopBarAction
-import erl.webdavtoon.ui.component.rememberGalleryScrollBehavior
-import erl.webdavtoon.ui.component.rememberGalleryTopBarScrollConnection
 import io.github.suqi8.coui.kmp.basic.BasicComponent
 import io.github.suqi8.coui.kmp.basic.Card
 import io.github.suqi8.coui.kmp.basic.CircularProgressIndicator
@@ -61,21 +58,12 @@ fun LicensesScreen(
     viewModel: LicensesViewModel,
     modifier: Modifier = Modifier,
 ) {
-    // Same collapsing header as the settings list it is reached from.
-    val topAppBarScrollBehavior = rememberGalleryScrollBehavior()
     val listState = rememberLazyListState()
-    val scrollConnection = rememberGalleryTopBarScrollConnection(
-        scrollBehavior = topAppBarScrollBehavior,
-        atTop = {
-            listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
-        },
-    )
     GlassTopBarScaffold(
         modifier = modifier,
         topBar = {
             GalleryTopAppBar(
                 title = stringResource(R.string.oss_licenses),
-                scrollBehavior = topAppBarScrollBehavior,
                 navigationIcon = {
                     HighlightedTopBarAction(
                         icon = COUIIcons.Light.Back,
@@ -87,7 +75,7 @@ fun LicensesScreen(
         },
     ) { paddingValues ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize().nestedScroll(scrollConnection),
+            modifier = Modifier.fillMaxSize(),
             state = listState,
             contentPadding = PaddingValues(
                 top = paddingValues.calculateTopPadding() + 12.dp,

@@ -20,7 +20,6 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -30,8 +29,6 @@ import erl.webdavtoon.ui.component.AnimatedSearchField
 import erl.webdavtoon.ui.component.AppAdaptiveNavigationScaffold
 import erl.webdavtoon.ui.component.GalleryTopAppBar
 import erl.webdavtoon.ui.component.GlassTopBarScaffold
-import erl.webdavtoon.ui.component.rememberGalleryScrollBehavior
-import erl.webdavtoon.ui.component.rememberGalleryTopBarScrollConnection
 import erl.webdavtoon.ui.component.HighlightedTopBarAction
 import erl.webdavtoon.ui.component.ServerSheetActions
 import erl.webdavtoon.ui.screen.waterfall.MediaCardMiuix
@@ -45,7 +42,6 @@ import io.github.suqi8.coui.kmp.basic.PullToRefresh
 import io.github.suqi8.coui.kmp.basic.DropdownEntry
 import io.github.suqi8.coui.kmp.basic.DropdownItem
 import io.github.suqi8.coui.kmp.basic.Icon as MiuixIcon
-import io.github.suqi8.coui.kmp.basic.ScrollBehavior
 import io.github.suqi8.coui.kmp.basic.Text as MiuixText
 import io.github.suqi8.coui.kmp.basic.couiGlassHeader
 import io.github.suqi8.coui.kmp.blur.LocalBackdrop
@@ -131,13 +127,6 @@ fun MediaWaterfallScreen(
         if (!uiState.showFilenames) List(visibleItems.size) { MediaCardImageMargin * 2 }
         else List(visibleItems.size) { MediaCardExtraHeight }
     }
-    // Pins the title to the toolbar row while scrolled down and expands only at the list's top.
-    val topAppBarScrollBehavior = rememberGalleryScrollBehavior()
-    val topAppBarScrollConnection = rememberGalleryTopBarScrollConnection(
-        scrollBehavior = topAppBarScrollBehavior,
-        atTop = { zoomState.scrollOffset == 0 },
-    )
-
     LaunchedEffect(zoomState, visibleItems.size) {
         snapshotFlow { zoomState.scrollOffset }.collect {
             val total = visibleItems.size
@@ -158,7 +147,6 @@ fun MediaWaterfallScreen(
                 MediaTopBarMiuix(
                     uiState = uiState,
                     actions = actions,
-                    scrollBehavior = topAppBarScrollBehavior,
                     onOpenDrawer = { showServerSheet = true },
                 )
             },
@@ -225,9 +213,7 @@ fun MediaWaterfallScreen(
                             state = zoomState,
                             itemExtraHeights = extraHeights,
                             itemHorizontalPadding = MediaCardImageMargin,
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .nestedScroll(topAppBarScrollConnection),
+                            modifier = Modifier.fillMaxSize(),
                         ) { index, widthPx, heightPx ->
                             // A filtered list can shrink while a stale subcomposition is still
                             // alive, so guard the index instead of crashing the composer.
@@ -267,7 +253,6 @@ private fun mediaSortItems(): List<Pair<Int, String>> = listOf(
 private fun MediaTopBarMiuix(
     uiState: MediaWaterfallUiState,
     actions: MediaWaterfallActions,
-    scrollBehavior: ScrollBehavior?,
     onOpenDrawer: () -> Unit,
 ) {
     var searchExpanded by remember { mutableStateOf(uiState.isSearching) }
@@ -281,7 +266,6 @@ private fun MediaTopBarMiuix(
     Column {
         GalleryTopAppBar(
             title = titleText,
-            scrollBehavior = scrollBehavior,
             navigationIcon = {
                 // Selection mode's "close" is a cancel/back action, and COUI reserves the top-left
                 // slot for exactly that. Outside selection mode the slot stays empty.

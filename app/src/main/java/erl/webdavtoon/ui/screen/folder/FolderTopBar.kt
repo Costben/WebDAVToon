@@ -30,7 +30,6 @@ import erl.webdavtoon.SettingsManager
 import io.github.suqi8.coui.kmp.basic.DropdownEntry
 import io.github.suqi8.coui.kmp.basic.DropdownItem
 import io.github.suqi8.coui.kmp.basic.Icon
-import io.github.suqi8.coui.kmp.basic.ScrollBehavior
 import io.github.suqi8.coui.kmp.basic.Text as MiuixText
 import io.github.suqi8.coui.kmp.basic.couiGlassHeader
 import io.github.suqi8.coui.kmp.blur.LocalBackdrop
@@ -67,7 +66,6 @@ fun FolderTopBarMiuix(
     uiState: FolderUiState,
     actions: FolderTopBarActions,
     modifier: Modifier = Modifier,
-    scrollBehavior: ScrollBehavior? = null,
 ) {
     var searchExpanded by remember { mutableStateOf(uiState.isSearching) }
     val tapHaptic = rememberTapHaptic()
@@ -119,7 +117,7 @@ fun FolderTopBarMiuix(
         } else {
             GalleryTopAppBar(
                 title = stringResource(R.string.app_name),
-                scrollBehavior = scrollBehavior,
+                largeTitle = true,
                 actions = {
                     // COUI keeps the top-left slot for back/cancel only; a root page leaves it empty
                     // and puts every action in the top-right group (see the COUI example app's

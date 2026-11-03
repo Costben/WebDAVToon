@@ -19,7 +19,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -28,8 +27,6 @@ import erl.webdavtoon.ui.component.CouiFloatingBall
 import erl.webdavtoon.ui.component.GalleryChrome
 import erl.webdavtoon.ui.component.GlassTopBarScaffold
 import erl.webdavtoon.ui.component.ServerSheetActions
-import erl.webdavtoon.ui.component.rememberGalleryScrollBehavior
-import erl.webdavtoon.ui.component.rememberGalleryTopBarScrollConnection
 import erl.webdavtoon.ui.screen.waterfall.FolderCardExtraHeight
 import erl.webdavtoon.ui.screen.waterfall.FollowZoomWaterfallLayout
 import erl.webdavtoon.ui.screen.waterfall.MediaCardImageMargin
@@ -38,7 +35,6 @@ import io.github.suqi8.coui.kmp.basic.BottomFloatingNavigationBarDefaults
 import io.github.suqi8.coui.kmp.basic.CircularProgressIndicator as MiuixCircularProgressIndicator
 import io.github.suqi8.coui.kmp.basic.Icon as MiuixIcon
 import io.github.suqi8.coui.kmp.basic.PullToRefresh
-import io.github.suqi8.coui.kmp.basic.ScrollBehavior
 import io.github.suqi8.coui.kmp.basic.Text as MiuixText
 import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.extended.Add
@@ -112,10 +108,6 @@ fun FolderScreen(
         if (uiState.isSelectionMode) actions.onClearSelection() else actions.onBack()
     }
 
-    // Pins the title to the toolbar row while scrolled down and expands back into the large-title
-    // row only when reaching the top of the list, matching native ColorOS headers.
-    val topAppBarScrollBehavior = rememberGalleryScrollBehavior()
-
     AppAdaptiveNavigationScaffold(
         showServerSheet = showServerSheet,
         onDismissServerSheet = { showServerSheet = false },
@@ -130,7 +122,6 @@ fun FolderScreen(
                 FolderTopBarMiuix(
                     uiState = uiState,
                     actions = topBarActions,
-                    scrollBehavior = topAppBarScrollBehavior,
                 )
             },
         ) { padding ->
@@ -152,7 +143,6 @@ fun FolderScreen(
                         FolderGrid(
                             uiState = uiState,
                             actions = actions,
-                            scrollBehavior = topAppBarScrollBehavior,
                             topContentPadding = padding.calculateTopPadding(),
                             modifier = Modifier.fillMaxSize(),
                         )
@@ -185,7 +175,6 @@ fun FolderScreen(
 private fun FolderGrid(
     uiState: FolderUiState,
     actions: FolderScreenActions,
-    scrollBehavior: ScrollBehavior? = null,
     topContentPadding: Dp = 0.dp,
     modifier: Modifier = Modifier,
 ) {
@@ -198,11 +187,6 @@ private fun FolderGrid(
     )
     val aspectRatios = remember(folders) { List(folders.size) { 1f } }
     val extraHeights = remember(folders) { List(folders.size) { FolderCardExtraHeight } }
-    val scrollConnection = if (scrollBehavior != null) {
-        rememberGalleryTopBarScrollConnection(scrollBehavior) { zoomState.scrollOffset == 0 }
-    } else {
-        null
-    }
     when {
         uiState.loading -> Box(
             modifier.padding(top = topContentPadding),
@@ -237,15 +221,7 @@ private fun FolderGrid(
             state = zoomState,
             itemExtraHeights = extraHeights,
             itemHorizontalPadding = MediaCardImageMargin,
-            modifier = modifier
-                .navigationBarsPadding()
-                .then(
-                    if (scrollConnection != null) {
-                        Modifier.nestedScroll(scrollConnection)
-                    } else {
-                        Modifier
-                    }
-                ),
+            modifier = modifier.navigationBarsPadding(),
         ) { index, _, _ ->
             // Filtering can shrink the list while a subcomposition for a stale index is still
             // alive, so a missing index must render nothing instead of crashing the composer.
