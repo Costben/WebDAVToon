@@ -2,9 +2,10 @@
 <resources>
     <string name="edit">编辑</string>
     <string name="comfyui_server">ComfyUI 编辑服务器</string>
-    <string name="comfyui_server_url_hint">http://127.0.0.1:8188</string>
+    <string name="comfyui_server_url_hint">http://192.168.1.x:3001</string>
     <string name="comfyui_server_url_invalid">请输入有效的 http:// 或 https:// 地址</string>
     <string name="comfyui_edit_title">发送到 ComfyUI 编辑</string>
+    <string name="comfyui_toolbar_label">ComfyUI</string>
     <string name="comfyui_workflow">工作流</string>
     <string name="comfyui_prompt">Prompt</string>
     <string name="comfyui_prompt_hint">输入编辑指令</string>

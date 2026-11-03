@@ -2,9 +2,10 @@
 <resources>
     <string name="edit">Edit</string>
     <string name="comfyui_server">ComfyUI edit server</string>
-    <string name="comfyui_server_url_hint">http://127.0.0.1:8188</string>
+    <string name="comfyui_server_url_hint">http://192.168.1.x:3001</string>
     <string name="comfyui_server_url_invalid">Enter a valid http:// or https:// URL</string>
     <string name="comfyui_edit_title">Send to ComfyUI</string>
+    <string name="comfyui_toolbar_label">ComfyUI</string>
     <string name="comfyui_workflow">Workflow</string>
     <string name="comfyui_prompt">Prompt</string>
     <string name="comfyui_prompt_hint">Describe the edit</string>

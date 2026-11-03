@@ -3,11 +3,6 @@
 package erl.webdavtoon.ui.screen.media
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -43,7 +38,7 @@ import erl.webdavtoon.ui.screen.waterfall.MediaCardMiuix
 import erl.webdavtoon.ui.screen.waterfall.MediaCardExtraHeight
 import erl.webdavtoon.ui.screen.waterfall.MediaCardImageMargin
 import erl.webdavtoon.ui.screen.waterfall.FollowZoomWaterfallLayout
-import erl.webdavtoon.ui.screen.waterfall.SelectionBottomBarMiuix
+import erl.webdavtoon.ui.screen.waterfall.SelectionBottomBar
 import erl.webdavtoon.ui.screen.waterfall.rememberFollowZoomGridState
 import io.github.suqi8.coui.kmp.basic.CircularProgressIndicator as MiuixCircularProgressIndicator
 import io.github.suqi8.coui.kmp.basic.PullToRefresh
@@ -167,6 +162,19 @@ fun MediaWaterfallScreen(
                     onOpenDrawer = { showServerSheet = true },
                 )
             },
+            bottomBar = {
+                SelectionBottomBar(
+                    visible = uiState.isSelectionMode,
+                    selectedCount = uiState.selectedCount,
+                    isAllSelected = uiState.isAllSelected,
+                    onToggleSelectAll = actions.onToggleSelectAll,
+                    onToggleFavorite = actions.onToggleFavorite,
+                    onDelete = actions.onDeleteClick,
+                    onShare = actions.onShareClick,
+                    onDismiss = actions.onExitSelectionMode,
+                    onEditClick = actions.onEditClick,
+                )
+            },
         ) { padding ->
             Box(modifier = Modifier.fillMaxSize()) {
                 PullToRefresh(
@@ -238,23 +246,6 @@ fun MediaWaterfallScreen(
                             )
                         }
                     }
-                }
-
-                AnimatedVisibility(
-                    visible = uiState.isSelectionMode,
-                    enter = slideInVertically { it } + fadeIn(),
-                    exit = slideOutVertically { it } + fadeOut(),
-                    modifier = Modifier.align(Alignment.BottomCenter),
-                ) {
-                    SelectionBottomBarMiuix(
-                        selectedCount = uiState.selectedCount,
-                        isAllSelected = uiState.isAllSelected,
-                        onToggleSelectAll = actions.onToggleSelectAll,
-                        onToggleFavorite = actions.onToggleFavorite,
-                        onDelete = actions.onDeleteClick,
-                        onShare = actions.onShareClick,
-                        onDismiss = actions.onExitSelectionMode,
-                    )
                 }
             }
         }

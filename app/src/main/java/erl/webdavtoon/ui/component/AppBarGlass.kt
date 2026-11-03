@@ -28,6 +28,8 @@ import io.github.suqi8.coui.kmp.theme.COUITheme
  * sibling of that layer, never part of it — a bar sampling its own output would blur itself.
  *
  * @param topBar the app bar, typically a COUI `TopAppBar` with `gradientGlass = true`.
+ * @param bottomBar a bar pinned to the bottom edge. Like [topBar] it sits outside the backdrop
+ *   layer, so it can read [LocalBackdrop] to blur the content scrolling under it.
  * @param containerColor the page colour. It is also the material's base colour, so the bar never
  *   reads as a band of its own over the page.
  * @param content the page body. Apply the received top padding to the scrollable's content
@@ -37,6 +39,7 @@ import io.github.suqi8.coui.kmp.theme.COUITheme
 fun GlassTopBarScaffold(
     topBar: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+    bottomBar: @Composable () -> Unit = {},
     containerColor: Color = COUITheme.colorScheme.surface,
     content: @Composable (PaddingValues) -> Unit,
 ) {
@@ -50,6 +53,7 @@ fun GlassTopBarScaffold(
         Scaffold(
             modifier = modifier,
             topBar = topBar,
+            bottomBar = bottomBar,
             containerColor = containerColor,
             edgeToEdge = true,
         ) { padding ->

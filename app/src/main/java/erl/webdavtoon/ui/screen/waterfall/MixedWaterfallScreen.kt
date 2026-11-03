@@ -3,11 +3,6 @@
 package erl.webdavtoon.ui.screen.waterfall
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -82,6 +77,7 @@ data class MixedWaterfallActions(
     val onDeleteClick: () -> Unit,
     val onShareClick: () -> Unit,
     val onExitSelectionMode: () -> Unit,
+    val onEditClick: (() -> Unit)? = null,
     val onDimensionsResolved: (photoId: String, width: Int, height: Int) -> Unit,
     val onFolderVisibilityChanged: (folder: Folder, visible: Boolean) -> Unit = { _, _ -> },
     val onFolderPreviewsRequested: () -> Unit = {},
@@ -131,6 +127,19 @@ fun MixedWaterfallScreen(
                 uiState = uiState,
                 actions = actions,
                 scrollBehavior = topAppBarScrollBehavior,
+            )
+        },
+        bottomBar = {
+            SelectionBottomBar(
+                visible = uiState.isSelectionMode,
+                selectedCount = uiState.selectedCount,
+                isAllSelected = uiState.isAllSelected,
+                onToggleSelectAll = actions.onToggleSelectAll,
+                onToggleFavorite = actions.onToggleFavorite,
+                onDelete = actions.onDeleteClick,
+                onShare = actions.onShareClick,
+                onDismiss = actions.onExitSelectionMode,
+                onEditClick = actions.onEditClick,
             )
         },
     ) { padding ->
@@ -226,23 +235,6 @@ fun MixedWaterfallScreen(
                         MiuixIcon(COUIIcons.Light.Add, contentDescription = null)
                     }
                 }
-            }
-
-            androidx.compose.animation.AnimatedVisibility(
-                visible = uiState.isSelectionMode,
-                enter = slideInVertically { it } + fadeIn(),
-                exit = slideOutVertically { it } + fadeOut(),
-                modifier = Modifier.align(Alignment.BottomCenter),
-            ) {
-                SelectionBottomBarMiuix(
-                    selectedCount = uiState.selectedCount,
-                    isAllSelected = uiState.isAllSelected,
-                    onToggleSelectAll = actions.onToggleSelectAll,
-                    onToggleFavorite = actions.onToggleFavorite,
-                    onDelete = actions.onDeleteClick,
-                    onShare = actions.onShareClick,
-                    onDismiss = actions.onExitSelectionMode,
-                )
             }
         }
     }

@@ -2,50 +2,62 @@
 // Copyright (C) 2026 Rin Shibuya
 package erl.webdavtoon.ui.screen.waterfall
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import erl.webdavtoon.R
-import erl.webdavtoon.ui.component.GalleryBottomCapsule
+import erl.webdavtoon.ui.component.GalleryChrome
 import erl.webdavtoon.ui.component.rememberStrongHaptic
 import erl.webdavtoon.ui.component.rememberTapHaptic
-import erl.webdavtoon.ui.theme.LocalDarkTheme
-import io.github.suqi8.coui.kmp.basic.Icon
-import io.github.suqi8.coui.kmp.basic.Text
+import io.github.suqi8.coui.kmp.anim.COUIInEase
+import io.github.suqi8.coui.kmp.anim.COUIOutEase
+import io.github.suqi8.coui.kmp.basic.BottomFloatingNavigationBarDefaults
+import io.github.suqi8.coui.kmp.basic.BottomFloatingScrollToolbar
+import io.github.suqi8.coui.kmp.basic.BottomFloatingScrollToolbarDefaults
+import io.github.suqi8.coui.kmp.basic.BottomFloatingScrollToolbarItem
+import io.github.suqi8.coui.kmp.basic.NavigationBarMotion
 import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.extended.Close
 import io.github.suqi8.coui.kmp.icon.extended.Delete
+import io.github.suqi8.coui.kmp.icon.extended.Edit
 import io.github.suqi8.coui.kmp.icon.extended.FavoritesFill
 import io.github.suqi8.coui.kmp.icon.extended.SelectAll
 import io.github.suqi8.coui.kmp.icon.extended.Share
 import io.github.suqi8.coui.kmp.theme.COUITheme
 
 /**
- * HyperOS / Miuix styled floating capsule selection bar for waterfall grid.
+ * The COUI scrolling tool bar (滚动工具栏) shown while items are selected.
+ *
+ * This is [BottomFloatingScrollToolbar], the pill the ColorOS Photos editor raises for its tools: a
+ * 56dp capsule with 28dp corners, one icon over a short label per item, centred and 16dp in from
+ * each side. The app keeps five bulk actions, so the pill does not scroll at rest, but it fades and
+ * scrolls the same way the native one does as soon as the item widths outgrow the screen.
+ *
+ * It is a floating pill over the grid rather than a bar pinned to the edge, so it is placed in the
+ * `bottomBar` slot of `GlassTopBarScaffold` (outside the content's backdrop layer) and the list
+ * scrolls behind it. The navigation-bar inset and the 16dp above it are carried by the padding
+ * below the pill, as [GalleryChrome]'s other capsules do.
+ *
+ * @param visible whether the selection mode is active.
+ * @param selectedCount the number of selected items; actions other than select-all and dismiss are
+ *   disabled while it is zero.
+ * @param isAllSelected whether every item is selected, which tints the select-all item as the
+ *   active tool.
+ * @param onEditClick sends the selection to the local ComfyUI workflow. The item is left out when
+ *   the host has no ComfyUI flow wired, as on the sub-folder screen.
  */
 @Composable
-fun SelectionBottomBarMiuix(
+fun SelectionBottomBar(
+    visible: Boolean,
     selectedCount: Int,
     isAllSelected: Boolean,
     onToggleSelectAll: () -> Unit,
@@ -54,141 +66,108 @@ fun SelectionBottomBarMiuix(
     onShare: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    onEditClick: (() -> Unit)? = null,
 ) {
     val hasSelection = selectedCount > 0
-    val normalColor = COUITheme.colorScheme.onSurface
-    val disabledColor = COUITheme.colorScheme.disabledOnSurface
-    val errorColor = COUITheme.colorScheme.error
+    val editAction = onEditClick
     val tapHaptic = rememberTapHaptic()
     val strongHaptic = rememberStrongHaptic()
-    val isDark = LocalDarkTheme.current || isSystemInDarkTheme()
-    val toolbarBackgroundColor = if (isDark) {
-        Color(0xF51C1C1E)
+    // The Photos editor's pill is always dark; here it follows the page instead, so a light page
+    // gets the same light capsule the gallery uses for its own bottom chrome.
+    val isDark = COUITheme.colorScheme.background.luminance() < 0.5f
+    val colors = if (isDark) {
+        BottomFloatingScrollToolbarDefaults.colors()
     } else {
-        Color(0xF5F5F5F7)
+        BottomFloatingScrollToolbarDefaults.colors(
+            containerColor = Color(0xF5F5F5F7),
+            strokeColor = Color(0x1A000000),
+            contentColor = Color(0xB3000000),
+            disabledContentColor = Color(0x33000000),
+        )
     }
 
-    Box(
-        modifier = modifier.fillMaxWidth(),
-        contentAlignment = Alignment.Center,
+    AnimatedVisibility(
+        visible = visible,
+        modifier = modifier,
+        // COUINavigationView.show() / hide(): the bar slides by its own height, without a fade.
+        enter = slideInVertically(
+            tween(NavigationBarMotion.ShowTranslateDurationMillis, easing = COUIInEase),
+        ) { it },
+        exit = slideOutVertically(
+            tween(NavigationBarMotion.HideTranslateDurationMillis, easing = COUIOutEase),
+        ) { it },
     ) {
-        GalleryBottomCapsule(
-            modifier = Modifier
-                .fillMaxWidth()
-                .widthIn(max = 520.dp),
-            color = toolbarBackgroundColor,
-        ) {
-            Row(
+        GalleryChrome {
+            BottomFloatingScrollToolbar(
                 modifier = Modifier
                     .fillMaxWidth()
-                    // 48dp slots inside a 56dp capsule, as the gallery's tab row: the 4dp here
-                    // and the 48dp in MiuixActionItem add up to the capsule's 56dp.
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                // Select All / Deselect All
-                MiuixActionItem(
-                    icon = COUIIcons.SelectAll,
-                    label = stringResource(
-                        if (isAllSelected) R.string.unselect_all else R.string.select_all
+                    .padding(
+                        bottom = BottomFloatingNavigationBarDefaults.navigationBarPadding() + 16.dp,
                     ),
-                    tint = normalColor,
-                    enabled = true,
+                colors = colors,
+            ) {
+                // A tool bar has no current tool: every action draws in the idle colour, except
+                // select-all, which reads as active once the whole page is selected.
+                BottomFloatingScrollToolbarItem(
                     onClick = {
                         tapHaptic()
                         onToggleSelectAll()
                     },
+                    icon = COUIIcons.SelectAll,
+                    label = stringResource(
+                        if (isAllSelected) R.string.unselect_all else R.string.select_all
+                    ),
+                    selected = isAllSelected,
                 )
-
-                // Favorite
-                MiuixActionItem(
-                    icon = COUIIcons.Light.FavoritesFill,
-                    label = stringResource(R.string.favorite),
-                    tint = if (hasSelection) normalColor else disabledColor,
-                    enabled = hasSelection,
+                BottomFloatingScrollToolbarItem(
                     onClick = {
                         tapHaptic()
                         onToggleFavorite()
                     },
-                )
-
-                // Share
-                MiuixActionItem(
-                    icon = COUIIcons.Light.Share,
-                    label = stringResource(R.string.share),
-                    tint = if (hasSelection) normalColor else disabledColor,
+                    icon = COUIIcons.Light.FavoritesFill,
+                    label = stringResource(R.string.favorite),
                     enabled = hasSelection,
+                )
+                BottomFloatingScrollToolbarItem(
                     onClick = {
                         tapHaptic()
                         onShare()
                     },
-                )
-
-                // Delete
-                MiuixActionItem(
-                    icon = COUIIcons.Delete,
-                    label = stringResource(R.string.delete),
-                    tint = if (hasSelection) errorColor else disabledColor,
+                    icon = COUIIcons.Light.Share,
+                    label = stringResource(R.string.share),
                     enabled = hasSelection,
+                )
+                // The label cell is 49dp at 8sp, so the pill keeps the product name and leaves the
+                // full sentence to the content description.
+                if (editAction != null) {
+                    BottomFloatingScrollToolbarItem(
+                        onClick = {
+                            tapHaptic()
+                            editAction()
+                        },
+                        icon = COUIIcons.Edit,
+                        label = stringResource(R.string.comfyui_toolbar_label),
+                        enabled = hasSelection,
+                    )
+                }
+                BottomFloatingScrollToolbarItem(
                     onClick = {
                         strongHaptic()
                         onDelete()
                     },
+                    icon = COUIIcons.Delete,
+                    label = stringResource(R.string.delete),
+                    enabled = hasSelection,
                 )
-
-                // Close / Dismiss
-                MiuixActionItem(
-                    icon = COUIIcons.Close,
-                    label = stringResource(R.string.cancel),
-                    tint = normalColor,
-                    enabled = true,
+                BottomFloatingScrollToolbarItem(
                     onClick = {
                         tapHaptic()
                         onDismiss()
                     },
+                    icon = COUIIcons.Close,
+                    label = stringResource(R.string.cancel),
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun RowScope.MiuixActionItem(
-    icon: ImageVector,
-    label: String,
-    tint: Color,
-    enabled: Boolean,
-    onClick: () -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .weight(1f)
-            // The gallery's tab slot measures 168px — 48dp at its 3.5 px/dp — with a 24dp icon
-            // box and a 10sp label.
-            .height(48.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .clickable(
-                enabled = enabled,
-                onClick = onClick,
-            )
-            .padding(horizontal = 2.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = label,
-            modifier = Modifier.size(24.dp),
-            tint = tint,
-        )
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(
-            text = label,
-            style = COUITheme.textStyles.footnote2.copy(fontSize = 10.sp),
-            color = tint,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
     }
 }

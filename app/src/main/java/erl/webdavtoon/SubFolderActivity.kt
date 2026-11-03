@@ -28,6 +28,7 @@ import erl.webdavtoon.ui.screen.waterfall.MixedWaterfallActions
 import erl.webdavtoon.ui.screen.waterfall.MixedWaterfallItemUi
 import erl.webdavtoon.ui.screen.waterfall.MixedWaterfallScreen
 import erl.webdavtoon.ui.screen.waterfall.MixedWaterfallViewModel
+import erl.webdavtoon.ui.component.ComfyUiEditDialog
 import erl.webdavtoon.ui.component.DeleteConfirmDialog
 import erl.webdavtoon.ui.component.SetHomeFolderConfirmDialog
 import erl.webdavtoon.ui.theme.WebDAVToonTheme
@@ -40,6 +41,7 @@ class SubFolderActivity : ComponentActivity() {
 
     private var showDeleteConfirmDialog by mutableStateOf(false)
     private var showSetHomeConfirmDialog by mutableStateOf(false)
+    private var comfyUiDialogState by mutableStateOf<EditDialogHelper.DialogState?>(null)
     private var pendingDeleteRequest: PendingMixedDelete? = null
 
     private data class PendingMixedDelete(
@@ -223,6 +225,9 @@ class SubFolderActivity : ComponentActivity() {
                         onExitSelectionMode = {
                             viewModel.exitSelectionMode()
                         },
+                        onEditClick = {
+                            editSelectedPhotos()
+                        },
                         onDimensionsResolved = { photoId, width, height ->
                             viewModel.updateResolvedDimensions(photoId, width, height)
                         },
@@ -275,12 +280,44 @@ class SubFolderActivity : ComponentActivity() {
                         )
                     }
 
+                    comfyUiDialogState?.let { dialogState ->
+                        ComfyUiEditDialog(
+                            state = dialogState,
+                            onSubmit = { workflow, prompt ->
+                                val form = dialogState as? EditDialogHelper.DialogState.Form
+                                comfyUiDialogState = null
+                                if (form != null) {
+                                    EditDialogHelper.submit(
+                                        activity = this@SubFolderActivity,
+                                        form = form,
+                                        workflow = workflow,
+                                        prompt = prompt,
+                                        onSubmitted = { viewModel.exitSelectionMode() },
+                                    )
+                                }
+                            },
+                            onDismiss = { comfyUiDialogState = null },
+                        )
+                    }
+
                     io.github.suqi8.coui.kmp.utils.COUIPopupUtils.COUIPopupHost()
                 }
             }
         }
 
         checkPermissionsAndLoad(isWebDav)
+    }
+
+    private fun editSelectedPhotos() {
+        val selectedPhotos = viewModel.uiState.value.selectedPhotos
+        if (selectedPhotos.isEmpty()) return
+        EditDialogHelper.show(
+            activity = this,
+            selectedPhotos = selectedPhotos,
+            settingsManager = settingsManager,
+            onStateChange = { comfyUiDialogState = it },
+            onSubmitted = { viewModel.exitSelectionMode() },
+        )
     }
 
     private fun confirmDeleteItems(selectedPhotos: List<Photo>, selectedFolders: List<Folder>) {
