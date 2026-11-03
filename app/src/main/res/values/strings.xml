@@ -78,6 +78,8 @@
     <string name="test_success">Test connection successful</string>
     <string name="test_failed">Test connection failed</string>
     <string name="webdav_server">WebDAV Server</string>
+    <string name="server_sheet_status_current">Current: %1$s</string>
+    <string name="server_sheet_status_none">No server selected</string>
     <string name="alias_hint">Alias (Optional)</string>
     <string name="protocol_hint">Protocol</string>
     <string name="host_hint">Host / URL</string>
@@ -190,7 +192,8 @@
     <string name="thumbnail_quality_mode_label">Mode</string>
     <string name="thumbnail_quality_enter_percent">Enter scale ratio (10–100)%%</string>
     <string name="thumbnail_quality_enter_max_width">Enter max width in px (e.g. 600)</string>
-    <string name="thumbnail_quality_value_label">Value</string>
+    <string name="percent_value">%1$d%%</string>
+    <string name="px_value">%1$dpx</string>
     <string name="reader_max_zoom">Reader Max Zoom</string>
     <string name="reader_max_zoom_summary">Maximum zoom: %1$d%%</string>
     <string name="reader_max_zoom_dialog_title">Set Maximum Zoom</string>

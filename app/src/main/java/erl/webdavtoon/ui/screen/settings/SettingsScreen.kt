@@ -333,17 +333,23 @@ private fun SettingsContent(
                     SliderPreference(
                         value = uiState.waterfallMaxWidth.toFloat(),
                         onValueChange = { actions.onSetWaterfallMaxWidth(it.toInt()) },
-                        title = stringResource(R.string.thumbnail_quality_value_label),
+                        modifier = SliderRowModifier,
+                        title = stringResource(R.string.thumbnail_quality_max_width_mode),
+                        valueText = stringResource(R.string.px_value, uiState.waterfallMaxWidth),
                         valueRange = 200f..2000f,
                         steps = 1799,
+                        insideMargin = SliderRowInsideMargin,
                     )
                 } else {
                     SliderPreference(
                         value = uiState.waterfallPercent.toFloat(),
                         onValueChange = { actions.onSetWaterfallPercent(it.toInt()) },
-                        title = stringResource(R.string.thumbnail_quality_value_label),
+                        modifier = SliderRowModifier,
+                        title = stringResource(R.string.thumbnail_quality_percent_mode),
+                        valueText = stringResource(R.string.percent_value, uiState.waterfallPercent),
                         valueRange = 10f..100f,
                         steps = 89,
+                        insideMargin = SliderRowInsideMargin,
                     )
                 }
             }
@@ -374,9 +380,12 @@ private fun SettingsContent(
                 SliderPreference(
                     value = uiState.readerMaxZoomPercent.toFloat(),
                     onValueChange = { actions.onSetReaderMaxZoom(it.toInt()) },
+                    modifier = SliderRowModifier,
                     title = stringResource(R.string.reader_max_zoom),
+                    valueText = stringResource(R.string.percent_value, uiState.readerMaxZoomPercent),
                     valueRange = 100f..500f,
                     steps = 399,
+                    insideMargin = SliderRowInsideMargin,
                 )
                 SettingsRowDivider()
                 ArrowPreference(title = stringResource(R.string.default_reader_mode), summary = stringResource(defaultReaderModeRes(uiState.defaultReaderMode)), onClick = actions.onPickDefaultReaderMode)
@@ -447,6 +456,21 @@ private val CurrentServerDotColor = Color(0xFF34C759)
  * lines up with the trailing chevron column used by arrow preferences.
  */
 private val SlotRowInsideMargin = PaddingValues(start = 16.dp, top = 10.dp, end = 1.dp, bottom = 10.dp)
+
+/**
+ * Slider rows stack a 36dp touch target and the component's 10dp vertical inside margin above the
+ * track, which opens a gap the COUI demo does not show. The track already carries 8dp of its own
+ * above and below inside the touch target, so the row reads tighter with the inside margin kept
+ * horizontal only.
+ */
+private val SliderRowInsideMargin = PaddingValues(horizontal = 16.dp, vertical = 0.dp)
+
+/**
+ * Dropping the vertical inside margin leaves the row at the component's 48dp minimum, and the COUI
+ * title line box is tall enough that the text then sits about 2dp under the divider above. The top
+ * inset goes on the row instead, so the text gets its breathing room without pushing the track down.
+ */
+private val SliderRowModifier = Modifier.padding(top = 14.dp)
 
 private fun sortValueForIndex(index: Int): Int = when (index) {
     0 -> SettingsDefaults.SORT_NAME_ASC

@@ -78,6 +78,8 @@
     <string name="test_success">测试连接成功</string>
     <string name="test_failed">测试连接失败</string>
     <string name="webdav_server">WebDAV 服务器</string>
+    <string name="server_sheet_status_current">当前：%1$s</string>
+    <string name="server_sheet_status_none">未选择服务器</string>
     <string name="alias_hint">别名 (可选)</string>
     <string name="protocol_hint">协议</string>
     <string name="host_hint">主机 / URL</string>
@@ -180,7 +182,8 @@
     <string name="thumbnail_quality_mode_label">模式</string>
     <string name="thumbnail_quality_enter_percent">输入缩放比例（10–100）%%</string>
     <string name="thumbnail_quality_enter_max_width">输入最大宽度（px，如 600）</string>
-    <string name="thumbnail_quality_value_label">数值</string>
+    <string name="percent_value">%1$d%%</string>
+    <string name="px_value">%1$dpx</string>
     <string name="reader_max_zoom">阅读最大缩放</string>
     <string name="reader_max_zoom_summary">最大缩放：%1$d%%</string>
     <string name="reader_max_zoom_dialog_title">设置最大缩放比例</string>
