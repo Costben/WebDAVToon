@@ -25,16 +25,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import erl.webdavtoon.FollowZoomWaterfallLayoutEngine
 import erl.webdavtoon.WaterfallItemFrame
 import erl.webdavtoon.WaterfallLayoutResult
+import io.github.suqi8.coui.kmp.utils.overScrollVertical
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -434,8 +439,24 @@ fun FollowZoomWaterfallLayout(
     val latestItemContent = rememberUpdatedState(itemContent)
     val itemContentCache = remember { ItemContentCache() }
 
+    // `scrollBy` refuses every delta while a pinch is active, so the fingers' vertical drift would
+    // reach the overscroll as unconsumed scroll and slide the whole grid mid-zoom. Swallow it here.
+    val pinchOverscrollGuard = remember(state) {
+        object : NestedScrollConnection {
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset =
+                if (state.isZoomActive) available else Offset.Zero
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity =
+                if (state.isZoomActive) available else Velocity.Zero
+        }
+    }
+
     SubcomposeLayout(
         modifier = modifier
+            // Outside the `scrollable` so the scroll and fling left over at either end stretch the
+            // content and spring it back, like every other COUI list.
+            .overScrollVertical()
+            .nestedScroll(pinchOverscrollGuard)
             .clipToBounds()
             .pointerInput(Unit) {
                 detectFollowZoomGestures(
