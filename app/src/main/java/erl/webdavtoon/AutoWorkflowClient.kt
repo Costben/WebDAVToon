@@ -11,8 +11,10 @@ import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 
 /** A task row from the AutoWorkflow database, as attached to one generated image. */
 data class AutoWorkflowTask(
@@ -63,6 +65,25 @@ data class AutoWorkflowCrumb(
     val relPath: String,
 )
 
+/**
+ * Outcome of one reviewer batch action (`POST /api/reviewer/tasks/batch-actions`).
+ *
+ * `decision` is `preview_only` until the same request is repeated with `confirm = true`; the
+ * backend refuses to mutate anything before that second step.
+ */
+data class AutoWorkflowActionResult(
+    val action: String,
+    val decision: String,
+    val message: String,
+    val executed: Boolean,
+    val matchedCount: Int,
+    val affectedTaskIds: List<Long>,
+    val newTaskIds: List<Long>,
+) {
+    val isPreview: Boolean get() = decision == "preview_only"
+    val isBlocked: Boolean get() = decision == "blocked"
+}
+
 data class AutoWorkflowPage(
     val relPath: String,
     val absPath: String,
@@ -79,11 +100,11 @@ data class AutoWorkflowPage(
 )
 
 /**
- * Read-only client for the AutoWorkflow backend output explorer.
+ * Client for the AutoWorkflow backend output explorer.
  *
- * The backend walks the real ComfyUI output folder and annotates every file with the task that
- * produced it (task id, workflow, seed, original input image). This client only issues GETs and
- * resolves the relative `/api/assets/image?...` URLs against the configured server address.
+ * Browsing walks the real ComfyUI output folder and annotates every file with the task that
+ * produced it (task id, workflow, seed, original input image) through a GET. Mutations — resubmit
+ * and delete — go through the reviewer batch-actions endpoint and are always previewed first.
  */
 class AutoWorkflowClient(baseUrl: String) {
 
@@ -102,21 +123,13 @@ class AutoWorkflowClient(baseUrl: String) {
         relPath: String,
         offset: Int = 0,
         limit: Int = PAGE_SIZE,
+        sort: String = DEFAULT_SORT,
     ): Result<AutoWorkflowPage> = withContext(Dispatchers.IO) {
         runCatching {
             if (normalizedBaseUrl.isEmpty()) {
                 throw IOException("AutoWorkflow server is not configured")
             }
-            val encodedPath = URLEncoder.encode(relPath, "UTF-8").replace("+", "%20")
-            val url = buildString {
-                append(normalizedBaseUrl)
-                append("/api/output/browse?rel_path=")
-                append(encodedPath)
-                append("&offset=")
-                append(offset.coerceAtLeast(0))
-                append("&limit=")
-                append(limit)
-            }
+            val url = buildBrowseUrl(normalizedBaseUrl, relPath, offset, limit, sort)
             val request = Request.Builder().url(url).get().build()
             httpClient.newCall(request).execute().use { response ->
                 val body = response.body?.string().orEmpty()
@@ -130,9 +143,156 @@ class AutoWorkflowClient(baseUrl: String) {
         }
     }
 
+    /** Reads saved reviewer prompt presets without modifying them on the backend. */
+    suspend fun fetchPromptPresets(): Result<List<PromptPreset>> = withContext(Dispatchers.IO) {
+        runCatching {
+            if (normalizedBaseUrl.isEmpty()) {
+                throw IOException("AutoWorkflow server is not configured")
+            }
+            val request = Request.Builder()
+                .url("$normalizedBaseUrl/api/reviews/prompt-presets")
+                .get()
+                .build()
+            httpClient.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (!response.isSuccessful) {
+                    throw IOException("HTTP ${response.code}: ${extractDetail(body) ?: response.message}")
+                }
+                parsePromptPresets(body)
+            }
+        }.onFailure { error ->
+            Log.e(TAG, "fetchPromptPresets failed", error)
+        }
+    }
+
+    /**
+     * Asks the reviewer endpoint to re-run [taskIds] through either the edit flow (original image
+     * in) or the upscale flow (current output in).
+     *
+     * With `confirm = false` the backend only answers `preview_only` and touches nothing; the caller
+     * repeats the same call with `confirm = true` once the user has seen the preview.
+     */
+    suspend fun resubmit(
+        taskIds: List<Long>,
+        flow: String,
+        deleteOldOutput: Boolean,
+        confirm: Boolean,
+        promptText: String? = null,
+    ): Result<AutoWorkflowActionResult> = batchAction(
+        taskIds = taskIds,
+        action = ACTION_RESUBMIT,
+        confirm = confirm,
+        flow = flow,
+        deleteOldOutput = deleteOldOutput,
+        promptText = promptText,
+    )
+
+    /** Deletes the output, the relations and the task rows behind [taskIds]. */
+    suspend fun deleteTasks(taskIds: List<Long>): Result<AutoWorkflowActionResult> = batchAction(
+        taskIds = taskIds,
+        action = ACTION_DELETE,
+        confirm = true,
+    )
+
+    private suspend fun batchAction(
+        taskIds: List<Long>,
+        action: String,
+        confirm: Boolean,
+        flow: String = FLOW_EDIT,
+        deleteOldOutput: Boolean = false,
+        promptText: String? = null,
+    ): Result<AutoWorkflowActionResult> = withContext(Dispatchers.IO) {
+        runCatching {
+            if (normalizedBaseUrl.isEmpty()) {
+                throw IOException("AutoWorkflow server is not configured")
+            }
+            val payload = buildBatchActionPayload(
+                taskIds = taskIds,
+                action = action,
+                confirm = confirm,
+                flow = flow,
+                deleteOldOutput = deleteOldOutput,
+                promptText = promptText,
+            )
+            val request = Request.Builder()
+                .url("$normalizedBaseUrl/api/reviewer/tasks/batch-actions")
+                .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE))
+                .build()
+            httpClient.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (!response.isSuccessful) {
+                    throw IOException("HTTP ${response.code}: ${extractDetail(body) ?: response.message}")
+                }
+                parseActionResult(body)
+            }
+        }.onFailure { error ->
+            Log.e(TAG, "batch action failed action=$action taskIds=$taskIds", error)
+        }
+    }
+
     companion object {
         private const val TAG = "AutoWorkflowClient"
         const val PAGE_SIZE = 120
+        const val SORT_MTIME_DESC = "mtime_desc"
+        const val SORT_MTIME_ASC = "mtime_asc"
+        const val SORT_NAME_ASC = "name_asc"
+        const val SORT_NAME_DESC = "name_desc"
+        const val DEFAULT_SORT = SORT_MTIME_DESC
+
+        internal fun buildBrowseUrl(
+            baseUrl: String,
+            relPath: String,
+            offset: Int = 0,
+            limit: Int = PAGE_SIZE,
+            sort: String = DEFAULT_SORT,
+        ): String {
+            val base = baseUrl.trim().trimEnd('/')
+            val encodedPath = URLEncoder.encode(relPath, "UTF-8").replace("+", "%20")
+            val encodedSort = URLEncoder.encode(sort.ifBlank { DEFAULT_SORT }, "UTF-8")
+            return buildString {
+                append(base)
+                append("/api/output/browse?rel_path=")
+                append(encodedPath)
+                append("&offset=")
+                append(offset.coerceAtLeast(0))
+                append("&limit=")
+                append(limit)
+                append("&sort=")
+                append(encodedSort)
+            }
+        }
+
+        const val ACTION_RESUBMIT = "resubmit"
+        const val ACTION_DELETE = "delete"
+        const val FLOW_EDIT = "edit"
+        const val FLOW_UPSCALE = "upscale"
+        private const val DELETE_MODE_OUTPUT_AND_RELATIONS = "output_and_relations"
+
+        private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
+
+        internal fun buildBatchActionPayload(
+            taskIds: List<Long>,
+            action: String,
+            confirm: Boolean,
+            flow: String = FLOW_EDIT,
+            deleteOldOutput: Boolean = false,
+            promptText: String? = null,
+        ): JsonObject = JsonObject().apply {
+            add(
+                "task_ids",
+                com.google.gson.JsonArray().apply { taskIds.forEach { add(it) } },
+            )
+            addProperty("action", action)
+            addProperty("confirm", confirm)
+            addProperty("flow", flow)
+            addProperty("delete_old_output", deleteOldOutput)
+            addProperty("delete_mode", DELETE_MODE_OUTPUT_AND_RELATIONS)
+            addProperty("prompt_mode", "create")
+            val trimmedPrompt = promptText?.trim().orEmpty()
+            if (trimmedPrompt.isNotEmpty()) {
+                addProperty("prompt_text", trimmedPrompt)
+            }
+        }
 
         /** Backend sends relative `/api/...` URLs; everything the app loads must be absolute. */
         internal fun absoluteAssetUrl(baseUrl: String, relative: String?): String? {
@@ -207,6 +367,29 @@ class AutoWorkflowClient(baseUrl: String) {
             )
         }
 
+        internal fun parseActionResult(json: String): AutoWorkflowActionResult {
+            val root = JsonParser.parseString(json).asJsonObject
+            return AutoWorkflowActionResult(
+                action = root.stringOrNull("action").orEmpty(),
+                decision = root.stringOrNull("decision").orEmpty(),
+                message = root.stringOrNull("message").orEmpty(),
+                executed = root.boolOrFalse("executed"),
+                matchedCount = root.intOrZero("matched_count"),
+                affectedTaskIds = root.longArrayOrEmpty("affected_task_ids"),
+                newTaskIds = root.longArrayOrEmpty("new_task_ids"),
+            )
+        }
+
+        internal fun parsePromptPresets(json: String): List<PromptPreset> {
+            val root = JsonParser.parseString(json).asJsonObject
+            return root.arrayOrEmpty("presets").mapNotNull { element ->
+                val obj = element.asObjectOrNull() ?: return@mapNotNull null
+                val name = obj.stringOrNull("name") ?: return@mapNotNull null
+                val content = obj.stringOrNull("content") ?: return@mapNotNull null
+                PromptPreset(name = name, content = content)
+            }
+        }
+
         private fun parseTask(obj: JsonObject, baseUrl: String): AutoWorkflowTask = AutoWorkflowTask(
             id = obj.longOrNull("id") ?: 0L,
             filename = obj.stringOrNull("filename").orEmpty(),
@@ -254,6 +437,11 @@ private fun JsonObject.arrayOrEmpty(name: String): List<JsonElement> {
     if (element.isJsonNull || !element.isJsonArray) return emptyList()
     return element.asJsonArray.toList()
 }
+
+private fun JsonObject.longArrayOrEmpty(name: String): List<Long> =
+    arrayOrEmpty(name).mapNotNull { element ->
+        if (element.isJsonNull) null else runCatching { element.asLong }.getOrNull()
+    }
 
 private fun JsonObject.objectOrNull(name: String): JsonObject? {
     val element = get(name) ?: return null

@@ -2,32 +2,41 @@
 // Copyright (C) 2026 Rin Shibuya
 package erl.webdavtoon.ui.screen.autoworkflow
 
+import android.app.Activity
+import android.content.Context
+import android.content.Intent
 import android.net.Uri
-import android.widget.ImageView
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -35,50 +44,93 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import erl.webdavtoon.AutoWorkflowClient
+import erl.webdavtoon.AutoWorkflowCompareInfo
+import erl.webdavtoon.AutoWorkflowCompareStore
 import erl.webdavtoon.AutoWorkflowFolder
 import erl.webdavtoon.AutoWorkflowImage
+import erl.webdavtoon.AutoWorkflowTask
 import erl.webdavtoon.Folder
 import erl.webdavtoon.Photo
+import erl.webdavtoon.PhotoViewActivity
+import erl.webdavtoon.PromptPreset
 import erl.webdavtoon.R
+import erl.webdavtoon.ReaderSessionSource
+import erl.webdavtoon.ReaderSessions
 import erl.webdavtoon.SettingsManager
 import erl.webdavtoon.WebDavImageLoader
 import erl.webdavtoon.autoWorkflowFileName
+import erl.webdavtoon.ui.component.AnimatedSearchField
+import erl.webdavtoon.ui.component.CouiCascadingMenuPopup
+import erl.webdavtoon.ui.component.CouiFlatMenu
+import erl.webdavtoon.ui.component.DeleteConfirmDialog
+import erl.webdavtoon.ui.component.GalleryChrome
 import erl.webdavtoon.ui.component.GalleryTopAppBar
 import erl.webdavtoon.ui.component.GlassTopBarScaffold
 import erl.webdavtoon.ui.component.HighlightedTopBarAction
-import erl.webdavtoon.ui.component.PreviewTilePlaceholder
-import erl.webdavtoon.ui.screen.waterfall.FolderCardExtraHeight
+import erl.webdavtoon.ui.component.TopBarIcons
+import erl.webdavtoon.ui.component.rememberStrongHaptic
+import erl.webdavtoon.ui.component.rememberTapHaptic
 import erl.webdavtoon.ui.screen.waterfall.FollowZoomWaterfallLayout
+import erl.webdavtoon.ui.screen.waterfall.FolderCardExtraHeight
 import erl.webdavtoon.ui.screen.waterfall.MediaCardExtraHeight
 import erl.webdavtoon.ui.screen.waterfall.MediaCardImageMargin
 import erl.webdavtoon.ui.screen.waterfall.MediaCardMiuix
 import erl.webdavtoon.ui.screen.waterfall.MediaCardOverlay
 import erl.webdavtoon.ui.screen.waterfall.MixedWaterfallItemUi
 import erl.webdavtoon.ui.screen.waterfall.rememberFollowZoomGridState
+import io.github.suqi8.coui.kmp.anim.COUIInEase
+import io.github.suqi8.coui.kmp.anim.COUIOutEase
+import io.github.suqi8.coui.kmp.basic.BottomFloatingNavigationBarDefaults
+import io.github.suqi8.coui.kmp.basic.BottomFloatingScrollToolbar
+import io.github.suqi8.coui.kmp.basic.BottomFloatingScrollToolbarDefaults
+import io.github.suqi8.coui.kmp.basic.BottomFloatingScrollToolbarItem
 import io.github.suqi8.coui.kmp.basic.Button
 import io.github.suqi8.coui.kmp.basic.CircularProgressIndicator
+import io.github.suqi8.coui.kmp.basic.DropdownEntry
+import io.github.suqi8.coui.kmp.basic.DropdownItem
+import io.github.suqi8.coui.kmp.basic.HorizontalDivider
 import io.github.suqi8.coui.kmp.basic.Icon
 import io.github.suqi8.coui.kmp.basic.IconButton
+import io.github.suqi8.coui.kmp.basic.NavigationBarMotion
 import io.github.suqi8.coui.kmp.basic.PullToRefresh
 import io.github.suqi8.coui.kmp.basic.Text
+import io.github.suqi8.coui.kmp.basic.TextField
+import io.github.suqi8.coui.kmp.basic.couiGlassHeader
+import io.github.suqi8.coui.kmp.blur.LocalBackdrop
 import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.extended.Back
 import io.github.suqi8.coui.kmp.icon.extended.Close
+import io.github.suqi8.coui.kmp.icon.extended.Delete
+import io.github.suqi8.coui.kmp.icon.extended.Edit
+import io.github.suqi8.coui.kmp.icon.extended.GridView
+import io.github.suqi8.coui.kmp.icon.extended.More
 import io.github.suqi8.coui.kmp.icon.extended.Refresh
+import io.github.suqi8.coui.kmp.icon.extended.SelectAll
 import io.github.suqi8.coui.kmp.icon.extended.Settings
+import io.github.suqi8.coui.kmp.icon.extended.Sort
+import io.github.suqi8.coui.kmp.layout.DialogButtonBar
+import io.github.suqi8.coui.kmp.layout.DialogButtonBarAction
+import io.github.suqi8.coui.kmp.layout.DialogDefaults
+import io.github.suqi8.coui.kmp.overlay.OverlayDialog
+import io.github.suqi8.coui.kmp.preference.RadioButtonPreference
+import io.github.suqi8.coui.kmp.preference.SwitchPreference
 import io.github.suqi8.coui.kmp.theme.COUITheme
 
 /** Callbacks the AutoWorkflow output browser needs from its host. */
@@ -89,6 +141,18 @@ data class AutoWorkflowActions(
     val onOpenFolder: (relPath: String) -> Unit,
     val onLoadMore: () -> Unit,
     val onOpenSettings: () -> Unit,
+    val onSetSortOrder: (Int) -> Unit,
+    val getScrollOffset: (relPath: String) -> Int = { 0 },
+    val onScrollOffsetChanged: (relPath: String, offset: Int) -> Unit = { _, _ -> },
+    val onToggleSelection: (taskId: Long) -> Unit,
+    val onSelectAll: () -> Unit,
+    val onClearSelection: () -> Unit,
+    val onPreviewReedit: (taskIds: List<Long>, promptText: String, deleteOldOutput: Boolean) -> Unit,
+    val onPreviewResubmit: (taskIds: List<Long>, flow: String, deleteOldOutput: Boolean) -> Unit,
+    val onConfirmPendingAction: () -> Unit,
+    val onDismissPendingAction: () -> Unit,
+    val onDeleteTasks: (taskIds: List<Long>) -> Unit,
+    val onMessageShown: () -> Unit,
 )
 
 /**
@@ -96,7 +160,9 @@ data class AutoWorkflowActions(
  *
  * The page is the folder page's grid, one level of detail deeper: folder and image tiles are the
  * app's own waterfall cards, so the only AutoWorkflow-specific chrome is the task badge and the
- * original-image inset on an image tile, plus the comparison overlay behind a tap.
+ * original-image inset on an image tile. A tap hands the directory to the album reader, which
+ * keeps its own paging and chrome; long-pressing a linked image selects it, and the selection bar
+ * then offers resubmit / delete through the reviewer actions endpoint.
  */
 @Composable
 fun AutoWorkflowScreen(
@@ -104,7 +170,11 @@ fun AutoWorkflowScreen(
     actions: AutoWorkflowActions,
     modifier: Modifier = Modifier,
 ) {
-    var compareImage by remember { mutableStateOf<AutoWorkflowImage?>(null) }
+    var reeditRequest by remember { mutableStateOf<List<Long>?>(null) }
+    var resubmitRequest by remember { mutableStateOf<List<Long>?>(null) }
+    var deleteRequest by remember { mutableStateOf<List<Long>?>(null) }
+    var searchExpanded by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
     val context = LocalContext.current
     val settings = remember { SettingsManager(context) }
     var columns by remember { mutableIntStateOf(settings.getGridColumns()) }
@@ -118,52 +188,289 @@ fun AutoWorkflowScreen(
     // level until the request returns, which made the title flash the parent's name mid-load.
     val title = state.relPath.substringAfterLast('/').takeIf { it.isNotBlank() } ?: rootTitle
 
+    LaunchedEffect(state.relPath) {
+        searchQuery = ""
+        searchExpanded = false
+    }
+
+    LaunchedEffect(state.actionMessage) {
+        val message = state.actionMessage ?: return@LaunchedEffect
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        actions.onMessageShown()
+    }
+
     val goUpOrBack = {
         if (state.relPath.isNotEmpty()) actions.onUp() else actions.onBack()
     }
-    BackHandler { goUpOrBack() }
+    BackHandler {
+        when {
+            state.isSelectionMode -> actions.onClearSelection()
+            searchExpanded -> {
+                searchQuery = ""
+                searchExpanded = false
+            }
+            reeditRequest != null -> reeditRequest = null
+            resubmitRequest != null -> resubmitRequest = null
+            deleteRequest != null -> deleteRequest = null
+            else -> goUpOrBack()
+        }
+    }
+
+    val linkedIds = remember(state.images) { state.images.mapNotNull { it.task?.id }.toSet() }
+    val isAllSelected = linkedIds.isNotEmpty() && state.selectedTaskIds.containsAll(linkedIds)
 
     GlassTopBarScaffold(
         modifier = modifier,
         topBar = {
-            GalleryTopAppBar(
-                title = title,
-                navigationIcon = {
-                    HighlightedTopBarAction(
-                        icon = COUIIcons.Light.Back,
-                        contentDescription = stringResource(R.string.back),
-                        onClick = goUpOrBack,
+            Column {
+                GalleryTopAppBar(
+                    title = if (state.isSelectionMode) {
+                        stringResource(R.string.autoworkflow_selected_count, state.selectedCount)
+                    } else {
+                        title
+                    },
+                    navigationIcon = {
+                        if (state.isSelectionMode) {
+                            HighlightedTopBarAction(
+                                icon = COUIIcons.Light.Close,
+                                contentDescription = stringResource(R.string.cancel),
+                                onClick = actions.onClearSelection,
+                            )
+                        } else {
+                            HighlightedTopBarAction(
+                                icon = COUIIcons.Light.Back,
+                                contentDescription = stringResource(R.string.back),
+                                onClick = goUpOrBack,
+                            )
+                        }
+                    },
+                    actions = {
+                        if (!state.isSelectionMode) {
+                            HighlightedTopBarAction(
+                                icon = TopBarIcons.Filter,
+                                contentDescription = stringResource(R.string.filter),
+                                onClick = { searchExpanded = true },
+                            )
+                            AutoWorkflowMoreMenuButton(
+                                sortOrder = state.sortOrder,
+                                onSetSortOrder = actions.onSetSortOrder,
+                                columns = columns,
+                                onColumnsChanged = onColumnsChanged,
+                                onRefresh = actions.onRefresh,
+                                onOpenSettings = actions.onOpenSettings,
+                            )
+                        }
+                    },
+                )
+                Column(modifier = Modifier.couiGlassHeader(LocalBackdrop.current, COUITheme.colorScheme.surface)) {
+                    AnimatedSearchField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
+                        placeholder = stringResource(R.string.autoworkflow_search_hint),
+                        visible = !state.isSelectionMode && searchExpanded,
+                        onClose = {
+                            searchQuery = ""
+                            searchExpanded = false
+                        },
                     )
+                }
+            }
+        },
+        bottomBar = {
+            AutoWorkflowSelectionBar(
+                visible = state.isSelectionMode,
+                selectedCount = state.selectedCount,
+                isAllSelected = isAllSelected,
+                onToggleSelectAll = {
+                    if (isAllSelected) actions.onClearSelection() else actions.onSelectAll()
                 },
-                actions = {
-                    HighlightedTopBarAction(
-                        icon = COUIIcons.Light.Refresh,
-                        contentDescription = stringResource(R.string.refresh),
-                        onClick = actions.onRefresh,
-                    )
-                    HighlightedTopBarAction(
-                        icon = COUIIcons.Light.Settings,
-                        contentDescription = stringResource(R.string.settings),
-                        onClick = actions.onOpenSettings,
-                    )
-                },
+                onReedit = { reeditRequest = state.selectedTaskIds.toList() },
+                onResubmit = { resubmitRequest = state.selectedTaskIds.toList() },
+                onDelete = { deleteRequest = state.selectedTaskIds.toList() },
+                onDismiss = actions.onClearSelection,
             )
         },
     ) { paddingValues ->
         AutoWorkflowLevels(
             state = state,
             columns = columns,
+            searchQuery = searchQuery,
             onColumnsChanged = onColumnsChanged,
             topInset = paddingValues.calculateTopPadding(),
             actions = actions,
-            onOpenImage = { compareImage = it },
+            onOpenImage = { target ->
+                val query = searchQuery.trim()
+                val visibleImages = state.images.filter {
+                    it.isLinked && (query.isEmpty() || it.name.contains(query, ignoreCase = true))
+                }
+                openOutputReader(context, visibleImages, target.relPath, title)
+            },
         )
-    }
 
-    compareImage?.let { image ->
-        CompareOverlay(image = image, onDismiss = { compareImage = null })
+        reeditRequest?.let { taskIds ->
+            ReeditPromptDialog(
+                onDismiss = { reeditRequest = null },
+                onConfirm = { promptText, deleteOldOutput ->
+                    actions.onPreviewReedit(taskIds, promptText, deleteOldOutput)
+                    reeditRequest = null
+                },
+            )
+        }
+
+        resubmitRequest?.let { taskIds ->
+            ResubmitDialog(
+                onDismiss = { resubmitRequest = null },
+                onConfirm = { flow, deleteOldOutput ->
+                    actions.onPreviewResubmit(taskIds, flow, deleteOldOutput)
+                    resubmitRequest = null
+                },
+            )
+        }
+
+        state.pendingConfirm?.let { pending ->
+            ConfirmActionDialog(
+                pending = pending,
+                running = state.actionRunning,
+                onConfirm = actions.onConfirmPendingAction,
+                onDismiss = actions.onDismissPendingAction,
+            )
+        }
+
+        deleteRequest?.let { taskIds ->
+            DeleteConfirmDialog(
+                message = stringResource(R.string.autoworkflow_delete_confirm, taskIds.size),
+                onConfirm = {
+                    actions.onDeleteTasks(taskIds)
+                    deleteRequest = null
+                },
+                onDismiss = { deleteRequest = null },
+            )
+        }
     }
 }
+
+/**
+ * Opens the app's own reader on this directory's output images.
+ *
+ * The viewer, its page transitions and its gestures are the album reader's — this only hands over a
+ * [ReaderSessions] snapshot (one [Photo] per output file, addressed by its relative path) and
+ * records each output's original-image counterpart so the reader can draw its compare inset.
+ */
+private fun openOutputReader(
+    context: Context,
+    images: List<AutoWorkflowImage>,
+    startRelPath: String,
+    title: String,
+) {
+    if (images.isEmpty()) return
+    val photos = images.map { image ->
+        Photo(
+            id = image.relPath,
+            imageUri = Uri.parse(image.imageUrl ?: image.thumbUrl ?: image.absPath),
+            title = image.name,
+            size = image.size,
+            isLocal = false,
+        )
+    }
+    val startIndex = photos.indexOfFirst { it.id == startRelPath }.coerceAtLeast(0)
+    AutoWorkflowCompareStore.putAll(
+        images.mapNotNull { image ->
+            val task = image.task ?: return@mapNotNull null
+            image.relPath to AutoWorkflowCompareInfo(
+                sourceUrl = task.sourceImageUrl ?: task.sourceThumbUrl,
+                generatedUrl = image.imageUrl ?: image.thumbUrl,
+                taskId = task.id,
+                sourceName = task.sourcePath?.let(::autoWorkflowFileName),
+                workflowFile = task.workflowFile,
+                seed = task.seed,
+            )
+        }.toMap(),
+    )
+    val session = ReaderSessions.create(ReaderSessionSource.AUTOWORKFLOW, photos, title)
+    val intent = Intent(context, PhotoViewActivity::class.java).apply {
+        putExtra(ReaderSessions.EXTRA_SESSION_ID, session.id)
+        putExtra("EXTRA_CURRENT_INDEX", startIndex)
+        putExtra("EXTRA_IS_FAVORITES", false)
+        // Output images are separate files, so the card pager is the only mode that makes
+        // left/right stepping work the way the album does.
+        putExtra("EXTRA_IS_CARD_MODE", true)
+        if (context !is Activity) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    context.startActivity(intent)
+}
+
+@Composable
+private fun AutoWorkflowMoreMenuButton(
+    sortOrder: Int,
+    onSetSortOrder: (Int) -> Unit,
+    columns: Int,
+    onColumnsChanged: (Int) -> Unit,
+    onRefresh: () -> Unit,
+    onOpenSettings: () -> Unit,
+) {
+    var showMenu by remember { mutableStateOf(false) }
+    val sortItems = autoWorkflowSortItems().map { (order, label) ->
+        DropdownItem(
+            text = label,
+            selected = sortOrder == order,
+            onClick = { onSetSortOrder(order) },
+        )
+    }
+    val columnItems = (1..4).map { count ->
+        DropdownItem(
+            text = stringResource(R.string.columns_suffix, count),
+            selected = columns == count,
+            onClick = { onColumnsChanged(count) },
+        )
+    }
+    Box {
+        HighlightedTopBarAction(
+            icon = COUIIcons.Light.More,
+            contentDescription = stringResource(R.string.more),
+            onClick = { showMenu = true },
+        )
+        CouiCascadingMenuPopup(
+            show = showMenu,
+            entries = listOf(
+                DropdownEntry(
+                    items = listOf(
+                        DropdownItem(
+                            text = stringResource(R.string.sort_order),
+                            icon = { modifier -> Icon(COUIIcons.Light.Sort, null, modifier) },
+                            children = sortItems,
+                        ),
+                        DropdownItem(
+                            text = stringResource(R.string.grid_columns),
+                            icon = { modifier -> Icon(COUIIcons.Light.GridView, null, modifier) },
+                            children = columnItems,
+                        ),
+                        DropdownItem(
+                            text = stringResource(R.string.refresh),
+                            icon = { modifier -> Icon(COUIIcons.Light.Refresh, null, modifier) },
+                            onClick = onRefresh,
+                        ),
+                        DropdownItem(
+                            text = stringResource(R.string.settings),
+                            icon = { modifier -> Icon(COUIIcons.Light.Settings, null, modifier) },
+                            onClick = onOpenSettings,
+                        ),
+                    ),
+                ),
+            ),
+            onDismissRequest = { showMenu = false },
+        )
+    }
+}
+
+@Composable
+private fun autoWorkflowSortItems(): List<Pair<Int, String>> = listOf(
+    SettingsManager.SORT_NAME_ASC to stringResource(R.string.sort_name_asc),
+    SettingsManager.SORT_NAME_DESC to stringResource(R.string.sort_name_desc),
+    SettingsManager.SORT_DATE_DESC to stringResource(R.string.sort_date_desc),
+    SettingsManager.SORT_DATE_ASC to stringResource(R.string.sort_date_asc),
+    SettingsManager.SORT_RANDOM_FOLDERS to stringResource(R.string.sort_random_folders),
+    SettingsManager.SORT_RANDOM_PHOTOS to stringResource(R.string.sort_random_photos),
+)
 
 /**
  * Slides one directory level out and the next one in.
@@ -176,6 +483,7 @@ fun AutoWorkflowScreen(
 private fun AutoWorkflowLevels(
     state: AutoWorkflowUiState,
     columns: Int,
+    searchQuery: String,
     onColumnsChanged: (Int) -> Unit,
     topInset: Dp,
     actions: AutoWorkflowActions,
@@ -208,9 +516,13 @@ private fun AutoWorkflowLevels(
             level = level,
             isActive = isActive,
             columns = columns,
+            searchQuery = if (isActive) searchQuery else "",
+            initialScrollOffset = actions.getScrollOffset(relPath),
+            onScrollOffsetChanged = { offset -> actions.onScrollOffsetChanged(relPath, offset) },
             onColumnsChanged = onColumnsChanged,
             topInset = topInset,
             actions = actions,
+            selectedTaskIds = if (isActive) state.selectedTaskIds else emptySet(),
             onOpenImage = onOpenImage,
         )
     }
@@ -224,13 +536,19 @@ private fun AutoWorkflowLevel(
     level: AutoWorkflowLevelState,
     isActive: Boolean,
     columns: Int,
+    searchQuery: String,
+    initialScrollOffset: Int,
+    onScrollOffsetChanged: (Int) -> Unit,
     onColumnsChanged: (Int) -> Unit,
     topInset: Dp,
     actions: AutoWorkflowActions,
+    selectedTaskIds: Set<Long>,
     onOpenImage: (AutoWorkflowImage) -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
-        val cells = remember(level.folders, level.images) { level.toCells() }
+        val cells = remember(level.folders, level.images, selectedTaskIds, searchQuery) {
+            level.toCells(selectedTaskIds, searchQuery)
+        }
         when {
             !level.isConfigured -> MessagePanel(
                 message = stringResource(R.string.autoworkflow_configure_first),
@@ -257,13 +575,18 @@ private fun AutoWorkflowLevel(
                     cells = cells,
                     columns = columns,
                     onColumnsChanged = onColumnsChanged,
+                    initialScrollOffset = initialScrollOffset,
+                    onScrollOffsetChanged = onScrollOffsetChanged,
+                    isSearchFiltered = searchQuery.isNotBlank(),
                     isRefreshing = level.loading,
                     isActive = isActive,
+                    isSelectionMode = selectedTaskIds.isNotEmpty(),
                     topInset = topInset,
                     onRefresh = actions.onRefresh,
                     onLoadMore = actions.onLoadMore,
                     onOpenFolder = actions.onOpenFolder,
                     onOpenImage = onOpenImage,
+                    onToggleSelection = actions.onToggleSelection,
                 )
             }
         }
@@ -273,28 +596,36 @@ private fun AutoWorkflowLevel(
 /**
  * The output grid.
  *
- * Rebuilt per directory ([key] on the relative path) so entering a folder starts at the top, the
- * same way opening a folder does today.
+ * Rebuilt per directory ([key] on the relative path), restoring the remembered scroll offset for
+ * that directory so navigating back up or returning from the reader resumes where the user left off.
  */
 @Composable
 private fun AutoWorkflowGrid(
     cells: List<AutoWorkflowCell>,
     columns: Int,
     onColumnsChanged: (Int) -> Unit,
+    initialScrollOffset: Int,
+    onScrollOffsetChanged: (Int) -> Unit,
+    isSearchFiltered: Boolean,
     isRefreshing: Boolean,
     isActive: Boolean,
+    isSelectionMode: Boolean,
     topInset: Dp,
     onRefresh: () -> Unit,
     onLoadMore: () -> Unit,
     onOpenFolder: (String) -> Unit,
     onOpenImage: (AutoWorkflowImage) -> Unit,
+    onToggleSelection: (Long) -> Unit,
 ) {
     val zoomState = rememberFollowZoomGridState(
         columns = columns,
         minColumns = 1,
         maxColumns = 4,
         onColumnsChanged = onColumnsChanged,
+        initialScrollOffset = initialScrollOffset,
     )
+    val latestIsSearchFiltered by rememberUpdatedState(isSearchFiltered)
+    val latestOnScrollOffsetChanged by rememberUpdatedState(onScrollOffsetChanged)
     val aspectRatios = remember(cells) { cells.map { it.item.aspectRatio } }
     val extraHeights = remember(cells) {
         cells.map { cell ->
@@ -306,6 +637,14 @@ private fun AutoWorkflowGrid(
         snapshotFlow { zoomState.scrollOffset }.collect {
             val total = cells.size
             if (total > 0 && zoomState.lastVisibleIndex >= total - 16) onLoadMore()
+        }
+    }
+    LaunchedEffect(zoomState, isActive) {
+        if (!isActive) return@LaunchedEffect
+        snapshotFlow { zoomState.scrollOffset }.collect { offset ->
+            if (!latestIsSearchFiltered) {
+                latestOnScrollOffsetChanged(offset)
+            }
         }
     }
 
@@ -327,7 +666,7 @@ private fun AutoWorkflowGrid(
                 start = 16.dp,
                 top = topInset + 12.dp,
                 end = 16.dp,
-                bottom = 12.dp,
+                bottom = 96.dp,
             ),
             state = zoomState,
             itemExtraHeights = extraHeights,
@@ -354,9 +693,16 @@ private fun AutoWorkflowGrid(
                 is AutoWorkflowCell.ImageCell -> MediaCardMiuix(
                     item = cell.item,
                     showFilename = true,
-                    isSelectionMode = false,
-                    onClick = { onOpenImage(cell.source) },
-                    onLongClick = {},
+                    isSelectionMode = isSelectionMode,
+                    onClick = {
+                        val taskId = cell.source.task?.id
+                        when {
+                            isSelectionMode && taskId != null -> onToggleSelection(taskId)
+                            isSelectionMode -> Unit
+                            else -> onOpenImage(cell.source)
+                        }
+                    },
+                    onLongClick = { cell.source.task?.id?.let(onToggleSelection) },
                     targetWidthPx = widthPx,
                     targetHeightPx = heightPx,
                     fillHeight = true,
@@ -385,8 +731,18 @@ private sealed interface AutoWorkflowCell {
 
 private const val IMAGE_TILE_ASPECT = 0.75f
 
-private fun AutoWorkflowLevelState.toCells(): List<AutoWorkflowCell> =
-    folders.map { folder ->
+private fun AutoWorkflowLevelState.toCells(
+    selectedTaskIds: Set<Long> = emptySet(),
+    searchQuery: String = "",
+): List<AutoWorkflowCell> {
+    val query = searchQuery.trim()
+    val visibleFolders = folders.filter {
+        it.taskCount > 0 && (query.isEmpty() || it.name.contains(query, ignoreCase = true))
+    }
+    val visibleImages = images.filter {
+        it.isLinked && (query.isEmpty() || it.name.contains(query, ignoreCase = true))
+    }
+    return visibleFolders.map { folder ->
         val path = folder.relPath
         AutoWorkflowCell.FolderCell(
             source = folder,
@@ -407,7 +763,7 @@ private fun AutoWorkflowLevelState.toCells(): List<AutoWorkflowCell> =
                 aspectRatio = 1f,
             ),
         )
-    } + images.mapNotNull { image ->
+    } + visibleImages.mapNotNull { image ->
         val url = image.thumbUrl ?: image.imageUrl ?: return@mapNotNull null
         val uri = Uri.parse(url)
         AutoWorkflowCell.ImageCell(
@@ -429,9 +785,11 @@ private fun AutoWorkflowLevelState.toCells(): List<AutoWorkflowCell> =
                 durationText = "",
                 aspectRatio = IMAGE_TILE_ASPECT,
                 isFavorite = false,
+                isSelected = image.task?.id?.let { it in selectedTaskIds } ?: false,
             ),
         )
     }
+}
 
 @Composable
 private fun folderSummary(folder: AutoWorkflowFolder): String = when {
@@ -472,6 +830,381 @@ private fun imageOverlay(image: AutoWorkflowImage): MediaCardOverlay {
     )
 }
 
+/**
+ * The COUI scrolling toolbar shown while images are selected, built from the same
+ * [BottomFloatingScrollToolbar] capsule the folder pages use for their bulk actions.
+ */
+@Composable
+private fun AutoWorkflowSelectionBar(
+    visible: Boolean,
+    selectedCount: Int,
+    isAllSelected: Boolean,
+    onToggleSelectAll: () -> Unit,
+    onReedit: () -> Unit,
+    onResubmit: () -> Unit,
+    onDelete: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val hasSelection = selectedCount > 0
+    val tapHaptic = rememberTapHaptic()
+    val strongHaptic = rememberStrongHaptic()
+    val isDark = COUITheme.colorScheme.background.luminance() < 0.5f
+    val colors = if (isDark) {
+        BottomFloatingScrollToolbarDefaults.colors()
+    } else {
+        BottomFloatingScrollToolbarDefaults.colors(
+            containerColor = Color(0xF5F5F5F7),
+            strokeColor = Color(0x1A000000),
+            contentColor = Color(0xB3000000),
+            disabledContentColor = Color(0x33000000),
+        )
+    }
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = slideInVertically(
+            tween(NavigationBarMotion.ShowTranslateDurationMillis, easing = COUIInEase),
+        ) { it },
+        exit = slideOutVertically(
+            tween(NavigationBarMotion.HideTranslateDurationMillis, easing = COUIOutEase),
+        ) { it },
+    ) {
+        GalleryChrome {
+            BottomFloatingScrollToolbar(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        bottom = BottomFloatingNavigationBarDefaults.navigationBarPadding() + 16.dp,
+                    ),
+                colors = colors,
+            ) {
+                BottomFloatingScrollToolbarItem(
+                    onClick = {
+                        tapHaptic()
+                        onToggleSelectAll()
+                    },
+                    icon = COUIIcons.SelectAll,
+                    label = stringResource(
+                        if (isAllSelected) R.string.unselect_all else R.string.select_all,
+                    ),
+                    selected = isAllSelected,
+                )
+                BottomFloatingScrollToolbarItem(
+                    onClick = {
+                        tapHaptic()
+                        onReedit()
+                    },
+                    icon = COUIIcons.Light.Edit,
+                    label = stringResource(R.string.autoworkflow_resubmit_edit),
+                    enabled = hasSelection,
+                )
+                BottomFloatingScrollToolbarItem(
+                    onClick = {
+                        tapHaptic()
+                        onResubmit()
+                    },
+                    icon = COUIIcons.Light.Refresh,
+                    label = stringResource(R.string.autoworkflow_resubmit),
+                    enabled = hasSelection,
+                )
+                BottomFloatingScrollToolbarItem(
+                    onClick = {
+                        strongHaptic()
+                        onDelete()
+                    },
+                    icon = COUIIcons.Delete,
+                    label = stringResource(R.string.autoworkflow_delete_task),
+                    enabled = hasSelection,
+                )
+                BottomFloatingScrollToolbarItem(
+                    onClick = {
+                        tapHaptic()
+                        onDismiss()
+                    },
+                    icon = COUIIcons.Close,
+                    label = stringResource(R.string.cancel),
+                )
+            }
+        }
+    }
+}
+
+private val DialogRowInsideMargin = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
+
+@Composable
+internal fun ReeditPromptDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (promptText: String, deleteOldOutput: Boolean) -> Unit,
+) {
+    val context = LocalContext.current
+    val settings = remember { SettingsManager(context) }
+    val serverUrl = remember { settings.getAutoWorkflowUrl() }
+    var presets by remember { mutableStateOf<List<PromptPreset>>(emptyList()) }
+    var presetsLoading by remember { mutableStateOf(serverUrl.isNotBlank()) }
+    var selectedPresetName by remember { mutableStateOf<String?>(null) }
+    var presetExpanded by remember { mutableStateOf(false) }
+    var prompt by remember { mutableStateOf("") }
+    var promptError by remember { mutableStateOf(false) }
+    var deleteOldOutput by remember { mutableStateOf(false) }
+
+    LaunchedEffect(serverUrl) {
+        if (serverUrl.isBlank()) {
+            presetsLoading = false
+            return@LaunchedEffect
+        }
+        presetsLoading = true
+        AutoWorkflowClient(serverUrl).fetchPromptPresets().onSuccess { loaded ->
+            presets = loaded
+        }
+        presetsLoading = false
+    }
+
+    val presetDisplayValue = when {
+        presetsLoading -> stringResource(R.string.autoworkflow_preset_loading)
+        selectedPresetName != null -> selectedPresetName.orEmpty()
+        presets.isEmpty() -> stringResource(R.string.autoworkflow_preset_empty)
+        else -> stringResource(R.string.autoworkflow_preset_placeholder)
+    }
+
+    OverlayDialog(
+        show = true,
+        title = stringResource(R.string.autoworkflow_reedit_title),
+        onDismissRequest = onDismiss,
+        messageBottomPadding = DialogDefaults.MessageBottomPaddingWithCustomContent,
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 420.dp)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
+                ) {
+                    TextField(
+                        value = presetDisplayValue,
+                        onValueChange = {},
+                        modifier = Modifier.fillMaxWidth(),
+                        label = stringResource(R.string.autoworkflow_preset_label),
+                        singleLine = true,
+                    )
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .clickable(
+                                enabled = !presetsLoading && presets.isNotEmpty(),
+                                role = Role.Button,
+                            ) { presetExpanded = true },
+                    ) {
+                        Text(
+                            text = "\u25BE",
+                            modifier = Modifier
+                                .align(Alignment.CenterEnd)
+                                .padding(end = 16.dp),
+                        )
+                    }
+                    CouiFlatMenu(
+                        expanded = presetExpanded,
+                        entries = listOf(
+                            DropdownEntry(
+                                items = buildList {
+                                    add(
+                                        DropdownItem(
+                                            text = stringResource(R.string.autoworkflow_preset_none),
+                                            selected = selectedPresetName == null,
+                                            onClick = {
+                                                selectedPresetName = null
+                                                presetExpanded = false
+                                            },
+                                        ),
+                                    )
+                                    presets.forEach { preset ->
+                                        add(
+                                            DropdownItem(
+                                                text = preset.name,
+                                                selected = selectedPresetName == preset.name,
+                                                onClick = {
+                                                    selectedPresetName = preset.name
+                                                    // Copy into the submission buffer only; saved backend presets stay read-only.
+                                                    prompt = preset.content
+                                                    promptError = false
+                                                    presetExpanded = false
+                                                },
+                                            ),
+                                        )
+                                    }
+                                },
+                            ),
+                        ),
+                        onDismissRequest = { presetExpanded = false },
+                    )
+                }
+                Spacer(Modifier.height(10.dp))
+                TextField(
+                    value = prompt,
+                    onValueChange = { value ->
+                        prompt = value
+                        if (value.isNotBlank()) promptError = false
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp)
+                        .heightIn(min = 96.dp),
+                    label = stringResource(R.string.autoworkflow_reedit_prompt_hint),
+                    singleLine = false,
+                )
+                if (promptError) {
+                    Text(
+                        text = stringResource(R.string.autoworkflow_reedit_prompt_required),
+                        style = COUITheme.textStyles.footnote1,
+                        color = COUITheme.colorScheme.error,
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 6.dp),
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                SwitchPreference(
+                    checked = deleteOldOutput,
+                    onCheckedChange = { deleteOldOutput = it },
+                    title = stringResource(R.string.autoworkflow_resubmit_delete_old),
+                    insideMargin = DialogRowInsideMargin,
+                )
+            }
+
+            DialogButtonBar(
+                negative = DialogButtonBarAction(
+                    text = stringResource(R.string.cancel),
+                    onClick = onDismiss,
+                ),
+                positive = DialogButtonBarAction(
+                    text = stringResource(R.string.autoworkflow_reedit_title),
+                    recommended = true,
+                    onClick = {
+                        if (prompt.isBlank()) {
+                            promptError = true
+                        } else {
+                            onConfirm(prompt.trim(), deleteOldOutput)
+                        }
+                    },
+                ),
+                hasContentAbove = true,
+            )
+        }
+    }
+}
+
+@Composable
+internal fun ResubmitDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (flow: String, deleteOldOutput: Boolean) -> Unit,
+) {
+    val context = LocalContext.current
+    val settings = remember { SettingsManager(context) }
+    var flow by remember { mutableStateOf(settings.getAutoWorkflowResubmitFlow()) }
+    var deleteOldOutput by remember { mutableStateOf(settings.getAutoWorkflowResubmitDeleteOld()) }
+
+    OverlayDialog(
+        show = true,
+        title = stringResource(R.string.autoworkflow_resubmit_title),
+        onDismissRequest = onDismiss,
+        messageBottomPadding = DialogDefaults.MessageBottomPaddingWithCustomContent,
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            RadioButtonPreference(
+                title = stringResource(R.string.autoworkflow_resubmit_edit),
+                selected = flow == AutoWorkflowClient.FLOW_EDIT,
+                onClick = {
+                    flow = AutoWorkflowClient.FLOW_EDIT
+                    settings.setAutoWorkflowResubmitFlow(AutoWorkflowClient.FLOW_EDIT)
+                },
+                insideMargin = DialogRowInsideMargin,
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp))
+            RadioButtonPreference(
+                title = stringResource(R.string.autoworkflow_resubmit_upscale),
+                selected = flow == AutoWorkflowClient.FLOW_UPSCALE,
+                onClick = {
+                    flow = AutoWorkflowClient.FLOW_UPSCALE
+                    settings.setAutoWorkflowResubmitFlow(AutoWorkflowClient.FLOW_UPSCALE)
+                },
+                insideMargin = DialogRowInsideMargin,
+            )
+            if (flow == AutoWorkflowClient.FLOW_EDIT) {
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp))
+                SwitchPreference(
+                    checked = deleteOldOutput,
+                    onCheckedChange = {
+                        deleteOldOutput = it
+                        settings.setAutoWorkflowResubmitDeleteOld(it)
+                    },
+                    title = stringResource(R.string.autoworkflow_resubmit_delete_old),
+                    insideMargin = DialogRowInsideMargin,
+                )
+            }
+
+            DialogButtonBar(
+                negative = DialogButtonBarAction(
+                    text = stringResource(R.string.cancel),
+                    onClick = onDismiss,
+                ),
+                positive = DialogButtonBarAction(
+                    text = stringResource(R.string.autoworkflow_resubmit),
+                    recommended = true,
+                    onClick = {
+                        settings.setAutoWorkflowResubmitFlow(flow)
+                        val effectiveDeleteOld = if (flow == AutoWorkflowClient.FLOW_EDIT) {
+                            settings.setAutoWorkflowResubmitDeleteOld(deleteOldOutput)
+                            deleteOldOutput
+                        } else {
+                            false
+                        }
+                        onConfirm(flow, effectiveDeleteOld)
+                    },
+                ),
+                hasContentAbove = true,
+            )
+        }
+    }
+}
+
+@Composable
+internal fun ConfirmActionDialog(
+    pending: AutoWorkflowPendingAction,
+    running: Boolean,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val isReedit = !pending.promptText.isNullOrBlank()
+    val titleRes = if (isReedit) R.string.autoworkflow_reedit_title else R.string.autoworkflow_resubmit_title
+    val positiveRes = if (isReedit) R.string.autoworkflow_reedit_title else R.string.autoworkflow_resubmit
+
+    OverlayDialog(
+        show = true,
+        title = stringResource(titleRes),
+        summary = pending.message,
+        onDismissRequest = if (running) null else onDismiss,
+    ) {
+        DialogButtonBar(
+            negative = DialogButtonBarAction(
+                text = stringResource(R.string.cancel),
+                onClick = { if (!running) onDismiss() },
+            ),
+            positive = DialogButtonBarAction(
+                text = if (running) {
+                    stringResource(R.string.autoworkflow_running)
+                } else {
+                    stringResource(positiveRes)
+                },
+                recommended = true,
+                onClick = { if (!running) onConfirm() },
+            ),
+            hasContentAbove = true,
+        )
+    }
+}
+
 @Composable
 private fun CenteredProgress() {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -507,206 +1240,6 @@ private fun MessagePanel(
                 }
             }
         }
-    }
-}
-
-/**
- * Loads an http(s) asset through the app's Glide pipeline at full view resolution.
- *
- * [WebDavImageLoader.loadLocalImage] is used deliberately: the registered OkHttp integration is
- * what makes a plain URL work without WebDAV credentials. It must *not* run as a folder preview —
- * that path forces a 160px decode, which is what made the compare panes blurry.
- */
-@Composable
-private fun RemoteImage(
-    url: String?,
-    contentScale: ImageView.ScaleType,
-    modifier: Modifier = Modifier,
-) {
-    if (url.isNullOrBlank()) return
-    AndroidView(
-        modifier = modifier,
-        factory = { context ->
-            ImageView(context).apply { scaleType = contentScale }
-        },
-        update = { imageView ->
-            imageView.scaleType = contentScale
-            val bound = imageView.getTag(R.id.tag_media_bind_key) as? String
-            if (bound == url && imageView.drawable != null) return@AndroidView
-            imageView.setTag(R.id.tag_media_bind_key, url)
-            WebDavImageLoader.loadLocalImage(
-                context = imageView.context,
-                imageUri = Uri.parse(url),
-                imageView = imageView,
-                limitSize = false,
-                isFolderPreview = false,
-            )
-        },
-    )
-}
-
-@Composable
-private fun CompareOverlay(image: AutoWorkflowImage, onDismiss: () -> Unit) {
-    var sideBySide by remember { mutableStateOf(false) }
-    val task = image.task
-    val generatedUrl = image.imageUrl ?: image.thumbUrl
-    val sourceUrl = task?.sourceImageUrl ?: task?.sourceThumbUrl
-
-    BackHandler(onBack = onDismiss)
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .systemBarsPadding(),
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = if (task != null) {
-                            stringResource(R.string.autoworkflow_task_badge, task.id) + " · " + image.name
-                        } else {
-                            image.name
-                        },
-                        style = COUITheme.textStyles.body2,
-                        color = Color.White,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    val meta = buildList {
-                        task?.sourcePath?.let(::autoWorkflowFileName)?.let {
-                            add(stringResource(R.string.autoworkflow_source_prefix, it))
-                        }
-                        task?.workflowFile?.takeIf { it.isNotBlank() }?.let { add(it) }
-                        task?.seed?.let { add(stringResource(R.string.autoworkflow_seed_prefix, it)) }
-                        if (task == null) add(stringResource(R.string.autoworkflow_unlinked))
-                    }.joinToString(" · ")
-                    if (meta.isNotEmpty()) {
-                        Text(
-                            text = meta,
-                            modifier = Modifier.padding(top = 2.dp),
-                            style = COUITheme.textStyles.footnote2,
-                            color = Color.White.copy(alpha = 0.7f),
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-                IconButton(onClick = onDismiss) {
-                    Icon(
-                        imageVector = COUIIcons.Light.Close,
-                        contentDescription = stringResource(R.string.autoworkflow_close),
-                        tint = Color.White,
-                    )
-                }
-            }
-
-            if (sideBySide) {
-                Row(modifier = Modifier.weight(1f)) {
-                    ComparePane(
-                        label = stringResource(R.string.autoworkflow_original),
-                        url = sourceUrl,
-                        modifier = Modifier.weight(1f),
-                    )
-                    ComparePane(
-                        label = stringResource(R.string.autoworkflow_generated),
-                        url = generatedUrl,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            } else {
-                Column(modifier = Modifier.weight(1f)) {
-                    ComparePane(
-                        label = stringResource(R.string.autoworkflow_original),
-                        url = sourceUrl,
-                        modifier = Modifier.weight(1f),
-                    )
-                    ComparePane(
-                        label = stringResource(R.string.autoworkflow_generated),
-                        url = generatedUrl,
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                OverlayButton(
-                    label = stringResource(R.string.autoworkflow_toggle_layout),
-                    onClick = { sideBySide = !sideBySide },
-                    modifier = Modifier.weight(1f),
-                )
-                OverlayButton(
-                    label = stringResource(R.string.autoworkflow_close),
-                    onClick = onDismiss,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun OverlayButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(22.dp))
-            .background(Color(0x33FFFFFF))
-            .clickable(onClick = onClick)
-            .padding(vertical = 14.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = label,
-            style = COUITheme.textStyles.body2,
-            color = Color.White,
-        )
-    }
-}
-
-@Composable
-private fun ComparePane(label: String, url: String?, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(4.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFF141414)),
-    ) {
-        if (url != null) {
-            RemoteImage(
-                url = url,
-                contentScale = ImageView.ScaleType.FIT_CENTER,
-                modifier = Modifier.fillMaxSize(),
-            )
-        } else {
-            Text(
-                text = stringResource(R.string.autoworkflow_no_source),
-                modifier = Modifier.align(Alignment.Center),
-                style = COUITheme.textStyles.footnote2,
-                color = Color.White.copy(alpha = 0.5f),
-            )
-        }
-        Badge(
-            text = label,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(8.dp),
-        )
     }
 }
 

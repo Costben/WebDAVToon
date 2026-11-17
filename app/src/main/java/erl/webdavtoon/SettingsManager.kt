@@ -5,6 +5,7 @@ package erl.webdavtoon
 import android.content.Context
 import android.util.Log
 import com.google.gson.Gson
+import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.runBlocking
@@ -247,6 +248,54 @@ class SettingsManager(context: Context) {
 
     fun setAutoWorkflowUrl(url: String) =
         appSettings.putString(AppSettingsStore.AUTO_WORKFLOW_URL, url.trim().trimEnd('/'))
+
+    fun getAutoWorkflowSortOrder(): Int =
+        appSettings.getOrDefaultInt(AppSettingsStore.AUTO_WORKFLOW_SORT_ORDER, SORT_DATE_DESC)
+
+    fun setAutoWorkflowSortOrder(order: Int) =
+        appSettings.putInt(AppSettingsStore.AUTO_WORKFLOW_SORT_ORDER, order)
+
+    fun getAutoWorkflowResubmitFlow(): String =
+        when (
+            appSettings.getOrDefaultString(
+                AppSettingsStore.AUTO_WORKFLOW_RESUBMIT_FLOW,
+                AutoWorkflowClient.FLOW_EDIT,
+            )
+        ) {
+            AutoWorkflowClient.FLOW_UPSCALE -> AutoWorkflowClient.FLOW_UPSCALE
+            else -> AutoWorkflowClient.FLOW_EDIT
+        }
+
+    fun setAutoWorkflowResubmitFlow(flow: String) {
+        val normalized = if (flow == AutoWorkflowClient.FLOW_UPSCALE) {
+            AutoWorkflowClient.FLOW_UPSCALE
+        } else {
+            AutoWorkflowClient.FLOW_EDIT
+        }
+        appSettings.putString(AppSettingsStore.AUTO_WORKFLOW_RESUBMIT_FLOW, normalized)
+    }
+
+    fun getAutoWorkflowResubmitDeleteOld(): Boolean =
+        appSettings.getOrDefaultBoolean(AppSettingsStore.AUTO_WORKFLOW_RESUBMIT_DELETE_OLD, false)
+
+    fun setAutoWorkflowResubmitDeleteOld(deleteOld: Boolean) =
+        appSettings.putBoolean(AppSettingsStore.AUTO_WORKFLOW_RESUBMIT_DELETE_OLD, deleteOld)
+
+    fun getAutoWorkflowScrollOffsets(): Map<String, Int> =
+        parseAutoWorkflowScrollOffsets(
+            appSettings.getOrDefaultString(AppSettingsStore.AUTO_WORKFLOW_SCROLL_OFFSETS, ""),
+        )
+
+    fun setAutoWorkflowScrollOffsets(offsets: Map<String, Int>) {
+        appSettings.putString(
+            AppSettingsStore.AUTO_WORKFLOW_SCROLL_OFFSETS,
+            encodeAutoWorkflowScrollOffsets(offsets),
+        )
+    }
+
+    fun clearAutoWorkflowScrollOffsets() {
+        appSettings.putString(AppSettingsStore.AUTO_WORKFLOW_SCROLL_OFFSETS, "")
+    }
 
     fun isRotationLocked(): Boolean =
         appSettings.getOrDefaultBoolean(AppSettingsStore.ROTATION_LOCKED, false)
@@ -584,4 +633,39 @@ class SettingsManager(context: Context) {
     }
 
     private fun removeFavoritePhotoFromLegacyPrefs(photoId: String) = Unit
+}
+
+private const val MAX_AUTO_WORKFLOW_SCROLL_OFFSETS = 32
+
+internal fun parseAutoWorkflowScrollOffsets(json: String): Map<String, Int> {
+    if (json.isBlank()) return emptyMap()
+    return runCatching {
+        val root = JsonParser.parseString(json)
+        if (!root.isJsonObject) return emptyMap()
+        val parsed = LinkedHashMap<String, Int>()
+        root.asJsonObject.entrySet().forEach { (key, value) ->
+            val offset = runCatching { value.asInt }.getOrNull() ?: return@forEach
+            if (offset > 0) {
+                parsed[key] = offset
+            }
+        }
+        parsed
+    }.getOrDefault(emptyMap())
+}
+
+internal fun encodeAutoWorkflowScrollOffsets(
+    offsets: Map<String, Int>,
+    maxEntries: Int = MAX_AUTO_WORKFLOW_SCROLL_OFFSETS,
+): String {
+    if (offsets.isEmpty() || maxEntries <= 0) return ""
+    val positive = offsets.entries.filter { it.value > 0 }
+    if (positive.isEmpty()) return ""
+    val trimmed = if (positive.size > maxEntries) {
+        positive.drop(positive.size - maxEntries)
+    } else {
+        positive
+    }
+    val obj = JsonObject()
+    trimmed.forEach { (path, offset) -> obj.addProperty(path, offset) }
+    return obj.toString()
 }

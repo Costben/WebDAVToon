@@ -101,13 +101,14 @@ class FollowZoomGridState(
     initialColumns: Int,
     private val minColumns: Int,
     private val maxColumns: Int,
+    initialScrollOffset: Int = 0,
 ) {
     /** Fractional column count that drives the live layout. */
     var virtualColumns: Float by mutableFloatStateOf(initialColumns.coerceIn(minColumns, maxColumns).toFloat())
         private set
 
     /** Vertical scroll offset in content pixels. */
-    var scrollOffset: Int by mutableIntStateOf(0)
+    var scrollOffset: Int by mutableIntStateOf(initialScrollOffset.coerceAtLeast(0))
         private set
 
     var isZooming: Boolean by mutableStateOf(false)
@@ -158,6 +159,8 @@ class FollowZoomGridState(
     }
 
     internal fun clampScroll() {
+        // Before the first measure pass viewportHeight is 0; clamping here would wipe a restored offset.
+        if (viewportHeight <= 0) return
         val max = scrollRange()
         if (scrollOffset > max) scrollOffset = max
         if (scrollOffset < 0) scrollOffset = 0
@@ -236,7 +239,7 @@ class FollowZoomGridState(
     fun scrollBy(delta: Float): Float {
         if (isZooming || isSettling) return 0f
         val max = scrollRange()
-        val current = scrollOffset
+        val current = scrollOffset.coerceIn(0, max)
         // `Modifier.scrollable` reports drag deltas opposite to the content scroll direction
         // (dragging up is negative), so subtract to make the content follow the finger.
         val targetFloat = current - delta
@@ -378,10 +381,11 @@ fun rememberFollowZoomGridState(
     minColumns: Int,
     maxColumns: Int,
     onColumnsChanged: (Int) -> Unit,
+    initialScrollOffset: Int = 0,
 ): FollowZoomGridState {
     val scope = rememberCoroutineScope()
     val state = remember(minColumns, maxColumns) {
-        FollowZoomGridState(columns, minColumns, maxColumns)
+        FollowZoomGridState(columns, minColumns, maxColumns, initialScrollOffset)
     }
     SideEffect {
         state.attachScope(scope)

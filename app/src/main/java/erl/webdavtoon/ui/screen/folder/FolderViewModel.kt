@@ -8,6 +8,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.bumptech.glide.Glide
 import erl.webdavtoon.AppSettingsStore
+import erl.webdavtoon.AutoWorkflowClient
 import erl.webdavtoon.Folder
 import erl.webdavtoon.FolderSearchMatcher
 import erl.webdavtoon.LocalPhotoRepository
@@ -163,6 +164,7 @@ class FolderViewModel @JvmOverloads constructor(app: Application) : AndroidViewM
                     )
                 }
                 publishFolders()
+                loadAutoWorkflowPreview()
                 if (forceRefresh) refreshVisibleFolderPreviews(forceRefresh = true)
             } catch (error: Exception) {
                 _uiState.update {
@@ -173,6 +175,38 @@ class FolderViewModel @JvmOverloads constructor(app: Application) : AndroidViewM
                         error = error.message ?: "Folder load failed",
                     )
                 }
+            }
+        }
+    }
+
+    private fun loadAutoWorkflowPreview() {
+        val baseUrl = settingsManager.getAutoWorkflowUrl()
+        if (baseUrl.isBlank()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            AutoWorkflowClient(baseUrl).browse(relPath = "", offset = 0, limit = 4).onSuccess { page ->
+                val linkedFolders = page.folders.filter { it.taskCount > 0 }
+                val firstPerFolder = linkedFolders.mapNotNull { it.previewUrls.firstOrNull() }
+                val previews = (
+                    firstPerFolder +
+                        linkedFolders.flatMap { it.previewUrls } +
+                        page.images.filter { it.isLinked }.mapNotNull { it.thumbUrl ?: it.imageUrl }
+                    )
+                    .distinct()
+                    .take(4)
+                    .map(Uri::parse)
+                if (previews.isEmpty()) return@onSuccess
+                _uiState.update { state ->
+                    state.copy(
+                        rawFolders = state.rawFolders.map { folder ->
+                            if (folder.path == AutoWorkflowEntry.PATH) {
+                                folder.copy(previewUris = previews)
+                            } else {
+                                folder
+                            }
+                        },
+                    )
+                }
+                publishFolders()
             }
         }
     }

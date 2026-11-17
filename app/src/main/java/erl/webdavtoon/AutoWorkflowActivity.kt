@@ -23,7 +23,8 @@ import erl.webdavtoon.ui.theme.WebDAVToonTheme
  * Hosts the AutoWorkflow output browser.
  *
  * The output tree, the task number behind each generated image and the original input image all
- * come from the AutoWorkflow backend's read-only `/api/output/browse`; nothing is persisted here.
+ * come from the AutoWorkflow backend's `/api/output/browse`. Resubmit and delete are reviewer
+ * batch actions: the screen previews them before anything is written.
  */
 class AutoWorkflowActivity : ComponentActivity() {
 
@@ -44,7 +45,7 @@ class AutoWorkflowActivity : ComponentActivity() {
                     themeId = settings.getThemeId(),
                     useCouiDefaultColors = settings.useCouiDefaultColors(),
                 ) {
-                    LaunchedEffect(Unit) { viewModel.load("") }
+                    LaunchedEffect(Unit) { viewModel.ensureLoaded() }
                     AutoWorkflowScreen(
                         state = uiState,
                         actions = AutoWorkflowActions(
@@ -53,6 +54,31 @@ class AutoWorkflowActivity : ComponentActivity() {
                             onUp = { viewModel.load(uiState.parentRelPath) },
                             onOpenFolder = { relPath -> viewModel.load(relPath) },
                             onLoadMore = { viewModel.loadMore() },
+                            onSetSortOrder = viewModel::setSortOrder,
+                            getScrollOffset = viewModel::scrollOffsetFor,
+                            onScrollOffsetChanged = viewModel::saveScrollOffset,
+                            onToggleSelection = viewModel::toggleSelection,
+                            onSelectAll = viewModel::selectAll,
+                            onClearSelection = viewModel::clearSelection,
+                            onPreviewReedit = { taskIds, promptText, deleteOldOutput ->
+                                viewModel.previewResubmit(
+                                    taskIds = taskIds,
+                                    flow = AutoWorkflowClient.FLOW_EDIT,
+                                    deleteOldOutput = deleteOldOutput,
+                                    promptText = promptText,
+                                )
+                            },
+                            onPreviewResubmit = { taskIds, flow, deleteOldOutput ->
+                                viewModel.previewResubmit(
+                                    taskIds = taskIds,
+                                    flow = flow,
+                                    deleteOldOutput = deleteOldOutput,
+                                )
+                            },
+                            onConfirmPendingAction = viewModel::confirmPendingAction,
+                            onDismissPendingAction = viewModel::dismissPendingAction,
+                            onDeleteTasks = viewModel::deleteTasks,
+                            onMessageShown = viewModel::consumeActionMessage,
                             onOpenSettings = {
                                 startActivity(
                                     Intent(
@@ -70,7 +96,8 @@ class AutoWorkflowActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        // Coming back from Settings may have changed the server address.
-        if (hasResumed) viewModel.refresh() else hasResumed = true
+        // Only reload when returning from Settings with a changed server address, or apply
+        // any deleted tasks from the reader locally without resetting list position.
+        if (hasResumed) viewModel.onHostResumed() else hasResumed = true
     }
 }

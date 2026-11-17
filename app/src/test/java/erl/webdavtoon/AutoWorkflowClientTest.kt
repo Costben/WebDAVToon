@@ -160,6 +160,49 @@ class AutoWorkflowClientTest {
     }
 
     @Test
+    fun `parses reviewer batch action preview and executed results`() {
+        val preview = AutoWorkflowClient.parseActionResult(
+            """
+            {
+              "action": "resubmit",
+              "decision": "preview_only",
+              "message": "Preview: will create one pending child task.",
+              "executed": false,
+              "requires_human_review": true,
+              "matched_count": 0,
+              "affected_task_ids": [43803],
+              "new_task_ids": []
+            }
+            """.trimIndent(),
+        )
+        assertTrue(preview.isPreview)
+        assertFalse(preview.isBlocked)
+        assertFalse(preview.executed)
+        assertEquals("resubmit", preview.action)
+        assertEquals(listOf(43803L), preview.affectedTaskIds)
+        assertTrue(preview.newTaskIds.isEmpty())
+
+        val executed = AutoWorkflowClient.parseActionResult(
+            """
+            {
+              "action": "delete",
+              "decision": "accepted",
+              "message": "Deleted 2 tasks.",
+              "executed": true,
+              "matched_count": 2,
+              "affected_task_ids": [11, 12],
+              "new_task_ids": [21, 22]
+            }
+            """.trimIndent(),
+        )
+        assertFalse(executed.isPreview)
+        assertTrue(executed.executed)
+        assertEquals(2, executed.matchedCount)
+        assertEquals(listOf(11L, 12L), executed.affectedTaskIds)
+        assertEquals(listOf(21L, 22L), executed.newTaskIds)
+    }
+
+    @Test
     fun `file name survives both windows and posix source paths`() {
         assertEquals(
             "黄绿紫_7695733740576378810_8.jpg",
@@ -170,5 +213,144 @@ class AutoWorkflowClientTest {
             autoWorkflowFileName("D:/inputs/Douyin/黄绿紫_7695733740576378810_8.jpg"),
         )
         assertNull(autoWorkflowFileName(""))
+    }
+
+    @Test
+    fun `builds batch action payload with optional prompt text`() {
+        val withPrompt = AutoWorkflowClient.buildBatchActionPayload(
+            taskIds = listOf(43803L),
+            action = AutoWorkflowClient.ACTION_RESUBMIT,
+            confirm = false,
+            flow = AutoWorkflowClient.FLOW_EDIT,
+            deleteOldOutput = true,
+            promptText = "  new prompt  ",
+        )
+        assertEquals("new prompt", withPrompt.get("prompt_text").asString)
+        assertTrue(withPrompt.get("delete_old_output").asBoolean)
+
+        val withoutPrompt = AutoWorkflowClient.buildBatchActionPayload(
+            taskIds = listOf(43803L),
+            action = AutoWorkflowClient.ACTION_RESUBMIT,
+            confirm = false,
+            flow = AutoWorkflowClient.FLOW_UPSCALE,
+            deleteOldOutput = false,
+            promptText = "   ",
+        )
+        assertFalse(withoutPrompt.has("prompt_text"))
+    }
+
+    @Test
+    fun `builds browse url with sort parameter`() {
+        val url = AutoWorkflowClient.buildBrowseUrl(
+            baseUrl = "http://127.0.0.1:8105/",
+            relPath = "FLJ/subdir",
+            offset = 120,
+            limit = 60,
+            sort = AutoWorkflowClient.SORT_NAME_ASC,
+        )
+        assertEquals(
+            "http://127.0.0.1:8105/api/output/browse?rel_path=FLJ%2Fsubdir&offset=120&limit=60&sort=name_asc",
+            url,
+        )
+    }
+
+    @Test
+    fun `sorts autoworkflow folders by name and task order`() {
+        val folders = listOf(
+            AutoWorkflowFolder("webui_input", "webui_input", 21, 0, 44, 44, 100L, 45569L),
+            AutoWorkflowFolder("Douyin", "Douyin", 0, 417, 4787, 0, 10L, 43000L),
+            AutoWorkflowFolder("FLJ", "FLJ", 0, 10, 2597, 0, 200L, 44000L),
+        )
+        assertEquals(
+            listOf("Douyin", "FLJ", "webui_input"),
+            erl.webdavtoon.ui.screen.autoworkflow.sortAutoWorkflowFolders(
+                folders,
+                SettingsManager.SORT_NAME_ASC,
+            ).map { it.name },
+        )
+        assertEquals(
+            listOf("webui_input", "FLJ", "Douyin"),
+            erl.webdavtoon.ui.screen.autoworkflow.sortAutoWorkflowFolders(
+                folders,
+                SettingsManager.SORT_NAME_DESC,
+            ).map { it.name },
+        )
+        assertEquals(
+            listOf("webui_input", "FLJ", "Douyin"),
+            erl.webdavtoon.ui.screen.autoworkflow.sortAutoWorkflowFolders(
+                folders,
+                SettingsManager.SORT_DATE_DESC,
+            ).map { it.name },
+        )
+        assertEquals(
+            listOf("Douyin", "webui_input", "FLJ"),
+            erl.webdavtoon.ui.screen.autoworkflow.sortAutoWorkflowFolders(
+                folders,
+                SettingsManager.SORT_DATE_ASC,
+            ).map { it.name },
+        )
+    }
+
+    @Test
+    fun `parses reviewer prompt presets`() {
+        val presets = AutoWorkflowClient.parsePromptPresets(
+            """
+            {
+              "count": 2,
+              "presets": [
+                { "name": "全裸simple", "content": "人物全裸，不穿鞋" },
+                { "name": "空内容", "content": "   " },
+                { "name": "M字开腿", "content": "人物M字开腿" }
+              ]
+            }
+            """.trimIndent(),
+        )
+        assertEquals(2, presets.size)
+        assertEquals("全裸simple", presets[0].name)
+        assertEquals("人物全裸，不穿鞋", presets[0].content)
+        assertEquals("M字开腿", presets[1].name)
+    }
+
+    @Test
+    fun `encodes and parses scroll offsets with LRU limit`() {
+        val raw = linkedMapOf(
+            "" to 0,
+            "FLJ" to 1200,
+            "Douyin" to 3400,
+            "GOod" to -5,
+            "webui_input" to 960,
+        )
+        val encoded = encodeAutoWorkflowScrollOffsets(raw, maxEntries = 2)
+        val parsed = parseAutoWorkflowScrollOffsets(encoded)
+        assertEquals(mapOf("Douyin" to 3400, "webui_input" to 960), parsed)
+        assertEquals(emptyMap<String, Int>(), parseAutoWorkflowScrollOffsets("{bad json"))
+    }
+
+    @Test
+    fun `removes deleted tasks locally without dropping remaining images`() {
+        val page = AutoWorkflowClient.parsePage(pageJson, baseUrl)
+        val remaining = erl.webdavtoon.ui.screen.autoworkflow.removeTasksFromImages(
+            page.images,
+            setOf(45768L),
+        )
+        assertEquals(1, remaining.size)
+        assertEquals("loose.png", remaining.single().name)
+    }
+
+    @Test
+    fun `follow zoom grid state preserves initial scroll offset until measured`() {
+        val state = erl.webdavtoon.ui.screen.waterfall.FollowZoomGridState(
+            initialColumns = 2,
+            minColumns = 1,
+            maxColumns = 4,
+            initialScrollOffset = 1480,
+        )
+        state.clampScroll()
+        assertEquals(1480, state.scrollOffset)
+
+        state.viewportHeight = 800
+        state.itemsContentHeight = 1600
+        state.clampScroll()
+        assertEquals(800, state.scrollOffset)
     }
 }

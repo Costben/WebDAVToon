@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="autoworkflow_entry_name">AutoWorkflow</string>
-    <string name="autoworkflow_entry_subtitle">ComfyUI 生成图 · 任务索引</string>
+    <string name="autoworkflow_entry_subtitle">ComfyUI 产物</string>
     <string name="autoworkflow_output_title">AutoWorkflow 产物</string>
     <string name="autoworkflow_configure_first">还没有填写 AutoWorkflow 服务地址，请先到设置里填写，才能浏览生成图。</string>
     <string name="autoworkflow_open_settings">打开设置</string>
@@ -17,8 +17,34 @@
     <string name="autoworkflow_retry">重试</string>
     <string name="autoworkflow_original">原图</string>
     <string name="autoworkflow_generated">产物</string>
-    <string name="autoworkflow_toggle_layout">切换左右/上下</string>
     <string name="autoworkflow_close">关闭</string>
     <string name="autoworkflow_seed_prefix">种子 %1$d</string>
     <string name="autoworkflow_source_prefix">原图 %1$s</string>
+    <string name="autoworkflow_selected_count">已选 %1$d 项</string>
+    <string name="autoworkflow_resubmit">重新提交</string>
+    <string name="autoworkflow_delete_task">删除任务</string>
+    <string name="autoworkflow_resubmit_title">重新提交</string>
+    <string name="autoworkflow_reedit_title">重新编辑</string>
+    <string name="autoworkflow_reedit_prompt_hint">输入新的提示词</string>
+    <string name="autoworkflow_reedit_prompt_required">请输入新的提示词</string>
+    <string name="autoworkflow_reedit_confirm">使用新提示词重新编辑当前任务？原任务会转为历史，并新建一个待执行的子任务。</string>
+    <string name="autoworkflow_reedit_batch_confirm">使用新提示词重新编辑 %1$d 个任务？原任务会转为历史，并新建对应待执行子任务。</string>
+    <string name="autoworkflow_preset_label">预设提示词</string>
+    <string name="autoworkflow_preset_placeholder">选择预设提示词（可选）</string>
+    <string name="autoworkflow_preset_loading">正在加载预设…</string>
+    <string name="autoworkflow_preset_empty">暂无预设提示词</string>
+    <string name="autoworkflow_preset_none">不使用预设</string>
+    <string name="autoworkflow_resubmit_edit">重新编辑</string>
+    <string name="autoworkflow_resubmit_upscale">重新放大</string>
+    <string name="autoworkflow_resubmit_delete_old">删除原产物</string>
+    <string name="autoworkflow_resubmit_confirm">重新提交 %1$d 个任务（%2$s）？原任务会转为历史，并新建一个待执行的子任务。</string>
+    <string name="autoworkflow_resubmit_delete_old_confirm">确认时会先删除原产物与任务记录。</string>
+    <string name="autoworkflow_resubmit_done">已提交 %1$d 个任务</string>
+    <string name="autoworkflow_delete_confirm">删除 %1$d 个任务的产物与任务记录？</string>
+    <string name="autoworkflow_delete_done">已删除 %1$d 个任务</string>
+    <string name="autoworkflow_action_failed">操作失败：%1$s</string>
+    <string name="autoworkflow_action_failed_unknown">未知错误</string>
+    <string name="autoworkflow_running">处理中…</string>
+    <string name="autoworkflow_swap">交换</string>
+    <string name="autoworkflow_search_hint">搜索目录或产物</string>
 </resources>

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="autoworkflow_entry_name">AutoWorkflow</string>
-    <string name="autoworkflow_entry_subtitle">ComfyUI output · task index</string>
+    <string name="autoworkflow_entry_subtitle">ComfyUI outputs</string>
     <string name="autoworkflow_output_title">AutoWorkflow output</string>
     <string name="autoworkflow_configure_first">The AutoWorkflow server address is not set yet. Add it in Settings to browse generated images.</string>
     <string name="autoworkflow_open_settings">Open settings</string>
@@ -17,8 +17,34 @@
     <string name="autoworkflow_retry">Retry</string>
     <string name="autoworkflow_original">Original</string>
     <string name="autoworkflow_generated">Generated</string>
-    <string name="autoworkflow_toggle_layout">Switch layout</string>
     <string name="autoworkflow_close">Close</string>
     <string name="autoworkflow_seed_prefix">seed %1$d</string>
     <string name="autoworkflow_source_prefix">source %1$s</string>
+    <string name="autoworkflow_selected_count">%1$d selected</string>
+    <string name="autoworkflow_resubmit">Resubmit</string>
+    <string name="autoworkflow_delete_task">Delete task</string>
+    <string name="autoworkflow_resubmit_title">Resubmit task</string>
+    <string name="autoworkflow_reedit_title">Re-edit</string>
+    <string name="autoworkflow_reedit_prompt_hint">Enter a new prompt</string>
+    <string name="autoworkflow_reedit_prompt_required">Please enter a new prompt</string>
+    <string name="autoworkflow_reedit_confirm">Re-edit this task with the new prompt? The current task becomes history and a pending child task is created.</string>
+    <string name="autoworkflow_reedit_batch_confirm">Re-edit %1$d task(s) with the new prompt? Current tasks become history and pending child tasks are created.</string>
+    <string name="autoworkflow_preset_label">Prompt preset</string>
+    <string name="autoworkflow_preset_placeholder">Choose a preset (optional)</string>
+    <string name="autoworkflow_preset_loading">Loading presets…</string>
+    <string name="autoworkflow_preset_empty">No presets available</string>
+    <string name="autoworkflow_preset_none">No preset</string>
+    <string name="autoworkflow_resubmit_edit">Re-edit</string>
+    <string name="autoworkflow_resubmit_upscale">Re-upscale</string>
+    <string name="autoworkflow_resubmit_delete_old">Delete old output</string>
+    <string name="autoworkflow_resubmit_confirm">Resubmit %1$d task(s) with %2$s? The current task becomes history and a pending child task is created.</string>
+    <string name="autoworkflow_resubmit_delete_old_confirm">The original output and its task row will be deleted first.</string>
+    <string name="autoworkflow_resubmit_done">Resubmitted %1$d task(s)</string>
+    <string name="autoworkflow_delete_confirm">Delete the output and task rows of %1$d task(s)?</string>
+    <string name="autoworkflow_delete_done">Deleted %1$d task(s)</string>
+    <string name="autoworkflow_action_failed">Action failed: %1$s</string>
+    <string name="autoworkflow_action_failed_unknown">unknown error</string>
+    <string name="autoworkflow_running">Working…</string>
+    <string name="autoworkflow_swap">Swap</string>
+    <string name="autoworkflow_search_hint">Search folders or outputs</string>
 </resources>
