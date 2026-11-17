@@ -291,12 +291,12 @@ fun ZoomableImage(
                 if (isScaling) {
                     WebDavImageLoader.freezeGifToFirstFrame(imageView)
                     if (imageView.drawable != null) {
-                        imageView.setTag(erl.webdavtoon.R.id.tag_media_bind_key, "zoom_frozen#${photo.id}")
+                        imageView.setTag(erl.webdavtoon.R.id.tag_media_bind_key, "zoom_frozen#${photo.id}#${photo.imageUri}")
                         return@AndroidView
                     }
                 }
 
-                val bindKey = "${photo.id}#${retryTrigger}"
+                val bindKey = "${photo.id}#${photo.imageUri}#${retryTrigger}"
                 val lastKey = imageView.getTag(erl.webdavtoon.R.id.tag_media_bind_key) as? String
                 if (lastKey == bindKey && imageView.drawable != null) {
                     if (!isScaling && isCurrentPage) {

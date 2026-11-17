@@ -5,6 +5,7 @@ package erl.webdavtoon.ui.screen.reader
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -87,6 +88,21 @@ fun ReaderScreen(
     val currentPhoto = uiState.currentPhoto
     val currentPhotoTitle = currentPhoto?.title ?: ""
     val compareInfo = currentPhoto?.let { AutoWorkflowCompareStore.get(it.id) }
+    var swappedPhotoIds by remember { mutableStateOf<Set<String>>(emptySet()) }
+    val displayPhotos = remember(uiState.photos, swappedPhotoIds) {
+        if (swappedPhotoIds.isEmpty()) {
+            uiState.photos
+        } else {
+            uiState.photos.map { photo ->
+                if (photo.id in swappedPhotoIds) {
+                    val sourceUrl = AutoWorkflowCompareStore.get(photo.id)?.sourceUrl
+                    if (sourceUrl != null) photo.copy(imageUri = Uri.parse(sourceUrl)) else photo
+                } else {
+                    photo
+                }
+            }
+        }
+    }
     val settingsManager = remember(context) { SettingsManager(context) }
     val downloadSuccessMessage = stringResource(R.string.download_success)
     val downloadFailedMessage = stringResource(R.string.download_failed)
@@ -243,7 +259,7 @@ fun ReaderScreen(
                 when (uiState.readingMode) {
                     ReadingMode.CARD -> {
                         CardReader(
-                            photos = uiState.photos,
+                            photos = displayPhotos,
                             currentIndex = uiState.currentIndex,
                             onPageChanged = { viewModel.updateCurrentIndex(it) },
                             // Gesture zones only exist in card mode, matching the pre-Compose reader.
@@ -270,7 +286,7 @@ fun ReaderScreen(
                     }
                     ReadingMode.WEBTOON -> {
                         WebtoonReader(
-                            photos = uiState.photos,
+                            photos = displayPhotos,
                             currentIndex = uiState.currentIndex,
                             onIndexChanged = { viewModel.updateCurrentIndex(it) },
                             onSingleTap = { viewModel.toggleImmersive() }
@@ -310,6 +326,17 @@ fun ReaderScreen(
             AutoWorkflowCompareInset(
                 info = compareInfo,
                 visible = visible,
+                isSwapped = currentPhoto?.id?.let { it in swappedPhotoIds } == true,
+                fallbackGeneratedUrl = currentPhoto?.imageUri?.toString(),
+                onToggleSwap = {
+                    val id = currentPhoto?.id ?: return@AutoWorkflowCompareInset
+                    if (compareInfo?.sourceUrl == null) return@AutoWorkflowCompareInset
+                    swappedPhotoIds = if (id in swappedPhotoIds) {
+                        swappedPhotoIds - id
+                    } else {
+                        swappedPhotoIds + id
+                    }
+                },
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .padding(

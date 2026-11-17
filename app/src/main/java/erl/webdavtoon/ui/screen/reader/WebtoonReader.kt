@@ -109,7 +109,7 @@ private fun WebtoonImageItem(
     // the ratio starts unknown and is learned once the drawable is ready. Without
     // it a fast scroll measures the tile against the square placeholder and the
     // real image ends up letterboxed inside that square.
-    var resolvedAspectRatio by remember(photo.id) {
+    var resolvedAspectRatio by remember(photo.id, photo.imageUri) {
         mutableStateOf(
             if (photo.width > 0 && photo.height > 0) {
                 photo.width.toFloat() / photo.height.toFloat()
@@ -147,7 +147,7 @@ private fun WebtoonImageItem(
                 }
             },
             update = { imageView ->
-                val bindKey = photo.id
+                val bindKey = "${photo.id}#${photo.imageUri}"
                 val lastKey = imageView.getTag(erl.webdavtoon.R.id.tag_media_bind_key) as? String
                 if (lastKey == bindKey && imageView.drawable != null) {
                     (imageView.drawable as? android.graphics.drawable.Animatable)?.start()

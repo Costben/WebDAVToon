@@ -11,6 +11,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,6 +25,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import erl.webdavtoon.AutoWorkflowCompareInfo
@@ -46,9 +48,20 @@ private val InsetCorner = RoundedCornerShape(10.dp)
 internal fun AutoWorkflowCompareInset(
     info: AutoWorkflowCompareInfo?,
     visible: Boolean,
+    isSwapped: Boolean,
+    fallbackGeneratedUrl: String?,
+    onToggleSwap: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val url = info?.sourceUrl ?: return
+    val sourceUrl = info?.sourceUrl ?: return
+    val displayUrl = if (isSwapped) {
+        info.generatedUrl ?: fallbackGeneratedUrl ?: sourceUrl
+    } else {
+        sourceUrl
+    }
+    val roleLabel = stringResource(
+        if (isSwapped) R.string.autoworkflow_generated else R.string.autoworkflow_original,
+    )
     AnimatedVisibility(
         visible = visible,
         enter = fadeIn() + slideInHorizontally { -it / 3 },
@@ -62,12 +75,13 @@ internal fun AutoWorkflowCompareInset(
                 .shadow(8.dp, InsetCorner)
                 .clip(InsetCorner)
                 .background(Color(0xFF141414))
-                .border(1.dp, Color.White.copy(alpha = 0.75f), InsetCorner),
+                .border(1.dp, Color.White.copy(alpha = 0.75f), InsetCorner)
+                .clickable(role = Role.Button, onClick = onToggleSwap),
         ) {
-            RemoteInsetImage(url)
+            RemoteInsetImage(displayUrl)
             InsetBadge(
                 text = buildString {
-                    append(stringResource(R.string.autoworkflow_original))
+                    append(roleLabel)
                     info.taskId?.let {
                         append(" · ")
                         append(stringResource(R.string.autoworkflow_task_badge, it))
@@ -97,6 +111,7 @@ private fun RemoteInsetImage(url: String) {
                 imageUri = Uri.parse(url),
                 imageView = imageView,
                 limitSize = false,
+                preserveCurrentDrawable = true,
             )
         },
     )
