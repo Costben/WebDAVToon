@@ -28,6 +28,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import erl.webdavtoon.ui.screen.folder.FolderItemUi
+import erl.webdavtoon.ui.screen.autoworkflow.AutoWorkflowEntry
 import erl.webdavtoon.ui.screen.folder.FolderScreen
 import erl.webdavtoon.ui.screen.folder.FolderScreenActions
 import erl.webdavtoon.ui.screen.folder.FolderViewModel
@@ -404,6 +405,11 @@ class FolderViewActivity : FragmentActivity() {
     private fun onFolderClick(folder: FolderItemUi) {
         val isInternalPhotos = folder.path.startsWith("virtual://internal_photos")
         val realPath = if (isInternalPhotos) folder.path.substringAfter("path=") else folder.path
+
+        if (folder.path == AutoWorkflowEntry.PATH) {
+            startActivity(Intent(this, AutoWorkflowActivity::class.java))
+            return
+        }
 
         if (folder.path == "virtual://local_all") {
             val intent = Intent(this, MainActivity::class.java).apply {

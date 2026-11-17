@@ -16,6 +16,7 @@ import erl.webdavtoon.R
 import erl.webdavtoon.RemoteFolderPreviewMemoryCache
 import erl.webdavtoon.RustWebDavPhotoRepository
 import erl.webdavtoon.SettingsManager
+import erl.webdavtoon.ui.screen.autoworkflow.AutoWorkflowEntry
 import erl.webdavtoon.VisibleRemotePreviewScheduler
 import erl.webdavtoon.PhotoRepository
 import kotlinx.coroutines.Dispatchers
@@ -138,6 +139,17 @@ class FolderViewModel @JvmOverloads constructor(app: Application) : AndroidViewM
                     if (result.isEmpty() && remoteFailure != null) {
                         throw IllegalStateException(remoteFailure)
                     }
+                    result.add(
+                        0,
+                        Folder(
+                            path = AutoWorkflowEntry.PATH,
+                            name = context.getString(R.string.autoworkflow_entry_name),
+                            isLocal = true,
+                            photoCount = 0,
+                            previewUris = emptyList(),
+                            hasSubFolders = true,
+                        ),
+                    )
                     result to remoteFailure
                 }
                 _uiState.update {
@@ -313,6 +325,7 @@ class FolderViewModel @JvmOverloads constructor(app: Application) : AndroidViewM
     }
 
     fun toggleSelection(path: String) {
+        if (path == AutoWorkflowEntry.PATH) return
         _uiState.update {
             val selected = it.selectedPaths.toMutableSet().apply {
                 if (!add(path)) remove(path)
@@ -323,7 +336,10 @@ class FolderViewModel @JvmOverloads constructor(app: Application) : AndroidViewM
     }
 
     fun selectAll() {
-        val paths = _uiState.value.rawFolders.map { it.path }.toSet()
+        val paths = _uiState.value.rawFolders
+            .map { it.path }
+            .filterNot { it == AutoWorkflowEntry.PATH }
+            .toSet()
         _uiState.update { it.copy(selectedPaths = paths, selectedCount = paths.size, isSelectionMode = paths.isNotEmpty()) }
         publishFolders()
     }
@@ -393,16 +409,20 @@ class FolderViewModel @JvmOverloads constructor(app: Application) : AndroidViewM
     private fun publishFolders() {
         val state = _uiState.value
         val filtered = state.rawFolders.filter { FolderSearchMatcher.matches(it.name, state.searchKeyword) }
+        // The AutoWorkflow entry is a fixed shortcut, not part of the user's sortable tree.
+        val pinned = filtered.filter { it.path == AutoWorkflowEntry.PATH }
+        val sortable = filtered.filterNot { it.path == AutoWorkflowEntry.PATH }
         val sorted = when (state.sortOrder) {
-            SettingsManager.SORT_NAME_ASC -> filtered.sortedBy { it.name }
-            SettingsManager.SORT_NAME_DESC -> filtered.sortedByDescending { it.name }
-            SettingsManager.SORT_DATE_ASC -> filtered.sortedBy { it.dateModified }
-            SettingsManager.SORT_RANDOM_FOLDERS -> filtered.shuffled(Random(shuffleSeed))
-            else -> filtered.sortedByDescending { it.dateModified }
+            SettingsManager.SORT_NAME_ASC -> sortable.sortedBy { it.name }
+            SettingsManager.SORT_NAME_DESC -> sortable.sortedByDescending { it.name }
+            SettingsManager.SORT_DATE_ASC -> sortable.sortedBy { it.dateModified }
+            SettingsManager.SORT_RANDOM_FOLDERS -> sortable.shuffled(Random(shuffleSeed))
+            else -> sortable.sortedByDescending { it.dateModified }
         }
+        val ordered = pinned + sorted
         val selected = state.selectedPaths
         val previousPreviewsByPath = state.folders.associate { it.path to it.previewUris }
-        _uiState.update { it.copy(folders = sorted.map { folder ->
+        _uiState.update { it.copy(folders = ordered.map { folder ->
             val stringPreviews = folder.previewUris.map { uri -> uri.toString() }
             val resolvedPreviews = if (stringPreviews.isNotEmpty()) stringPreviews else previousPreviewsByPath[folder.path].orEmpty()
             FolderItemUi(

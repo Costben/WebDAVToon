@@ -38,6 +38,7 @@ import erl.webdavtoon.ui.component.PreviewTileCornerRadius
 import erl.webdavtoon.ui.component.PreviewTilePlaceholder
 import erl.webdavtoon.ui.component.rememberStrongHaptic
 import erl.webdavtoon.ui.component.rememberTapHaptic
+import erl.webdavtoon.ui.screen.autoworkflow.AutoWorkflowEntry
 import erl.webdavtoon.ui.screen.waterfall.MediaCardImageMargin
 import io.github.suqi8.coui.kmp.basic.Card
 import io.github.suqi8.coui.kmp.basic.Icon
@@ -245,8 +246,8 @@ private fun FolderPreviewImage(uri: String, isLocal: Boolean, modifier: Modifier
 }
 
 @Composable
-private fun folderInfo(folder: FolderItemUi): String = if (folder.isLocal) {
-    stringResource(R.string.photos_local_suffix, folder.photoCount)
-} else {
-    stringResource(R.string.webdav_folder)
+private fun folderInfo(folder: FolderItemUi): String = when {
+    folder.path == AutoWorkflowEntry.PATH -> stringResource(R.string.autoworkflow_entry_subtitle)
+    folder.isLocal -> stringResource(R.string.photos_local_suffix, folder.photoCount)
+    else -> stringResource(R.string.webdav_folder)
 }

@@ -57,6 +57,13 @@
             android:windowSoftInputMode="adjustResize" />
 
         <activity
+            android:name=".AutoWorkflowActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
             android:name=".SubFolderActivity"
             android:exported="false"
             android:screenOrientation="portrait"
