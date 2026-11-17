@@ -51,8 +51,8 @@ class AutoWorkflowActivity : ComponentActivity() {
                         actions = AutoWorkflowActions(
                             onBack = { finish() },
                             onRefresh = { viewModel.refresh() },
-                            onUp = { viewModel.load(uiState.parentRelPath) },
-                            onOpenFolder = { relPath -> viewModel.load(relPath) },
+                            onUp = { viewModel.navigateUp() },
+                            onOpenFolder = { relPath -> viewModel.openFolder(relPath) },
                             onLoadMore = { viewModel.loadMore() },
                             onSetSortOrder = viewModel::setSortOrder,
                             getScrollOffset = viewModel::scrollOffsetFor,

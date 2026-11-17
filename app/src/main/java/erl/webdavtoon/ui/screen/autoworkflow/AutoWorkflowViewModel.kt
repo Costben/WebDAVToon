@@ -154,6 +154,11 @@ class AutoWorkflowViewModel(app: Application) : AndroidViewModel(app) {
     fun scrollOffsetFor(relPath: String): Int = scrollOffsets[relPath] ?: 0
 
     fun saveScrollOffset(relPath: String, offset: Int) {
+        val state = _uiState.value
+        if (relPath != state.relPath) return
+        // Only folder-listing levels need cross-navigation scroll memory so stepping back up
+        // restores the folder list position; leaf image folders always open from the top.
+        if (state.folders.isEmpty()) return
         val clean = offset.coerceAtLeast(0)
         val previous = scrollOffsets[relPath]
         if (clean == 0 && (previous == null || previous == 0)) return
@@ -164,6 +169,22 @@ class AutoWorkflowViewModel(app: Application) : AndroidViewModel(app) {
             scrollOffsets[relPath] = clean
         }
         schedulePersistScrollOffsets()
+    }
+
+    fun openFolder(relPath: String) {
+        if (scrollOffsets.remove(relPath) != null) {
+            schedulePersistScrollOffsets()
+        }
+        load(relPath)
+    }
+
+    fun navigateUp() {
+        val current = _uiState.value.relPath
+        val parent = _uiState.value.parentRelPath
+        if (current != parent && scrollOffsets.remove(current) != null) {
+            schedulePersistScrollOffsets()
+        }
+        load(parent)
     }
 
     private fun schedulePersistScrollOffsets() {
