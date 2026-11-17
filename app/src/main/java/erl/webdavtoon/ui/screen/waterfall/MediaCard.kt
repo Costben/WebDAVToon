@@ -53,6 +53,16 @@ import io.github.suqi8.coui.kmp.icon.extended.Play
 import io.github.suqi8.coui.kmp.theme.COUITheme
 
 /**
+ * Extra chrome a caller can hang on a media tile: a corner badge and the thumbnail of the
+ * file the tile was produced from. Both are optional so the gallery's cards stay untouched.
+ */
+data class MediaCardOverlay(
+    val badgeText: String? = null,
+    val badgeHighlighted: Boolean = false,
+    val sourceThumbUrl: String? = null,
+)
+
+/**
  * HyperOS/Miuix-styled media/folder card for waterfall grid.
  */
 @Composable
@@ -69,6 +79,8 @@ fun MediaCardMiuix(
     modifier: Modifier = Modifier,
     fillHeight: Boolean = false,
     isZooming: Boolean = false,
+    overlay: MediaCardOverlay? = null,
+    folderSubtitle: String? = null,
 ) {
     when (item) {
         is MixedWaterfallItemUi.MediaItem -> {
@@ -84,6 +96,7 @@ fun MediaCardMiuix(
                 modifier = modifier,
                 fillHeight = fillHeight,
                 isZooming = isZooming,
+                overlay = overlay,
             )
         }
         is MixedWaterfallItemUi.FolderItem -> {
@@ -96,6 +109,7 @@ fun MediaCardMiuix(
                 onVisibilityChanged = onFolderVisibilityChanged,
                 modifier = modifier,
                 fillHeight = fillHeight,
+                subtitle = folderSubtitle,
             )
         }
     }
@@ -111,6 +125,7 @@ fun WaterfallFolderCardMiuix(
     onVisibilityChanged: ((folder: Folder, visible: Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier,
     fillHeight: Boolean = false,
+    subtitle: String? = null,
 ) {
     if (item is MixedWaterfallItemUi.FolderItem) {
         WaterfallFolderCardMiuix(
@@ -122,6 +137,7 @@ fun WaterfallFolderCardMiuix(
             onVisibilityChanged = onVisibilityChanged,
             modifier = modifier,
             fillHeight = fillHeight,
+            subtitle = subtitle,
         )
     }
 }
@@ -136,6 +152,7 @@ fun WaterfallFolderCardMiuix(
     onVisibilityChanged: ((folder: Folder, visible: Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier,
     fillHeight: Boolean = false,
+    subtitle: String? = null,
 ) {
     DisposableEffect(item.key, onVisibilityChanged) {
         onVisibilityChanged?.invoke(item.folder, true)
@@ -231,7 +248,7 @@ fun WaterfallFolderCardMiuix(
                         overflow = TextOverflow.Ellipsis,
                     )
                     Text(
-                        text = if (item.isLocal) {
+                        text = subtitle ?: if (item.isLocal) {
                             stringResource(R.string.photos_local_suffix, item.photoCount)
                         } else {
                             stringResource(R.string.webdav_folder)
@@ -260,6 +277,7 @@ private fun WaterfallMediaCardMiuix(
     modifier: Modifier = Modifier,
     fillHeight: Boolean = false,
     isZooming: Boolean = false,
+    overlay: MediaCardOverlay? = null,
 ) {
     val cardShape = RoundedCornerShape(12.dp)
     val innerShape = RoundedCornerShape(12.dp)
@@ -444,6 +462,70 @@ private fun WaterfallMediaCardMiuix(
                             tint = Color(0xFFFF4D4F),
                             modifier = Modifier.size(14.dp),
                         )
+                    }
+                }
+
+                // Badge and source thumbnail for callers that know what produced the file.
+                val cardOverlay = overlay
+                if (cardOverlay != null) {
+                    cardOverlay.badgeText?.let { badge ->
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .padding(6.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(
+                                    if (cardOverlay.badgeHighlighted) {
+                                        Color(0xCC0A59F7)
+                                    } else {
+                                        Color(0x99000000)
+                                    },
+                                )
+                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = badge,
+                                color = Color.White,
+                                style = COUITheme.textStyles.footnote1.copy(fontSize = 11.sp),
+                                maxLines = 1,
+                            )
+                        }
+                    }
+                    cardOverlay.sourceThumbUrl?.let { url ->
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .padding(6.dp)
+                                .size(44.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(PreviewTilePlaceholder)
+                                .border(
+                                    1.dp,
+                                    Color.White.copy(alpha = 0.55f),
+                                    RoundedCornerShape(6.dp),
+                                ),
+                        ) {
+                            AndroidView(
+                                modifier = Modifier.fillMaxSize(),
+                                factory = { context ->
+                                    ImageView(context).apply {
+                                        scaleType = ImageView.ScaleType.CENTER_CROP
+                                    }
+                                },
+                                update = { imageView ->
+                                    val bound = imageView.getTag(R.id.tag_media_bind_key) as? String
+                                    if (bound == url && imageView.drawable != null) return@AndroidView
+                                    imageView.setTag(R.id.tag_media_bind_key, url)
+                                    WebDavImageLoader.loadLocalImage(
+                                        context = imageView.context,
+                                        imageUri = Uri.parse(url),
+                                        imageView = imageView,
+                                        isFolderPreview = true,
+                                    )
+                                },
+                            )
+                        }
                     }
                 }
 

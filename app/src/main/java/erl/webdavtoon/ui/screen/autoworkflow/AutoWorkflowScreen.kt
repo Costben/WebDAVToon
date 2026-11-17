@@ -3,36 +3,32 @@
 package erl.webdavtoon.ui.screen.autoworkflow
 
 import android.net.Uri
-import android.text.format.Formatter
 import android.widget.ImageView
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,28 +36,37 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import erl.webdavtoon.AutoWorkflowFolder
 import erl.webdavtoon.AutoWorkflowImage
+import erl.webdavtoon.Folder
+import erl.webdavtoon.Photo
 import erl.webdavtoon.R
+import erl.webdavtoon.SettingsManager
 import erl.webdavtoon.WebDavImageLoader
 import erl.webdavtoon.autoWorkflowFileName
 import erl.webdavtoon.ui.component.GalleryTopAppBar
 import erl.webdavtoon.ui.component.GlassTopBarScaffold
 import erl.webdavtoon.ui.component.HighlightedTopBarAction
-import erl.webdavtoon.ui.component.PreviewTileCornerRadius
 import erl.webdavtoon.ui.component.PreviewTilePlaceholder
+import erl.webdavtoon.ui.screen.waterfall.FolderCardExtraHeight
+import erl.webdavtoon.ui.screen.waterfall.FollowZoomWaterfallLayout
+import erl.webdavtoon.ui.screen.waterfall.MediaCardExtraHeight
+import erl.webdavtoon.ui.screen.waterfall.MediaCardImageMargin
+import erl.webdavtoon.ui.screen.waterfall.MediaCardMiuix
+import erl.webdavtoon.ui.screen.waterfall.MediaCardOverlay
+import erl.webdavtoon.ui.screen.waterfall.MixedWaterfallItemUi
+import erl.webdavtoon.ui.screen.waterfall.rememberFollowZoomGridState
 import io.github.suqi8.coui.kmp.basic.Button
-import io.github.suqi8.coui.kmp.basic.Card
 import io.github.suqi8.coui.kmp.basic.CircularProgressIndicator
 import io.github.suqi8.coui.kmp.basic.Icon
 import io.github.suqi8.coui.kmp.basic.IconButton
+import io.github.suqi8.coui.kmp.basic.PullToRefresh
 import io.github.suqi8.coui.kmp.basic.Text
-import io.github.suqi8.coui.kmp.basic.TextButton
 import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.extended.Back
-import io.github.suqi8.coui.kmp.icon.extended.ChevronForward
 import io.github.suqi8.coui.kmp.icon.extended.Close
 import io.github.suqi8.coui.kmp.icon.extended.Refresh
 import io.github.suqi8.coui.kmp.icon.extended.Settings
@@ -80,9 +85,9 @@ data class AutoWorkflowActions(
 /**
  * Browses the ComfyUI output folder through the AutoWorkflow backend.
  *
- * Each generated image carries the task that produced it, so the grid can show the task number
- * on the tile and the original input image as a small inset. Tapping a tile opens a full-screen
- * comparison of original vs. generated.
+ * The page is the folder page's grid, one level of detail deeper: folder and image tiles are the
+ * app's own waterfall cards, so the only AutoWorkflow-specific chrome is the task badge and the
+ * original-image inset on an image tile, plus the comparison overlay behind a tap.
  */
 @Composable
 fun AutoWorkflowScreen(
@@ -91,6 +96,14 @@ fun AutoWorkflowScreen(
     modifier: Modifier = Modifier,
 ) {
     var compareImage by remember { mutableStateOf<AutoWorkflowImage?>(null) }
+    val context = LocalContext.current
+    val settings = remember { SettingsManager(context) }
+    var columns by remember { mutableIntStateOf(settings.getGridColumns()) }
+    val onColumnsChanged: (Int) -> Unit = { newColumns ->
+        settings.setGridColumns(newColumns)
+        columns = newColumns
+    }
+
     val rootTitle = stringResource(R.string.autoworkflow_output_title)
     val title = if (state.isRoot) {
         rootTitle
@@ -98,9 +111,10 @@ fun AutoWorkflowScreen(
         state.breadcrumbs.lastOrNull()?.name?.takeIf { it.isNotBlank() } ?: rootTitle
     }
 
-    BackHandler {
+    val goUpOrBack = {
         if (state.relPath.isNotEmpty()) actions.onUp() else actions.onBack()
     }
+    BackHandler { goUpOrBack() }
 
     GlassTopBarScaffold(
         modifier = modifier,
@@ -111,7 +125,7 @@ fun AutoWorkflowScreen(
                     HighlightedTopBarAction(
                         icon = COUIIcons.Light.Back,
                         contentDescription = stringResource(R.string.back),
-                        onClick = actions.onBack,
+                        onClick = goUpOrBack,
                     )
                 },
                 actions = {
@@ -129,11 +143,8 @@ fun AutoWorkflowScreen(
             )
         },
     ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(top = paddingValues.calculateTopPadding()),
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            val cells = remember(state.folders, state.images) { state.toCells() }
             when {
                 !state.isConfigured -> MessagePanel(
                     message = stringResource(R.string.autoworkflow_configure_first),
@@ -141,103 +152,32 @@ fun AutoWorkflowScreen(
                     onAction = actions.onOpenSettings,
                 )
 
-                state.loading && state.folders.isEmpty() && state.images.isEmpty() ->
-                    LoadingPanel()
+                state.loading && cells.isEmpty() -> CenteredProgress()
 
-                state.error != null && state.folders.isEmpty() && state.images.isEmpty() ->
-                    MessagePanel(
-                        message = state.error.orEmpty(),
-                        actionLabel = stringResource(R.string.autoworkflow_retry),
-                        onAction = actions.onRefresh,
-                    )
+                state.error != null && cells.isEmpty() -> MessagePanel(
+                    message = state.error.orEmpty(),
+                    actionLabel = stringResource(R.string.autoworkflow_retry),
+                    onAction = actions.onRefresh,
+                )
 
-                state.empty -> MessagePanel(
+                cells.isEmpty() -> MessagePanel(
                     message = stringResource(R.string.autoworkflow_empty),
                     actionLabel = stringResource(R.string.autoworkflow_retry),
                     onAction = actions.onRefresh,
                 )
 
-                else -> {
-                    state.error?.let { message ->
-                        Text(
-                            text = message,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(start = 16.dp, end = 16.dp, top = 4.dp),
-                            style = COUITheme.textStyles.footnote2,
-                            color = COUITheme.colorScheme.error,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    PathBar(state = state, actions = actions)
-                    StatsLine(state = state)
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(
-                            start = 12.dp,
-                            end = 12.dp,
-                            top = 4.dp,
-                            bottom = paddingValues.calculateBottomPadding() + 24.dp,
-                        ),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        if (state.folders.isNotEmpty()) {
-                            item(key = "header-folders", span = { GridItemSpan(maxLineSpan) }) {
-                                SectionHeader(stringResource(R.string.autoworkflow_folders))
-                            }
-                            items(
-                                items = state.folders,
-                                key = { "folder:${it.relPath}" },
-                            ) { folder ->
-                                FolderTile(
-                                    folder = folder,
-                                    onClick = { actions.onOpenFolder(folder.relPath) },
-                                )
-                            }
-                        }
-                        if (state.images.isNotEmpty()) {
-                            item(key = "header-images", span = { GridItemSpan(maxLineSpan) }) {
-                                SectionHeader(
-                                    stringResource(
-                                        R.string.autoworkflow_images_progress,
-                                        state.images.size,
-                                        state.totalImages,
-                                    ),
-                                )
-                            }
-                            items(
-                                items = state.images,
-                                key = { "image:${it.relPath}" },
-                            ) { image ->
-                                ImageTile(
-                                    image = image,
-                                    onClick = { compareImage = image },
-                                )
-                            }
-                        }
-                        if (state.hasMore || state.loadingMore) {
-                            item(key = "load-more", span = { GridItemSpan(maxLineSpan) }) {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 12.dp),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    if (state.loadingMore) {
-                                        CircularProgressIndicator()
-                                    } else {
-                                        TextButton(
-                                            text = stringResource(R.string.autoworkflow_load_more),
-                                            onClick = actions.onLoadMore,
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
+                else -> key(state.relPath) {
+                    AutoWorkflowGrid(
+                        cells = cells,
+                        columns = columns,
+                        onColumnsChanged = onColumnsChanged,
+                        isRefreshing = state.loading,
+                        topInset = paddingValues.calculateTopPadding(),
+                        onRefresh = actions.onRefresh,
+                        onLoadMore = actions.onLoadMore,
+                        onOpenFolder = actions.onOpenFolder,
+                        onOpenImage = { compareImage = it },
+                    )
                 }
             }
         }
@@ -248,224 +188,210 @@ fun AutoWorkflowScreen(
     }
 }
 
+/**
+ * The output grid.
+ *
+ * Rebuilt per directory ([key] on the relative path) so entering a folder starts at the top, the
+ * same way opening a folder does today.
+ */
 @Composable
-private fun PathBar(state: AutoWorkflowUiState, actions: AutoWorkflowActions) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        TextButton(
-            text = stringResource(R.string.autoworkflow_up),
-            onClick = actions.onUp,
-            enabled = state.relPath.isNotEmpty(),
-        )
-        Crumb(text = stringResource(R.string.autoworkflow_output_title), onClick = { actions.onOpenFolder("") })
-        // The backend's first crumb is the output root itself, which the crumb above already is.
-        state.breadcrumbs.drop(1).forEach { crumb ->
-            Icon(
-                imageVector = COUIIcons.Light.ChevronForward,
-                contentDescription = null,
-                modifier = Modifier.size(14.dp),
-                tint = COUITheme.colorScheme.onSurfaceVariantSummary,
-            )
-            Crumb(text = crumb.name, onClick = { actions.onOpenFolder(crumb.relPath) })
-        }
-    }
-}
-
-@Composable
-private fun Crumb(text: String, onClick: () -> Unit) {
-    TextButton(text = text, onClick = onClick, minHeight = 32.dp)
-}
-
-@Composable
-private fun StatsLine(state: AutoWorkflowUiState) {
-    val parts = buildList {
-        if (state.folderCount > 0) add(stringResource(R.string.autoworkflow_folders_count, state.folderCount))
-        add(stringResource(R.string.autoworkflow_total_images, state.totalImages))
-        if (state.linkedLoaded > 0) add(stringResource(R.string.autoworkflow_linked_count, state.linkedLoaded))
-        if (state.taskCount > 0) add(stringResource(R.string.autoworkflow_dir_tasks, state.taskCount))
-        if (state.serverUrl.isNotBlank()) add(state.serverUrl)
-    }
-    Text(
-        text = parts.joinToString(" · "),
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
-        style = COUITheme.textStyles.footnote2,
-        color = COUITheme.colorScheme.onSurfaceVariantSummary,
-        maxLines = 2,
-        overflow = TextOverflow.Ellipsis,
-    )
-}
-
-@Composable
-private fun SectionHeader(text: String) {
-    Text(
-        text = text,
-        modifier = Modifier.padding(top = 8.dp),
-        style = COUITheme.textStyles.footnote1,
-        color = COUITheme.colorScheme.onSurfaceVariantSummary,
-    )
-}
-
-@Composable
-private fun FolderTile(folder: AutoWorkflowFolder, onClick: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth(), onClick = onClick) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text(
-                text = folder.name,
-                style = COUITheme.textStyles.body2,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = buildString {
-                    append(stringResource(R.string.autoworkflow_folder_images, folder.directImageCount))
-                    if (folder.subfolderCount > 0) {
-                        append(" · ")
-                        append(stringResource(R.string.autoworkflow_folder_subfolders, folder.subfolderCount))
-                    }
-                },
-                modifier = Modifier.padding(top = 4.dp),
-                style = COUITheme.textStyles.footnote2,
-                color = COUITheme.colorScheme.onSurfaceVariantSummary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = folderTaskSummary(folder),
-                modifier = Modifier.padding(top = 2.dp),
-                style = COUITheme.textStyles.footnote2,
-                color = if (folder.taskCount > 0) {
-                    COUITheme.colorScheme.primary
-                } else {
-                    COUITheme.colorScheme.onSurfaceVariantSummary
-                },
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
-@Composable
-private fun folderTaskSummary(folder: AutoWorkflowFolder): String {
-    if (folder.taskCount <= 0) return stringResource(R.string.autoworkflow_no_tasks)
-    val tasks = stringResource(R.string.autoworkflow_folder_tasks, folder.taskCount)
-    val first = folder.firstTaskId
-    val last = folder.lastTaskId
-    if (first == null || last == null) return tasks
-    return "$tasks · " + stringResource(R.string.autoworkflow_folder_task_range, first, last)
-}
-
-@Composable
-private fun ImageTile(image: AutoWorkflowImage, onClick: () -> Unit) {
-    val context = LocalContext.current
-    val task = image.task
-    Card(modifier = Modifier.fillMaxWidth(), onClick = onClick) {
-        Column {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(3f / 4f)
-                    .clip(RoundedCornerShape(PreviewTileCornerRadius))
-                    .background(PreviewTilePlaceholder),
-            ) {
-                RemoteImage(
-                    url = image.thumbUrl ?: image.imageUrl,
-                    contentScale = ImageView.ScaleType.CENTER_CROP,
-                    modifier = Modifier.fillMaxSize(),
-                )
-                Badge(
-                    text = if (task != null) {
-                        stringResource(R.string.autoworkflow_task_badge, task.id)
-                    } else {
-                        stringResource(R.string.autoworkflow_unlinked)
-                    },
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(6.dp),
-                    highlighted = task != null,
-                )
-                val sourceUrl = task?.sourceThumbUrl ?: task?.sourceImageUrl
-                if (sourceUrl != null) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(6.dp)
-                            .size(52.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(PreviewTilePlaceholder)
-                            .border(
-                                width = 1.dp,
-                                color = Color.White.copy(alpha = 0.6f),
-                                shape = RoundedCornerShape(6.dp),
-                            ),
-                    ) {
-                        RemoteImage(
-                            url = sourceUrl,
-                            contentScale = ImageView.ScaleType.CENTER_CROP,
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    }
-                }
-            }
-            Column(modifier = Modifier.padding(8.dp)) {
-                Text(
-                    text = image.name,
-                    style = COUITheme.textStyles.footnote1,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = task?.sourcePath?.let(::fileNameOrNull)
-                        ?: stringResource(R.string.autoworkflow_no_source),
-                    modifier = Modifier.padding(top = 2.dp),
-                    style = COUITheme.textStyles.footnote2,
-                    color = COUITheme.colorScheme.onSurfaceVariantSummary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = stringResource(
-                        R.string.autoworkflow_size_time,
-                        Formatter.formatFileSize(context, image.size),
-                        formatTime(image.mtime),
-                    ),
-                    modifier = Modifier.padding(top = 2.dp),
-                    style = COUITheme.textStyles.footnote2,
-                    color = COUITheme.colorScheme.onSurfaceVariantSummary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun Badge(
-    text: String,
-    modifier: Modifier = Modifier,
-    highlighted: Boolean = false,
+private fun AutoWorkflowGrid(
+    cells: List<AutoWorkflowCell>,
+    columns: Int,
+    onColumnsChanged: (Int) -> Unit,
+    isRefreshing: Boolean,
+    topInset: Dp,
+    onRefresh: () -> Unit,
+    onLoadMore: () -> Unit,
+    onOpenFolder: (String) -> Unit,
+    onOpenImage: (AutoWorkflowImage) -> Unit,
 ) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(
-                if (highlighted) Color(0xCC0A59F7) else Color(0x99000000),
-            )
-            .padding(horizontal = 6.dp, vertical = 2.dp),
+    val zoomState = rememberFollowZoomGridState(
+        columns = columns,
+        minColumns = 1,
+        maxColumns = 4,
+        onColumnsChanged = onColumnsChanged,
+    )
+    val aspectRatios = remember(cells) { cells.map { it.item.aspectRatio } }
+    val extraHeights = remember(cells) {
+        cells.map { cell ->
+            if (cell is AutoWorkflowCell.FolderCell) FolderCardExtraHeight else MediaCardExtraHeight
+        }
+    }
+    LaunchedEffect(zoomState, cells.size) {
+        snapshotFlow { zoomState.scrollOffset }.collect {
+            val total = cells.size
+            if (total > 0 && zoomState.lastVisibleIndex >= total - 16) onLoadMore()
+        }
+    }
+
+    PullToRefresh(
+        isRefreshing = isRefreshing,
+        onRefresh = onRefresh,
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(top = topInset),
     ) {
-        Text(
-            text = text,
-            style = COUITheme.textStyles.footnote2,
-            color = Color.White,
-            maxLines = 1,
+        FollowZoomWaterfallLayout(
+            itemCount = cells.size,
+            aspectRatios = aspectRatios,
+            columns = columns,
+            minColumns = 1,
+            maxColumns = 4,
+            onColumnsChanged = onColumnsChanged,
+            spacing = 12.dp,
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                top = topInset + 12.dp,
+                end = 16.dp,
+                bottom = 12.dp,
+            ),
+            state = zoomState,
+            itemExtraHeights = extraHeights,
+            itemHorizontalPadding = MediaCardImageMargin,
+            modifier = Modifier
+                .fillMaxSize()
+                .navigationBarsPadding(),
+        ) { index, widthPx, heightPx ->
+            val cell = cells.getOrNull(index) ?: return@FollowZoomWaterfallLayout
+            when (cell) {
+                is AutoWorkflowCell.FolderCell -> MediaCardMiuix(
+                    item = cell.item,
+                    showFilename = true,
+                    isSelectionMode = false,
+                    onClick = { onOpenFolder(cell.source.relPath) },
+                    onLongClick = {},
+                    targetWidthPx = widthPx,
+                    targetHeightPx = heightPx,
+                    fillHeight = true,
+                    isZooming = zoomState.isZoomActive,
+                    folderSubtitle = folderSummary(cell.source),
+                )
+
+                is AutoWorkflowCell.ImageCell -> MediaCardMiuix(
+                    item = cell.item,
+                    showFilename = true,
+                    isSelectionMode = false,
+                    onClick = { onOpenImage(cell.source) },
+                    onLongClick = {},
+                    targetWidthPx = widthPx,
+                    targetHeightPx = heightPx,
+                    fillHeight = true,
+                    isZooming = zoomState.isZoomActive,
+                    overlay = imageOverlay(cell.source),
+                )
+            }
+        }
+    }
+}
+
+/** One cell of the output grid: an output folder or one generated image. */
+private sealed interface AutoWorkflowCell {
+    val item: MixedWaterfallItemUi
+
+    data class FolderCell(
+        val source: AutoWorkflowFolder,
+        override val item: MixedWaterfallItemUi.FolderItem,
+    ) : AutoWorkflowCell
+
+    data class ImageCell(
+        val source: AutoWorkflowImage,
+        override val item: MixedWaterfallItemUi.MediaItem,
+    ) : AutoWorkflowCell
+}
+
+private const val IMAGE_TILE_ASPECT = 0.75f
+
+private fun AutoWorkflowUiState.toCells(): List<AutoWorkflowCell> =
+    folders.map { folder ->
+        val path = folder.relPath
+        AutoWorkflowCell.FolderCell(
+            source = folder,
+            item = MixedWaterfallItemUi.FolderItem(
+                folder = Folder(
+                    path = path,
+                    name = folder.name,
+                    isLocal = true,
+                    photoCount = folder.directImageCount,
+                    hasSubFolders = folder.subfolderCount > 0,
+                ),
+                key = "folder:$path",
+                name = folder.name,
+                path = path,
+                isLocal = true,
+                photoCount = folder.directImageCount,
+                previewUris = emptyList(),
+                aspectRatio = 1f,
+            ),
         )
+    } + images.mapNotNull { image ->
+        val url = image.thumbUrl ?: image.imageUrl ?: return@mapNotNull null
+        val uri = Uri.parse(url)
+        AutoWorkflowCell.ImageCell(
+            source = image,
+            item = MixedWaterfallItemUi.MediaItem(
+                photo = Photo(
+                    id = image.relPath,
+                    imageUri = uri,
+                    title = image.name,
+                    isLocal = true,
+                    size = image.size,
+                ),
+                key = "image:${image.relPath}",
+                id = image.relPath,
+                uri = uri,
+                title = image.name,
+                isLocal = true,
+                isVideo = false,
+                durationText = "",
+                aspectRatio = IMAGE_TILE_ASPECT,
+                isFavorite = false,
+            ),
+        )
+    }
+
+@Composable
+private fun folderSummary(folder: AutoWorkflowFolder): String = when {
+    folder.taskCount <= 0 && folder.directImageCount > 0 ->
+        stringResource(R.string.autoworkflow_folder_images_no_tasks, folder.directImageCount)
+
+    folder.taskCount <= 0 && folder.subfolderCount > 0 ->
+        stringResource(R.string.autoworkflow_folder_subfolders_no_tasks, folder.subfolderCount)
+
+    folder.directImageCount > 0 ->
+        stringResource(
+            R.string.autoworkflow_folder_images_tasks,
+            folder.directImageCount,
+            folder.taskCount,
+        )
+
+    folder.subfolderCount > 0 ->
+        stringResource(
+            R.string.autoworkflow_folder_subfolders_tasks,
+            folder.subfolderCount,
+            folder.taskCount,
+        )
+
+    else -> stringResource(R.string.autoworkflow_folder_images, folder.directImageCount)
+}
+
+@Composable
+private fun imageOverlay(image: AutoWorkflowImage): MediaCardOverlay {
+    val task = image.task
+    return MediaCardOverlay(
+        badgeText = if (task != null) {
+            stringResource(R.string.autoworkflow_task_badge, task.id)
+        } else {
+            stringResource(R.string.autoworkflow_unlinked)
+        },
+        badgeHighlighted = task != null,
+        sourceThumbUrl = task?.sourceThumbUrl ?: task?.sourceImageUrl,
+    )
+}
+
+@Composable
+private fun CenteredProgress() {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator()
     }
 }
 
@@ -496,26 +422,6 @@ private fun MessagePanel(
                     Text(text = actionLabel)
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun LoadingPanel() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            CircularProgressIndicator()
-            Text(
-                text = stringResource(R.string.autoworkflow_loading),
-                style = COUITheme.textStyles.footnote2,
-                color = COUITheme.colorScheme.onSurfaceVariantSummary,
-            )
         }
     }
 }
@@ -593,7 +499,7 @@ private fun CompareOverlay(image: AutoWorkflowImage, onDismiss: () -> Unit) {
                         overflow = TextOverflow.Ellipsis,
                     )
                     val meta = buildList {
-                        task?.sourcePath?.let(::fileNameOrNull)?.let {
+                        task?.sourcePath?.let(::autoWorkflowFileName)?.let {
                             add(stringResource(R.string.autoworkflow_source_prefix, it))
                         }
                         task?.workflowFile?.takeIf { it.isNotBlank() }?.let { add(it) }
@@ -720,14 +626,25 @@ private fun ComparePane(label: String, url: String?, modifier: Modifier = Modifi
     }
 }
 
-/** Last path segment of a Windows or POSIX path. */
-private fun fileNameOrNull(path: String): String? = autoWorkflowFileName(path)
-
-/** `2026-11-16T20:15:33` -> `11-16 20:15`, without pulling in java.time on minSdk 24. */
-private fun formatTime(raw: String): String {
-    val cleaned = raw.replace(' ', 'T')
-    if (cleaned.length >= 16 && cleaned.getOrNull(4) == '-' && cleaned.getOrNull(7) == '-') {
-        return cleaned.substring(5, 16).replace('T', ' ')
+@Composable
+private fun Badge(
+    text: String,
+    modifier: Modifier = Modifier,
+    highlighted: Boolean = false,
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(
+                if (highlighted) Color(0xCC0A59F7) else Color(0x99000000),
+            )
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+    ) {
+        Text(
+            text = text,
+            style = COUITheme.textStyles.footnote2,
+            color = Color.White,
+            maxLines = 1,
+        )
     }
-    return raw
 }
