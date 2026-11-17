@@ -16,6 +16,24 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/**
+ * Immutable snapshot of one directory level.
+ *
+ * The screen keeps the level it is leaving around so the outgoing page can animate away with its
+ * own content instead of flashing the new directory's (still empty) grid.
+ */
+data class AutoWorkflowLevelState(
+    val relPath: String,
+    val folders: List<AutoWorkflowFolder> = emptyList(),
+    val images: List<AutoWorkflowImage> = emptyList(),
+    val loading: Boolean = false,
+    val error: String? = null,
+    val isConfigured: Boolean = true,
+) {
+    val isEmpty: Boolean
+        get() = !loading && error == null && folders.isEmpty() && images.isEmpty()
+}
+
 data class AutoWorkflowUiState(
     val relPath: String = "",
     val absPath: String = "",
@@ -34,10 +52,20 @@ data class AutoWorkflowUiState(
     val error: String? = null,
     val isConfigured: Boolean = true,
     val serverUrl: String = "",
+    val previousLevel: AutoWorkflowLevelState? = null,
 ) {
     val isRoot: Boolean get() = relPath.isEmpty()
     val empty: Boolean
         get() = !loading && error == null && folders.isEmpty() && images.isEmpty()
+
+    fun levelState(): AutoWorkflowLevelState = AutoWorkflowLevelState(
+        relPath = relPath,
+        folders = folders,
+        images = images,
+        loading = loading,
+        error = error,
+        isConfigured = isConfigured,
+    )
 }
 
 /**
@@ -76,6 +104,7 @@ class AutoWorkflowViewModel(app: Application) : AndroidViewModel(app) {
                     error = null,
                     serverUrl = "",
                     relPath = relPath,
+                    previousLevel = if (relPath == it.relPath) it.previousLevel else it.levelState(),
                     folders = emptyList(),
                     images = emptyList(),
                 )
@@ -93,6 +122,7 @@ class AutoWorkflowViewModel(app: Application) : AndroidViewModel(app) {
                 serverUrl = baseUrl,
                 error = null,
                 relPath = relPath,
+                previousLevel = if (sameFolder) it.previousLevel else it.levelState(),
                 folders = if (sameFolder) it.folders else emptyList(),
                 images = if (sameFolder) it.images else emptyList(),
                 totalImages = if (sameFolder) it.totalImages else 0,

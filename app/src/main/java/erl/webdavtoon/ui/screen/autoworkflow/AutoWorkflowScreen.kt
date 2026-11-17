@@ -5,6 +5,14 @@ package erl.webdavtoon.ui.screen.autoworkflow
 import android.net.Uri
 import android.widget.ImageView
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -37,6 +45,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import erl.webdavtoon.AutoWorkflowFolder
@@ -105,11 +114,9 @@ fun AutoWorkflowScreen(
     }
 
     val rootTitle = stringResource(R.string.autoworkflow_output_title)
-    val title = if (state.isRoot) {
-        rootTitle
-    } else {
-        state.breadcrumbs.lastOrNull()?.name?.takeIf { it.isNotBlank() } ?: rootTitle
-    }
+    // Derived from the target path, not from `breadcrumbs`: those still describe the previous
+    // level until the request returns, which made the title flash the parent's name mid-load.
+    val title = state.relPath.substringAfterLast('/').takeIf { it.isNotBlank() } ?: rootTitle
 
     val goUpOrBack = {
         if (state.relPath.isNotEmpty()) actions.onUp() else actions.onBack()
@@ -143,48 +150,123 @@ fun AutoWorkflowScreen(
             )
         },
     ) { paddingValues ->
-        Box(modifier = Modifier.fillMaxSize()) {
-            val cells = remember(state.folders, state.images) { state.toCells() }
-            when {
-                !state.isConfigured -> MessagePanel(
-                    message = stringResource(R.string.autoworkflow_configure_first),
-                    actionLabel = stringResource(R.string.autoworkflow_open_settings),
-                    onAction = actions.onOpenSettings,
-                )
-
-                state.loading && cells.isEmpty() -> CenteredProgress()
-
-                state.error != null && cells.isEmpty() -> MessagePanel(
-                    message = state.error.orEmpty(),
-                    actionLabel = stringResource(R.string.autoworkflow_retry),
-                    onAction = actions.onRefresh,
-                )
-
-                cells.isEmpty() -> MessagePanel(
-                    message = stringResource(R.string.autoworkflow_empty),
-                    actionLabel = stringResource(R.string.autoworkflow_retry),
-                    onAction = actions.onRefresh,
-                )
-
-                else -> key(state.relPath) {
-                    AutoWorkflowGrid(
-                        cells = cells,
-                        columns = columns,
-                        onColumnsChanged = onColumnsChanged,
-                        isRefreshing = state.loading,
-                        topInset = paddingValues.calculateTopPadding(),
-                        onRefresh = actions.onRefresh,
-                        onLoadMore = actions.onLoadMore,
-                        onOpenFolder = actions.onOpenFolder,
-                        onOpenImage = { compareImage = it },
-                    )
-                }
-            }
-        }
+        AutoWorkflowLevels(
+            state = state,
+            columns = columns,
+            onColumnsChanged = onColumnsChanged,
+            topInset = paddingValues.calculateTopPadding(),
+            actions = actions,
+            onOpenImage = { compareImage = it },
+        )
     }
 
     compareImage?.let { image ->
         CompareOverlay(image = image, onDismiss = { compareImage = null })
+    }
+}
+
+/**
+ * Slides one directory level out and the next one in.
+ *
+ * The level being left is drawn from [AutoWorkflowUiState.previousLevel] — the state snapshot
+ * taken when navigation started — so the outgoing page keeps its own grid and does not flash the
+ * new directory's empty loading state.
+ */
+@Composable
+private fun AutoWorkflowLevels(
+    state: AutoWorkflowUiState,
+    columns: Int,
+    onColumnsChanged: (Int) -> Unit,
+    topInset: Dp,
+    actions: AutoWorkflowActions,
+    onOpenImage: (AutoWorkflowImage) -> Unit,
+) {
+    AnimatedContent(
+        targetState = state.relPath,
+        modifier = Modifier.fillMaxSize(),
+        transitionSpec = {
+            val forward = levelDepth(targetState) > levelDepth(initialState)
+            val slide = tween<IntOffset>(durationMillis = 280, easing = FastOutSlowInEasing)
+            val fade = tween<Float>(durationMillis = 220)
+            if (forward) {
+                (slideInHorizontally(slide) { it / 4 } + fadeIn(fade)) togetherWith
+                    (slideOutHorizontally(slide) { -it / 4 } + fadeOut(fade))
+            } else {
+                (slideInHorizontally(slide) { -it / 4 } + fadeIn(fade)) togetherWith
+                    (slideOutHorizontally(slide) { it / 4 } + fadeOut(fade))
+            }
+        },
+        label = "autoworkflow-level",
+    ) { relPath ->
+        val isActive = relPath == state.relPath
+        val level = when {
+            isActive -> state.levelState()
+            else -> state.previousLevel?.takeIf { it.relPath == relPath }
+                ?: AutoWorkflowLevelState(relPath = relPath, loading = true)
+        }
+        AutoWorkflowLevel(
+            level = level,
+            isActive = isActive,
+            columns = columns,
+            onColumnsChanged = onColumnsChanged,
+            topInset = topInset,
+            actions = actions,
+            onOpenImage = onOpenImage,
+        )
+    }
+}
+
+private fun levelDepth(relPath: String): Int =
+    if (relPath.isBlank()) 0 else relPath.count { it == '/' } + 1
+
+@Composable
+private fun AutoWorkflowLevel(
+    level: AutoWorkflowLevelState,
+    isActive: Boolean,
+    columns: Int,
+    onColumnsChanged: (Int) -> Unit,
+    topInset: Dp,
+    actions: AutoWorkflowActions,
+    onOpenImage: (AutoWorkflowImage) -> Unit,
+) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        val cells = remember(level.folders, level.images) { level.toCells() }
+        when {
+            !level.isConfigured -> MessagePanel(
+                message = stringResource(R.string.autoworkflow_configure_first),
+                actionLabel = stringResource(R.string.autoworkflow_open_settings),
+                onAction = actions.onOpenSettings,
+            )
+
+            level.loading && cells.isEmpty() -> CenteredProgress()
+
+            level.error != null && cells.isEmpty() -> MessagePanel(
+                message = level.error.orEmpty(),
+                actionLabel = stringResource(R.string.autoworkflow_retry),
+                onAction = actions.onRefresh,
+            )
+
+            cells.isEmpty() -> MessagePanel(
+                message = stringResource(R.string.autoworkflow_empty),
+                actionLabel = stringResource(R.string.autoworkflow_retry),
+                onAction = actions.onRefresh,
+            )
+
+            else -> key(level.relPath) {
+                AutoWorkflowGrid(
+                    cells = cells,
+                    columns = columns,
+                    onColumnsChanged = onColumnsChanged,
+                    isRefreshing = level.loading,
+                    isActive = isActive,
+                    topInset = topInset,
+                    onRefresh = actions.onRefresh,
+                    onLoadMore = actions.onLoadMore,
+                    onOpenFolder = actions.onOpenFolder,
+                    onOpenImage = onOpenImage,
+                )
+            }
+        }
     }
 }
 
@@ -200,6 +282,7 @@ private fun AutoWorkflowGrid(
     columns: Int,
     onColumnsChanged: (Int) -> Unit,
     isRefreshing: Boolean,
+    isActive: Boolean,
     topInset: Dp,
     onRefresh: () -> Unit,
     onLoadMore: () -> Unit,
@@ -218,7 +301,8 @@ private fun AutoWorkflowGrid(
             if (cell is AutoWorkflowCell.FolderCell) FolderCardExtraHeight else MediaCardExtraHeight
         }
     }
-    LaunchedEffect(zoomState, cells.size) {
+    LaunchedEffect(zoomState, cells.size, isActive) {
+        if (!isActive) return@LaunchedEffect
         snapshotFlow { zoomState.scrollOffset }.collect {
             val total = cells.size
             if (total > 0 && zoomState.lastVisibleIndex >= total - 16) onLoadMore()
@@ -301,7 +385,7 @@ private sealed interface AutoWorkflowCell {
 
 private const val IMAGE_TILE_ASPECT = 0.75f
 
-private fun AutoWorkflowUiState.toCells(): List<AutoWorkflowCell> =
+private fun AutoWorkflowLevelState.toCells(): List<AutoWorkflowCell> =
     folders.map { folder ->
         val path = folder.relPath
         AutoWorkflowCell.FolderCell(
@@ -319,7 +403,7 @@ private fun AutoWorkflowUiState.toCells(): List<AutoWorkflowCell> =
                 path = path,
                 isLocal = true,
                 photoCount = folder.directImageCount,
-                previewUris = emptyList(),
+                previewUris = folder.previewUrls,
                 aspectRatio = 1f,
             ),
         )

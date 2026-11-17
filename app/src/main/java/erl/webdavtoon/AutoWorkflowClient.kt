@@ -55,6 +55,7 @@ data class AutoWorkflowFolder(
     val directTaskCount: Int,
     val firstTaskId: Long?,
     val lastTaskId: Long?,
+    val previewUrls: List<String> = emptyList(),
 )
 
 data class AutoWorkflowCrumb(
@@ -171,6 +172,9 @@ class AutoWorkflowClient(baseUrl: String) {
                     directTaskCount = obj.intOrZero("direct_task_count"),
                     firstTaskId = obj.longOrNull("first_task_id"),
                     lastTaskId = obj.longOrNull("last_task_id"),
+                    previewUrls = obj.arrayOrEmpty("preview_urls").mapNotNull { element ->
+                        absoluteAssetUrl(baseUrl, element.asStringOrNull())
+                    },
                 )
             }
             val images = root.arrayOrEmpty("images").mapNotNull { element ->
@@ -259,6 +263,11 @@ private fun JsonObject.objectOrNull(name: String): JsonObject? {
 
 private fun JsonElement.asObjectOrNull(): JsonObject? =
     if (isJsonObject) asJsonObject else null
+
+private fun JsonElement.asStringOrNull(): String? {
+    if (isJsonNull) return null
+    return runCatching { asString }.getOrNull()?.takeIf { it.isNotBlank() }
+}
 
 /** Last path segment of a Windows or POSIX path, or null when there is none. */
 internal fun autoWorkflowFileName(path: String): String? =
