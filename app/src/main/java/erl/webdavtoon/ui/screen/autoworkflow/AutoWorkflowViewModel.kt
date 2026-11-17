@@ -16,6 +16,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/** How many directory listings stay in memory so stepping back up paints instantly. */
+private const val LEVEL_CACHE_SIZE = 8
+
 /**
  * Immutable snapshot of one directory level.
  *
@@ -76,9 +79,23 @@ data class AutoWorkflowUiState(
  */
 class AutoWorkflowViewModel(app: Application) : AndroidViewModel(app) {
 
+    /** One directory's last successful listing, so going back up paints immediately. */
+    private data class CachedLevel(
+        val folders: List<AutoWorkflowFolder>,
+        val images: List<AutoWorkflowImage>,
+        val totalImages: Int,
+        val hasMore: Boolean,
+        val linkedLoaded: Int,
+    )
+
     private val settingsManager = SettingsManager(app)
     private val _uiState = MutableStateFlow(AutoWorkflowUiState())
     val uiState = _uiState.asStateFlow()
+
+    private val levelCache = object : LinkedHashMap<String, CachedLevel>(8, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, CachedLevel>): Boolean =
+            size > LEVEL_CACHE_SIZE
+    }
 
     private var loadJob: Job? = null
     private var client: AutoWorkflowClient? = null
@@ -114,6 +131,9 @@ class AutoWorkflowViewModel(app: Application) : AndroidViewModel(app) {
 
         loadJob?.cancel()
         val sameFolder = relPath == _uiState.value.relPath
+        // A directory we already listed paints from cache on the first frame, so stepping back up
+        // never shows a spinner; the request below still refreshes it in the background.
+        val cached = if (sameFolder) null else levelCache[relPath]
         _uiState.update {
             it.copy(
                 loading = true,
@@ -123,16 +143,23 @@ class AutoWorkflowViewModel(app: Application) : AndroidViewModel(app) {
                 error = null,
                 relPath = relPath,
                 previousLevel = if (sameFolder) it.previousLevel else it.levelState(),
-                folders = if (sameFolder) it.folders else emptyList(),
-                images = if (sameFolder) it.images else emptyList(),
-                totalImages = if (sameFolder) it.totalImages else 0,
-                hasMore = false,
-                linkedLoaded = if (sameFolder) it.linkedLoaded else 0,
+                folders = if (sameFolder) it.folders else cached?.folders.orEmpty(),
+                images = if (sameFolder) it.images else cached?.images.orEmpty(),
+                totalImages = if (sameFolder) it.totalImages else cached?.totalImages ?: 0,
+                hasMore = if (sameFolder) it.hasMore else cached?.hasMore ?: false,
+                linkedLoaded = if (sameFolder) it.linkedLoaded else cached?.linkedLoaded ?: 0,
             )
         }
         loadJob = viewModelScope.launch {
             clientFor(baseUrl).browse(relPath, offset = 0).fold(
                 onSuccess = { page ->
+                    levelCache[page.relPath] = CachedLevel(
+                        folders = page.folders,
+                        images = page.images,
+                        totalImages = page.totalImages,
+                        hasMore = page.hasMore,
+                        linkedLoaded = page.linkedInPage,
+                    )
                     _uiState.update {
                         it.copy(
                             loading = false,
@@ -186,6 +213,14 @@ class AutoWorkflowViewModel(app: Application) : AndroidViewModel(app) {
                             linkedLoaded = it.linkedLoaded + page.linkedInPage,
                         )
                     }
+                    val loaded = _uiState.value
+                    levelCache[loaded.relPath] = CachedLevel(
+                        folders = loaded.folders,
+                        images = loaded.images,
+                        totalImages = loaded.totalImages,
+                        hasMore = loaded.hasMore,
+                        linkedLoaded = loaded.linkedLoaded,
+                    )
                 },
                 onFailure = { error ->
                     _uiState.update {

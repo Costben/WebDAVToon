@@ -511,11 +511,11 @@ private fun MessagePanel(
 }
 
 /**
- * Loads an http(s) asset through the app's Glide pipeline.
+ * Loads an http(s) asset through the app's Glide pipeline at full view resolution.
  *
- * [WebDavImageLoader.loadLocalImage] is used deliberately: it applies the gallery's size
- * limits and cross-fades, and the registered OkHttp integration is what makes a plain URL
- * work without WebDAV credentials.
+ * [WebDavImageLoader.loadLocalImage] is used deliberately: the registered OkHttp integration is
+ * what makes a plain URL work without WebDAV credentials. It must *not* run as a folder preview —
+ * that path forces a 160px decode, which is what made the compare panes blurry.
  */
 @Composable
 private fun RemoteImage(
@@ -538,8 +538,8 @@ private fun RemoteImage(
                 context = imageView.context,
                 imageUri = Uri.parse(url),
                 imageView = imageView,
-                isFolderPreview = true,
-                limitSize = true,
+                limitSize = false,
+                isFolderPreview = false,
             )
         },
     )
