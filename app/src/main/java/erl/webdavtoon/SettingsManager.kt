@@ -281,6 +281,37 @@ class SettingsManager(context: Context) {
     fun setAutoWorkflowResubmitDeleteOld(deleteOld: Boolean) =
         appSettings.putBoolean(AppSettingsStore.AUTO_WORKFLOW_RESUBMIT_DELETE_OLD, deleteOld)
 
+    fun getAutoWorkflowReeditPresetName(): String? =
+        appSettings.getOrDefaultString(AppSettingsStore.AUTO_WORKFLOW_REEDIT_PRESET_NAME, "")
+            .takeIf { it.isNotBlank() }
+
+    fun setAutoWorkflowReeditPresetName(presetName: String?) {
+        val clean = presetName?.trim().orEmpty()
+        if (clean.isEmpty()) {
+            appSettings.remove(AppSettingsStore.AUTO_WORKFLOW_REEDIT_PRESET_NAME)
+        } else {
+            appSettings.putString(AppSettingsStore.AUTO_WORKFLOW_REEDIT_PRESET_NAME, clean)
+        }
+    }
+
+    fun getAutoWorkflowReeditPrompt(): String =
+        appSettings.getOrDefaultString(AppSettingsStore.AUTO_WORKFLOW_REEDIT_PROMPT, "")
+
+    fun setAutoWorkflowReeditPrompt(prompt: String) =
+        appSettings.putString(AppSettingsStore.AUTO_WORKFLOW_REEDIT_PROMPT, prompt)
+
+    fun getAutoWorkflowReeditDeleteOld(): Boolean =
+        appSettings.getOrDefaultBoolean(AppSettingsStore.AUTO_WORKFLOW_REEDIT_DELETE_OLD, false)
+
+    fun setAutoWorkflowReeditDeleteOld(deleteOld: Boolean) =
+        appSettings.putBoolean(AppSettingsStore.AUTO_WORKFLOW_REEDIT_DELETE_OLD, deleteOld)
+
+    fun getAutoWorkflowDeleteIncludeSource(): Boolean =
+        appSettings.getOrDefaultBoolean(AppSettingsStore.AUTO_WORKFLOW_DELETE_INCLUDE_SOURCE, false)
+
+    fun setAutoWorkflowDeleteIncludeSource(includeSource: Boolean) =
+        appSettings.putBoolean(AppSettingsStore.AUTO_WORKFLOW_DELETE_INCLUDE_SOURCE, includeSource)
+
     fun getAutoWorkflowScrollOffsets(): Map<String, Int> =
         parseAutoWorkflowScrollOffsets(
             appSettings.getOrDefaultString(AppSettingsStore.AUTO_WORKFLOW_SCROLL_OFFSETS, ""),

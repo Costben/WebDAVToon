@@ -56,6 +56,7 @@ import io.github.suqi8.coui.kmp.squircle.SquircleShape
 import io.github.suqi8.coui.kmp.squircle.isSquircleEnabled
 import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.extended.Back
+import io.github.suqi8.coui.kmp.icon.extended.Delete
 import io.github.suqi8.coui.kmp.icon.extended.Download
 import io.github.suqi8.coui.kmp.icon.extended.Edit
 import io.github.suqi8.coui.kmp.icon.extended.Favorites
@@ -115,6 +116,7 @@ fun ReaderOverlayMiuix(
     onShare: () -> Unit,
     onReedit: () -> Unit,
     onResubmit: () -> Unit,
+    onDeleteTask: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val maxSliderValue = maxOf(totalCount - 1, 1).toFloat()
@@ -220,7 +222,7 @@ fun ReaderOverlayMiuix(
                 Spacer(Modifier.height(BottomStackSpacing))
 
                 GalleryChrome {
-                    val itemCount = if (canResubmit) 7 else 5
+                    val itemCount = if (canResubmit) 8 else 5
                     BoxWithConstraints(
                         modifier = Modifier.fillMaxWidth(),
                         contentAlignment = Alignment.Center,
@@ -290,6 +292,14 @@ fun ReaderOverlayMiuix(
                                         },
                                         icon = COUIIcons.Light.Refresh,
                                         label = stringResource(R.string.autoworkflow_resubmit),
+                                    )
+                                    BottomFloatingScrollToolbarItem(
+                                        onClick = {
+                                            tapHaptic()
+                                            onDeleteTask()
+                                        },
+                                        icon = COUIIcons.Delete,
+                                        label = stringResource(R.string.autoworkflow_delete_task),
                                     )
                                 }
                                 BottomFloatingScrollToolbarItem(

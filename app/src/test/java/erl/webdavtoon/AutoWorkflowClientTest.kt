@@ -240,6 +240,33 @@ class AutoWorkflowClientTest {
     }
 
     @Test
+    fun `builds batch delete payload with normalized delete mode`() {
+        val keepSource = AutoWorkflowClient.buildBatchActionPayload(
+            taskIds = listOf(43803L),
+            action = AutoWorkflowClient.ACTION_DELETE,
+            confirm = true,
+            deleteMode = AutoWorkflowClient.DELETE_MODE_OUTPUT_AND_RELATIONS,
+        )
+        assertEquals("output_and_relations", keepSource.get("delete_mode").asString)
+
+        val deleteSource = AutoWorkflowClient.buildBatchActionPayload(
+            taskIds = listOf(43803L),
+            action = AutoWorkflowClient.ACTION_DELETE,
+            confirm = true,
+            deleteMode = AutoWorkflowClient.DELETE_MODE_INPUT_AND_OUTPUT,
+        )
+        assertEquals("input_and_output", deleteSource.get("delete_mode").asString)
+
+        val fallback = AutoWorkflowClient.buildBatchActionPayload(
+            taskIds = listOf(43803L),
+            action = AutoWorkflowClient.ACTION_DELETE,
+            confirm = true,
+            deleteMode = "unexpected_mode",
+        )
+        assertEquals("output_and_relations", fallback.get("delete_mode").asString)
+    }
+
+    @Test
     fun `builds browse url with sort parameter`() {
         val url = AutoWorkflowClient.buildBrowseUrl(
             baseUrl = "http://127.0.0.1:8105/",

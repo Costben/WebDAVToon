@@ -79,7 +79,6 @@ import erl.webdavtoon.autoWorkflowFileName
 import erl.webdavtoon.ui.component.AnimatedSearchField
 import erl.webdavtoon.ui.component.CouiCascadingMenuPopup
 import erl.webdavtoon.ui.component.CouiFlatMenu
-import erl.webdavtoon.ui.component.DeleteConfirmDialog
 import erl.webdavtoon.ui.component.GalleryChrome
 import erl.webdavtoon.ui.component.GalleryTopAppBar
 import erl.webdavtoon.ui.component.GlassTopBarScaffold
@@ -151,7 +150,7 @@ data class AutoWorkflowActions(
     val onPreviewResubmit: (taskIds: List<Long>, flow: String, deleteOldOutput: Boolean) -> Unit,
     val onConfirmPendingAction: () -> Unit,
     val onDismissPendingAction: () -> Unit,
-    val onDeleteTasks: (taskIds: List<Long>) -> Unit,
+    val onDeleteTasks: (taskIds: List<Long>, includeSource: Boolean) -> Unit,
     val onMessageShown: () -> Unit,
 )
 
@@ -337,10 +336,11 @@ fun AutoWorkflowScreen(
         }
 
         deleteRequest?.let { taskIds ->
-            DeleteConfirmDialog(
-                message = stringResource(R.string.autoworkflow_delete_confirm, taskIds.size),
-                onConfirm = {
-                    actions.onDeleteTasks(taskIds)
+            AutoWorkflowDeleteDialog(
+                taskCount = taskIds.size,
+                running = state.actionRunning,
+                onConfirm = { includeSource ->
+                    actions.onDeleteTasks(taskIds, includeSource)
                     deleteRequest = null
                 },
                 onDismiss = { deleteRequest = null },
@@ -941,11 +941,11 @@ internal fun ReeditPromptDialog(
     val serverUrl = remember { settings.getAutoWorkflowUrl() }
     var presets by remember { mutableStateOf<List<PromptPreset>>(emptyList()) }
     var presetsLoading by remember { mutableStateOf(serverUrl.isNotBlank()) }
-    var selectedPresetName by remember { mutableStateOf<String?>(null) }
+    var selectedPresetName by remember { mutableStateOf(settings.getAutoWorkflowReeditPresetName()) }
     var presetExpanded by remember { mutableStateOf(false) }
-    var prompt by remember { mutableStateOf("") }
+    var prompt by remember { mutableStateOf(settings.getAutoWorkflowReeditPrompt()) }
     var promptError by remember { mutableStateOf(false) }
-    var deleteOldOutput by remember { mutableStateOf(false) }
+    var deleteOldOutput by remember { mutableStateOf(settings.getAutoWorkflowReeditDeleteOld()) }
 
     LaunchedEffect(serverUrl) {
         if (serverUrl.isBlank()) {
@@ -955,6 +955,9 @@ internal fun ReeditPromptDialog(
         presetsLoading = true
         AutoWorkflowClient(serverUrl).fetchPromptPresets().onSuccess { loaded ->
             presets = loaded
+            if (selectedPresetName != null && loaded.none { it.name == selectedPresetName }) {
+                selectedPresetName = null
+            }
         }
         presetsLoading = false
     }
@@ -1085,7 +1088,11 @@ internal fun ReeditPromptDialog(
                         if (prompt.isBlank()) {
                             promptError = true
                         } else {
-                            onConfirm(prompt.trim(), deleteOldOutput)
+                            val trimmedPrompt = prompt.trim()
+                            settings.setAutoWorkflowReeditPresetName(selectedPresetName)
+                            settings.setAutoWorkflowReeditPrompt(trimmedPrompt)
+                            settings.setAutoWorkflowReeditDeleteOld(deleteOldOutput)
+                            onConfirm(trimmedPrompt, deleteOldOutput)
                         }
                     },
                 ),
@@ -1202,6 +1209,59 @@ internal fun ConfirmActionDialog(
             ),
             hasContentAbove = true,
         )
+    }
+}
+
+@Composable
+internal fun AutoWorkflowDeleteDialog(
+    taskCount: Int,
+    running: Boolean = false,
+    onDismiss: () -> Unit,
+    onConfirm: (includeSource: Boolean) -> Unit,
+) {
+    val context = LocalContext.current
+    val settings = remember { SettingsManager(context) }
+    val strongHaptic = rememberStrongHaptic()
+    var includeSource by remember { mutableStateOf(settings.getAutoWorkflowDeleteIncludeSource()) }
+
+    OverlayDialog(
+        show = true,
+        title = stringResource(R.string.autoworkflow_delete_task),
+        summary = stringResource(R.string.autoworkflow_delete_confirm, taskCount),
+        onDismissRequest = if (running) null else onDismiss,
+        messageBottomPadding = DialogDefaults.MessageBottomPaddingWithCustomContent,
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            SwitchPreference(
+                checked = includeSource,
+                onCheckedChange = { if (!running) includeSource = it },
+                title = stringResource(R.string.autoworkflow_delete_include_source),
+                summary = stringResource(R.string.autoworkflow_delete_include_source_summary),
+                insideMargin = DialogRowInsideMargin,
+            )
+
+            DialogButtonBar(
+                negative = DialogButtonBarAction(
+                    text = stringResource(R.string.cancel),
+                    onClick = { if (!running) onDismiss() },
+                ),
+                positive = DialogButtonBarAction(
+                    text = if (running) {
+                        stringResource(R.string.autoworkflow_running)
+                    } else {
+                        stringResource(R.string.delete)
+                    },
+                    onClick = {
+                        if (!running) {
+                            strongHaptic()
+                            settings.setAutoWorkflowDeleteIncludeSource(includeSource)
+                            onConfirm(includeSource)
+                        }
+                    },
+                ),
+                hasContentAbove = true,
+            )
+        }
     }
 }
 

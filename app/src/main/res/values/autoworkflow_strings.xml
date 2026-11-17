@@ -41,6 +41,8 @@
     <string name="autoworkflow_resubmit_delete_old_confirm">The original output and its task row will be deleted first.</string>
     <string name="autoworkflow_resubmit_done">Resubmitted %1$d task(s)</string>
     <string name="autoworkflow_delete_confirm">Delete the output and task rows of %1$d task(s)?</string>
+    <string name="autoworkflow_delete_include_source">Also delete input image</string>
+    <string name="autoworkflow_delete_include_source_summary">Off: keep input image; On: delete input image too.</string>
     <string name="autoworkflow_delete_done">Deleted %1$d task(s)</string>
     <string name="autoworkflow_action_failed">Action failed: %1$s</string>
     <string name="autoworkflow_action_failed_unknown">unknown error</string>

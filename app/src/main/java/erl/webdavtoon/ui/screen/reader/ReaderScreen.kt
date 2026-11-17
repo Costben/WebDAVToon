@@ -36,6 +36,7 @@ import erl.webdavtoon.GestureType
 import erl.webdavtoon.MediaShareHelper
 import erl.webdavtoon.R
 import erl.webdavtoon.SettingsManager
+import erl.webdavtoon.ui.screen.autoworkflow.AutoWorkflowDeleteDialog
 import erl.webdavtoon.ui.screen.autoworkflow.AutoWorkflowPendingAction
 import erl.webdavtoon.ui.screen.autoworkflow.ConfirmActionDialog
 import erl.webdavtoon.ui.screen.autoworkflow.ReeditPromptDialog
@@ -139,11 +140,14 @@ fun ReaderScreen(
 
     val modalOverlayVisible = uiState.isGesturePanelVisible || uiState.isPhotoInfoVisible
 
-    // Resubmit and re-edit only exist for output images that carry a generation task.
+    // Resubmit, re-edit and delete only exist for output images that carry a generation task.
     val resubmitTaskId = compareInfo?.taskId
     var reeditDialogTaskId by remember { mutableStateOf<Long?>(null) }
     var resubmitDialogTaskId by remember { mutableStateOf<Long?>(null) }
+    var deleteDialogTaskId by remember { mutableStateOf<Long?>(null) }
+    var deleteDialogPhotoId by remember { mutableStateOf<String?>(null) }
     var pendingResubmit by remember { mutableStateOf<AutoWorkflowPendingAction?>(null) }
+    var pendingResubmitPhotoId by remember { mutableStateOf<String?>(null) }
     var resubmitRunning by remember { mutableStateOf(false) }
     val autoWorkflowUrl = remember(context) { SettingsManager(context).getAutoWorkflowUrl() }
     val resubmitConfirmText = stringResource(R.string.autoworkflow_resubmit_confirm)
@@ -152,14 +156,36 @@ fun ReaderScreen(
     val resubmitEditLabel = stringResource(R.string.autoworkflow_resubmit_edit)
     val resubmitUpscaleLabel = stringResource(R.string.autoworkflow_resubmit_upscale)
     val resubmitDoneText = stringResource(R.string.autoworkflow_resubmit_done)
+    val deleteDoneText = stringResource(R.string.autoworkflow_delete_done)
     val resubmitFailedText = stringResource(R.string.autoworkflow_action_failed_unknown)
     val notConfiguredText = stringResource(R.string.autoworkflow_configure_first)
+
+    fun removeDeletedPhotos(removedTaskIds: Set<Long>, fallbackPhotoId: String?) {
+        if (removedTaskIds.isNotEmpty()) {
+            AutoWorkflowCompareStore.markDeletedTasks(removedTaskIds)
+        }
+        val currentPhotos = viewModel.uiState.value.photos
+        val remaining = currentPhotos.filterNot { photo ->
+            val photoTaskId = AutoWorkflowCompareStore.get(photo.id)?.taskId
+            (photoTaskId != null && photoTaskId in removedTaskIds) ||
+                (fallbackPhotoId != null && photo.id == fallbackPhotoId)
+        }
+        if (remaining.size != currentPhotos.size) {
+            val remainingIds = remaining.map { it.id }.toSet()
+            swappedPhotoIds = swappedPhotoIds.filterTo(HashSet()) { it in remainingIds }
+            viewModel.updatePhotos(remaining)
+            if (remaining.isEmpty()) {
+                onBack()
+            }
+        }
+    }
 
     // The reader is shared by every album, so the mutation path stays local to it: the same
     // two-step request the output browser uses (preview, then confirm) runs against the saved
     // AutoWorkflow address, and nothing is written before the second step.
     fun runResubmit(
         taskId: Long,
+        targetPhotoId: String?,
         flow: String,
         deleteOldOutput: Boolean,
         confirm: Boolean,
@@ -195,6 +221,7 @@ fun ReaderScreen(
                                 } else {
                                     resubmitConfirmText.format(1, flowLabel)
                                 }
+                                pendingResubmitPhotoId = targetPhotoId
                                 pendingResubmit = AutoWorkflowPendingAction(
                                     action = AutoWorkflowClient.ACTION_RESUBMIT,
                                     taskIds = listOf(taskId),
@@ -209,8 +236,8 @@ fun ReaderScreen(
                             else -> {
                                 val count = result.affectedTaskIds.size.takeIf { it > 0 } ?: 1
                                 if (flow == AutoWorkflowClient.FLOW_EDIT && deleteOldOutput) {
-                                    val removed = result.affectedTaskIds.ifEmpty { listOf(taskId) }
-                                    erl.webdavtoon.AutoWorkflowCompareStore.markDeletedTasks(removed)
+                                    val removed = result.affectedTaskIds.ifEmpty { listOf(taskId) }.toSet()
+                                    removeDeletedPhotos(removed, targetPhotoId)
                                 }
                                 Toast.makeText(
                                     context,
@@ -218,6 +245,55 @@ fun ReaderScreen(
                                     Toast.LENGTH_SHORT,
                                 ).show()
                             }
+                        }
+                    },
+                    onFailure = {
+                        resubmitRunning = false
+                        Toast.makeText(context, resubmitFailedText, Toast.LENGTH_SHORT).show()
+                    },
+                )
+        }
+    }
+
+    fun runDeleteTask(
+        taskId: Long,
+        targetPhotoId: String?,
+        includeSource: Boolean,
+    ) {
+        if (resubmitRunning) return
+        if (autoWorkflowUrl.isBlank()) {
+            Toast.makeText(context, notConfiguredText, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val deleteMode = if (includeSource) {
+            AutoWorkflowClient.DELETE_MODE_INPUT_AND_OUTPUT
+        } else {
+            AutoWorkflowClient.DELETE_MODE_OUTPUT_AND_RELATIONS
+        }
+        resubmitRunning = true
+        coroutineScope.launch {
+            AutoWorkflowClient(autoWorkflowUrl)
+                .deleteTasks(listOf(taskId), deleteMode)
+                .fold(
+                    onSuccess = { result ->
+                        resubmitRunning = false
+                        deleteDialogTaskId = null
+                        deleteDialogPhotoId = null
+                        if (result.executed) {
+                            val removed = result.affectedTaskIds.ifEmpty { listOf(taskId) }.toSet()
+                            val count = removed.size.coerceAtLeast(1)
+                            removeDeletedPhotos(removed, targetPhotoId)
+                            Toast.makeText(
+                                context,
+                                deleteDoneText.format(count),
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                        } else {
+                            Toast.makeText(
+                                context,
+                                result.message.ifBlank { resubmitFailedText },
+                                Toast.LENGTH_SHORT,
+                            ).show()
                         }
                     },
                     onFailure = {
@@ -319,6 +395,12 @@ fun ReaderScreen(
                 onShare = onShare,
                 onReedit = { resubmitTaskId?.let { reeditDialogTaskId = it } },
                 onResubmit = { resubmitTaskId?.let { resubmitDialogTaskId = it } },
+                onDeleteTask = {
+                    resubmitTaskId?.let {
+                        deleteDialogTaskId = it
+                        deleteDialogPhotoId = currentPhoto.id
+                    }
+                },
             )
 
             // The AutoWorkflow output browser's compare inset. Only images that were opened from the
@@ -369,12 +451,14 @@ fun ReaderScreen(
             // Re-edit and resubmit run against the output browser's backend, so their dialogs live
             // here rather than in the toolbar: the pill only raises the request.
             reeditDialogTaskId?.let { taskId ->
+                val targetPhotoId = currentPhoto?.id
                 ReeditPromptDialog(
                     onDismiss = { reeditDialogTaskId = null },
                     onConfirm = { promptText, deleteOld ->
                         reeditDialogTaskId = null
                         runResubmit(
                             taskId = taskId,
+                            targetPhotoId = targetPhotoId,
                             flow = AutoWorkflowClient.FLOW_EDIT,
                             deleteOldOutput = deleteOld,
                             confirm = false,
@@ -385,30 +469,56 @@ fun ReaderScreen(
             }
 
             resubmitDialogTaskId?.let { taskId ->
+                val targetPhotoId = currentPhoto?.id
                 ResubmitDialog(
                     onDismiss = { resubmitDialogTaskId = null },
                     onConfirm = { flow, deleteOld ->
                         resubmitDialogTaskId = null
-                        runResubmit(taskId, flow, deleteOld, confirm = false)
+                        runResubmit(taskId, targetPhotoId, flow, deleteOld, confirm = false)
+                    },
+                )
+            }
+
+            deleteDialogTaskId?.let { taskId ->
+                val targetPhotoId = deleteDialogPhotoId ?: currentPhoto?.id
+                AutoWorkflowDeleteDialog(
+                    taskCount = 1,
+                    running = resubmitRunning,
+                    onDismiss = {
+                        if (!resubmitRunning) {
+                            deleteDialogTaskId = null
+                            deleteDialogPhotoId = null
+                        }
+                    },
+                    onConfirm = { includeSource ->
+                        runDeleteTask(taskId, targetPhotoId, includeSource)
                     },
                 )
             }
 
             pendingResubmit?.let { pending ->
+                val targetPhotoId = pendingResubmitPhotoId ?: currentPhoto?.id
                 ConfirmActionDialog(
                     pending = pending,
                     running = resubmitRunning,
                     onConfirm = {
                         pendingResubmit = null
+                        pendingResubmitPhotoId = null
                         runResubmit(
                             taskId = pending.taskIds.first(),
+                            targetPhotoId = targetPhotoId,
                             flow = pending.flow,
                             deleteOldOutput = pending.deleteOldOutput,
                             confirm = true,
                             promptText = pending.promptText,
                         )
                     },
-                    onDismiss = { if (!resubmitRunning) pendingResubmit = null },
+                    onDismiss = {
+                        if (!resubmitRunning) {
+                            pendingResubmit = null
+                            pendingResubmitPhotoId = null
+                        }
+                    },
                 )
             }
 

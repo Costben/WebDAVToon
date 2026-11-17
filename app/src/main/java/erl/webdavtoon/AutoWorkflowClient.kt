@@ -188,10 +188,14 @@ class AutoWorkflowClient(baseUrl: String) {
     )
 
     /** Deletes the output, the relations and the task rows behind [taskIds]. */
-    suspend fun deleteTasks(taskIds: List<Long>): Result<AutoWorkflowActionResult> = batchAction(
+    suspend fun deleteTasks(
+        taskIds: List<Long>,
+        deleteMode: String = DELETE_MODE_OUTPUT_AND_RELATIONS,
+    ): Result<AutoWorkflowActionResult> = batchAction(
         taskIds = taskIds,
         action = ACTION_DELETE,
         confirm = true,
+        deleteMode = deleteMode,
     )
 
     private suspend fun batchAction(
@@ -201,6 +205,7 @@ class AutoWorkflowClient(baseUrl: String) {
         flow: String = FLOW_EDIT,
         deleteOldOutput: Boolean = false,
         promptText: String? = null,
+        deleteMode: String = DELETE_MODE_OUTPUT_AND_RELATIONS,
     ): Result<AutoWorkflowActionResult> = withContext(Dispatchers.IO) {
         runCatching {
             if (normalizedBaseUrl.isEmpty()) {
@@ -213,6 +218,7 @@ class AutoWorkflowClient(baseUrl: String) {
                 flow = flow,
                 deleteOldOutput = deleteOldOutput,
                 promptText = promptText,
+                deleteMode = deleteMode,
             )
             val request = Request.Builder()
                 .url("$normalizedBaseUrl/api/reviewer/tasks/batch-actions")
@@ -266,9 +272,17 @@ class AutoWorkflowClient(baseUrl: String) {
         const val ACTION_DELETE = "delete"
         const val FLOW_EDIT = "edit"
         const val FLOW_UPSCALE = "upscale"
-        private const val DELETE_MODE_OUTPUT_AND_RELATIONS = "output_and_relations"
+        const val DELETE_MODE_OUTPUT_AND_RELATIONS = "output_and_relations"
+        const val DELETE_MODE_INPUT_AND_OUTPUT = "input_and_output"
 
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
+
+        internal fun normalizeDeleteMode(deleteMode: String): String =
+            if (deleteMode == DELETE_MODE_INPUT_AND_OUTPUT) {
+                DELETE_MODE_INPUT_AND_OUTPUT
+            } else {
+                DELETE_MODE_OUTPUT_AND_RELATIONS
+            }
 
         internal fun buildBatchActionPayload(
             taskIds: List<Long>,
@@ -277,6 +291,7 @@ class AutoWorkflowClient(baseUrl: String) {
             flow: String = FLOW_EDIT,
             deleteOldOutput: Boolean = false,
             promptText: String? = null,
+            deleteMode: String = DELETE_MODE_OUTPUT_AND_RELATIONS,
         ): JsonObject = JsonObject().apply {
             add(
                 "task_ids",
@@ -286,7 +301,7 @@ class AutoWorkflowClient(baseUrl: String) {
             addProperty("confirm", confirm)
             addProperty("flow", flow)
             addProperty("delete_old_output", deleteOldOutput)
-            addProperty("delete_mode", DELETE_MODE_OUTPUT_AND_RELATIONS)
+            addProperty("delete_mode", normalizeDeleteMode(deleteMode))
             addProperty("prompt_mode", "create")
             val trimmedPrompt = promptText?.trim().orEmpty()
             if (trimmedPrompt.isNotEmpty()) {

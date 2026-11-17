@@ -41,6 +41,8 @@
     <string name="autoworkflow_resubmit_delete_old_confirm">确认时会先删除原产物与任务记录。</string>
     <string name="autoworkflow_resubmit_done">已提交 %1$d 个任务</string>
     <string name="autoworkflow_delete_confirm">删除 %1$d 个任务的产物与任务记录？</string>
+    <string name="autoworkflow_delete_include_source">同时删除输入原图</string>
+    <string name="autoworkflow_delete_include_source_summary">关闭时只删除产物与任务记录；开启后连同原图一并删除。</string>
     <string name="autoworkflow_delete_done">已删除 %1$d 个任务</string>
     <string name="autoworkflow_action_failed">操作失败：%1$s</string>
     <string name="autoworkflow_action_failed_unknown">未知错误</string>

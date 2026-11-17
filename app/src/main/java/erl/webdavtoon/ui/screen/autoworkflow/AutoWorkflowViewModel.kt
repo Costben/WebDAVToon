@@ -621,16 +621,21 @@ class AutoWorkflowViewModel(app: Application) : AndroidViewModel(app) {
         _uiState.update { it.copy(pendingConfirm = null) }
     }
 
-    fun deleteTasks(taskIds: List<Long>) {
+    fun deleteTasks(taskIds: List<Long>, includeSource: Boolean = false) {
         if (taskIds.isEmpty() || _uiState.value.actionRunning) return
         val baseUrl = _uiState.value.serverUrl.ifBlank { settingsManager.getAutoWorkflowUrl() }
         if (baseUrl.isBlank()) {
             _uiState.update { it.copy(actionMessage = errorString(R.string.autoworkflow_configure_first)) }
             return
         }
+        val deleteMode = if (includeSource) {
+            AutoWorkflowClient.DELETE_MODE_INPUT_AND_OUTPUT
+        } else {
+            AutoWorkflowClient.DELETE_MODE_OUTPUT_AND_RELATIONS
+        }
         _uiState.update { it.copy(actionRunning = true, actionMessage = null) }
         viewModelScope.launch {
-            clientFor(baseUrl).deleteTasks(taskIds).fold(
+            clientFor(baseUrl).deleteTasks(taskIds, deleteMode).fold(
                 onSuccess = { result ->
                     if (result.executed) {
                         val removed = result.affectedTaskIds.ifEmpty { taskIds }.toSet()
