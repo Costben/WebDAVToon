@@ -4,6 +4,7 @@ package erl.webdavtoon
 
 import android.content.pm.ActivityInfo
 import android.os.Bundle
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -32,16 +33,25 @@ class PhotoViewActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         ThemeHelper.applyTheme(this)
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+        )
 
         val sessionId = intent.getStringExtra(ReaderSessions.EXTRA_SESSION_ID)
         val intentIndex = intent.getIntExtra("EXTRA_CURRENT_INDEX", 0)
         val savedIndex = savedInstanceState?.getInt("EXTRA_CURRENT_INDEX")
         val isFavorites = intent.getBooleanExtra("EXTRA_IS_FAVORITES", false)
 
+        // The saved value wins so a rotation keeps the mode the user switched to; the intent
+        // value only seeds a fresh launch (the AutoWorkflow browser pins card mode so its output
+        // images are browsed with the left/right pager).
         val isCardModeOverride = savedInstanceState
             ?.takeIf { it.containsKey("EXTRA_IS_CARD_MODE") }
             ?.getBoolean("EXTRA_IS_CARD_MODE")
+            ?: intent
+                .takeIf { it.hasExtra("EXTRA_IS_CARD_MODE") }
+                ?.getBooleanExtra("EXTRA_IS_CARD_MODE", true)
 
         viewModel.initialize(
             sessionId = sessionId,
@@ -74,7 +84,10 @@ class PhotoViewActivity : ComponentActivity() {
             ) {
                 val uiState by viewModel.uiState.collectAsStateWithLifecycle()
                 val settings = erl.webdavtoon.SettingsManager(this)
+                // The reader always presents photos on a black canvas, so keep its chrome in dark
+                // mode regardless of the system light/dark setting used by the rest of the app.
                 WebDAVToonTheme(
+                    darkTheme = true,
                     themeId = settings.getThemeId(),
                     useCouiDefaultColors = settings.useCouiDefaultColors(),
                 ) {

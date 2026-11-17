@@ -7,22 +7,21 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -32,54 +31,67 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.shadow.Shadow
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import erl.webdavtoon.R
-import erl.webdavtoon.ui.component.CouiCascadingMenuPopup
-import erl.webdavtoon.ui.component.GalleryBottomCapsule
-import erl.webdavtoon.ui.component.GalleryFloatingToolbar
-import erl.webdavtoon.ui.theme.LocalDarkTheme
-import io.github.suqi8.coui.kmp.basic.DropdownEntry
-import io.github.suqi8.coui.kmp.basic.DropdownItem
-import io.github.suqi8.coui.kmp.basic.Icon
-import io.github.suqi8.coui.kmp.basic.IconButton
+import erl.webdavtoon.ui.component.GalleryChrome
+import erl.webdavtoon.ui.component.HighlightedTopBarAction
+import erl.webdavtoon.ui.component.rememberTapHaptic
+import io.github.suqi8.coui.kmp.basic.BottomFloatingNavigationBarDefaults
+import io.github.suqi8.coui.kmp.basic.BottomFloatingScrollToolbar
+import io.github.suqi8.coui.kmp.basic.BottomFloatingScrollToolbarDefaults
+import io.github.suqi8.coui.kmp.basic.BottomFloatingScrollToolbarItem
+import io.github.suqi8.coui.kmp.basic.BottomFloatingToolbarDefaults
+import io.github.suqi8.coui.kmp.basic.GlassContainer
 import io.github.suqi8.coui.kmp.basic.Slider
-import io.github.suqi8.coui.kmp.basic.Text
+import io.github.suqi8.coui.kmp.basic.SmallTopAppBar
+import io.github.suqi8.coui.kmp.basic.couiGlassSurface
+import io.github.suqi8.coui.kmp.basic.rememberGlassHighlight
+import io.github.suqi8.coui.kmp.blur.LocalBackdrop
+import io.github.suqi8.coui.kmp.squircle.SquircleShape
+import io.github.suqi8.coui.kmp.squircle.isSquircleEnabled
 import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.extended.Back
 import io.github.suqi8.coui.kmp.icon.extended.Download
+import io.github.suqi8.coui.kmp.icon.extended.Edit
 import io.github.suqi8.coui.kmp.icon.extended.Favorites
 import io.github.suqi8.coui.kmp.icon.extended.FavoritesFill
 import io.github.suqi8.coui.kmp.icon.extended.Image
 import io.github.suqi8.coui.kmp.icon.extended.ListView
 import io.github.suqi8.coui.kmp.icon.extended.Lock
-import io.github.suqi8.coui.kmp.icon.extended.More
 import io.github.suqi8.coui.kmp.icon.extended.Pause
 import io.github.suqi8.coui.kmp.icon.extended.Play
+import io.github.suqi8.coui.kmp.icon.extended.Refresh
 import io.github.suqi8.coui.kmp.icon.extended.RotateLeft
 import io.github.suqi8.coui.kmp.icon.extended.Share
 import io.github.suqi8.coui.kmp.icon.extended.Tune
-import io.github.suqi8.coui.kmp.theme.COUITheme
 import kotlin.math.roundToInt
 
-// Fixed skeleton for every bottom-bar slot. These are the only values the four function
-// buttons are allowed to differ in, and they differ in none of them. The slot, icon box and
-// label follow the gallery's tab row — 48dp, 24dp and 10sp — so the island's buttons measure
-// the same as the ones on the gallery's own bottom bar.
-private val BottomActionRowInset = 8.dp
-private val BottomActionSlotHeight = 48.dp
-private val BottomActionIconSize = 24.dp
-private val BottomActionIconLabelGap = 2.dp
-private val BottomActionLabelSize = 10.sp
-private val BottomActionLabelLineHeight = 12.sp
+/** The favourite disc's amber, kept off the theme so it reads the same over every photo. */
+private val FavoriteTint = Color(0xFFFFB300)
+
+private val ProgressCapsuleCorner = 22.dp
+private val ProgressCapsuleMargin = PaddingValues(horizontal = 16.dp)
+
+/** The gap between the progress capsule and the tool pill below it. */
+private val BottomStackSpacing = 10.dp
+
+/** How far the bottom stack sits above the navigation bar, matching the gallery's own chrome. */
+private val BottomStackInset = 16.dp
 
 /**
- * HyperOS / Miuix styled floating translucent overlay for the immersive reader.
+ * HyperOS / Miuix styled floating overlay for the immersive reader.
+ *
+ * The top is the app's own [GalleryTopAppBar] — the same ColorOS 17 glass row every other page
+ * wears — so the back key keeps its halo light and the album name sits where the gallery puts it,
+ * with favourite and share as the end actions. The bottom is split in two the way ColorOS 17's
+ * viewer does it: the seek slider in a capsule of its own, and under it
+ * [BottomFloatingScrollToolbar], the Photos editor's scrolling tool pill. The page counter is gone
+ * on purpose: the slider already tells where the reader is, and the number only crowded the bar.
  */
 @Composable
 fun ReaderOverlayMiuix(
@@ -91,6 +103,7 @@ fun ReaderOverlayMiuix(
     isSlideshowPlaying: Boolean,
     isOrientationLocked: Boolean,
     isFavorite: Boolean,
+    canResubmit: Boolean,
     onBack: () -> Unit,
     onSeek: (Int) -> Unit,
     onToggleMode: () -> Unit,
@@ -100,12 +113,13 @@ fun ReaderOverlayMiuix(
     onSaveImage: () -> Unit,
     onOpenGestureControl: () -> Unit,
     onShare: () -> Unit,
+    onReedit: () -> Unit,
+    onResubmit: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val maxSliderValue = maxOf(totalCount - 1, 1).toFloat()
     var sliderPosition by remember(currentIndex) { mutableFloatStateOf(currentIndex.toFloat()) }
     var isDragging by remember { mutableStateOf(false) }
-    var showMoreMenu by remember { mutableStateOf(false) }
 
     LaunchedEffect(currentIndex) {
         if (!isDragging) {
@@ -113,239 +127,225 @@ fun ReaderOverlayMiuix(
         }
     }
 
-    val displayIndex = if (isDragging) {
-        sliderPosition.roundToInt().coerceIn(0, maxOf(totalCount - 1, 0))
-    } else {
-        currentIndex.coerceIn(0, maxOf(totalCount - 1, 0))
+    val lastIndex = maxOf(totalCount - 1, 0)
+    val backdrop = LocalBackdrop.current
+    val squircleEnabled = isSquircleEnabled()
+    val toolbarShape = remember(squircleEnabled) {
+        SquircleShape(
+            cornerRadius = BottomFloatingScrollToolbarDefaults.CornerRadius,
+            squircleEnabled = squircleEnabled,
+        )
     }
-    val pageDisplay = if (totalCount <= 0) "0 / 0" else "${displayIndex + 1} / $totalCount"
-    val isDark = LocalDarkTheme.current || isSystemInDarkTheme()
-    val toolbarBackgroundColor = if (isDark) {
-        Color(0xF51C1C1E)
-    } else {
-        Color(0xF5F5F5F7)
-    }
+    val toolColors = BottomFloatingScrollToolbarDefaults.colors(
+        containerColor = Color.Transparent,
+        strokeColor = Color.Transparent,
+        contentColor = Color(0xCCFFFFFF),
+    )
+    val tapHaptic = rememberTapHaptic()
 
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            // The bottom island carries the gallery's own 8dp/36dp navigation padding itself
-            // (see GalleryBottomCapsule), so the raw inset must not be added on top of it.
-            .statusBarsPadding(),
-    ) {
-        // Top Bar
+    Box(modifier = modifier.fillMaxSize()) {
         AnimatedVisibility(
             visible = visible,
             enter = fadeIn() + slideInVertically { -it },
             exit = fadeOut() + slideOutVertically { -it },
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .fillMaxWidth(),
         ) {
-            GalleryFloatingToolbar(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 600.dp),
-                color = toolbarBackgroundColor,
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    IconButton(
-                        onClick = onBack,
-                        minWidth = 40.dp,
-                        minHeight = 40.dp,
-                    ) {
-                        Icon(
-                            imageVector = COUIIcons.Light.Back,
+            // The reader keeps a transparent top bar with no gradient blur band; the circular
+            // dark-mode buttons blur the photo inside their own 40dp discs and the title stays white.
+            GalleryChrome {
+                SmallTopAppBar(
+                    title = title,
+                    color = Color.Transparent,
+                    titleColor = Color.White,
+                    navigationIcon = {
+                        HighlightedTopBarAction(
+                            icon = COUIIcons.Light.Back,
                             contentDescription = stringResource(R.string.back),
-                            tint = COUITheme.colorScheme.onSurface,
+                            onClick = onBack,
+                            iconTint = Color.White,
+                            backdrop = backdrop,
                         )
-                    }
-
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(horizontal = 8.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                    ) {
-                        Text(
-                            text = title.ifBlank { stringResource(R.string.app_name) },
-                            style = COUITheme.textStyles.title3,
-                            color = COUITheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            text = pageDisplay,
-                            style = COUITheme.textStyles.footnote2.copy(fontSize = 11.sp),
-                            color = COUITheme.colorScheme.onSurfaceSecondary,
-                            maxLines = 1,
-                        )
-                    }
-
-                    IconButton(
-                        onClick = onToggleFavorite,
-                        minWidth = 40.dp,
-                        minHeight = 40.dp,
-                    ) {
-                        Icon(
-                            imageVector = if (isFavorite) COUIIcons.Light.FavoritesFill else COUIIcons.Light.Favorites,
+                    },
+                    actions = {
+                        HighlightedTopBarAction(
+                            icon = if (isFavorite) COUIIcons.Light.FavoritesFill else COUIIcons.Light.Favorites,
                             contentDescription = stringResource(R.string.favorite),
-                            tint = if (isFavorite) Color(0xFFFFB300) else COUITheme.colorScheme.onSurface,
-                            modifier = Modifier.size(24.dp),
+                            onClick = onToggleFavorite,
+                            iconTint = if (isFavorite) FavoriteTint else Color.White,
+                            backdrop = backdrop,
                         )
-                    }
-
-                    IconButton(
-                        onClick = onShare,
-                        minWidth = 40.dp,
-                        minHeight = 40.dp,
-                    ) {
-                        Icon(
-                            imageVector = COUIIcons.Light.Share,
+                        HighlightedTopBarAction(
+                            icon = COUIIcons.Light.Share,
                             contentDescription = stringResource(R.string.share),
-                            tint = COUITheme.colorScheme.onSurface,
-                            modifier = Modifier.size(24.dp),
+                            onClick = onShare,
+                            iconTint = Color.White,
+                            backdrop = backdrop,
                         )
-                    }
-                }
+                    },
+                    gradientGlass = false,
+                    showDivider = false,
+                )
             }
         }
 
-        // Bottom Control Island
         AnimatedVisibility(
             visible = visible,
             enter = fadeIn() + slideInVertically { it },
             exit = fadeOut() + slideOutVertically { it },
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .padding(
+                    bottom = BottomFloatingNavigationBarDefaults.navigationBarPadding() + BottomStackInset,
+                ),
         ) {
-            GalleryBottomCapsule(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 600.dp),
-                color = toolbarBackgroundColor,
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    // Upper Row: Progress Slider + Page indicator
-                    Row(
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                ReaderProgressCapsule(
+                    value = if (totalCount <= 1) 0f else sliderPosition.coerceIn(0f, maxSliderValue),
+                    maxValue = maxSliderValue,
+                    enabled = totalCount > 1,
+                    onValueChange = { value ->
+                        isDragging = true
+                        sliderPosition = value
+                        onSeek(value.roundToInt().coerceIn(0, lastIndex))
+                    },
+                    onValueChangeFinished = {
+                        isDragging = false
+                        onSeek(sliderPosition.roundToInt().coerceIn(0, lastIndex))
+                    },
+                )
+
+                Spacer(Modifier.height(BottomStackSpacing))
+
+                GalleryChrome {
+                    val itemCount = if (canResubmit) 7 else 5
+                    BoxWithConstraints(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        contentAlignment = Alignment.Center,
                     ) {
-                        Slider(
-                            value = if (totalCount <= 1) 0f else sliderPosition.coerceIn(0f, maxSliderValue),
-                            onValueChange = { value ->
-                                isDragging = true
-                                sliderPosition = value
-                                onSeek(value.roundToInt().coerceIn(0, maxOf(totalCount - 1, 0)))
-                            },
-                            onValueChangeFinished = {
-                                isDragging = false
-                                onSeek(sliderPosition.roundToInt().coerceIn(0, maxOf(totalCount - 1, 0)))
-                            },
-                            valueRange = 0f..maxSliderValue,
-                            enabled = totalCount > 1,
-                            modifier = Modifier.weight(1f),
+                        val maxPillWidth = minOf(
+                            (maxWidth - BottomFloatingScrollToolbarDefaults.MarginHorizontal * 2)
+                                .coerceAtLeast(0.dp),
+                            BottomFloatingScrollToolbarDefaults.MaxWidth,
                         )
-                        Text(
-                            text = pageDisplay,
-                            style = COUITheme.textStyles.footnote1,
-                            color = COUITheme.colorScheme.onSurface,
-                            maxLines = 1,
-                        )
-                    }
+                        val naturalPillWidth =
+                            BottomFloatingScrollToolbarDefaults.ContentPadding * 2 +
+                                BottomFloatingScrollToolbarDefaults.ItemWidth * itemCount +
+                                BottomFloatingScrollToolbarDefaults.ItemSpacing *
+                                (itemCount - 1).coerceAtLeast(0)
+                        val pillWidth = minOf(naturalPillWidth, maxPillWidth)
 
-                    // Lower Row: Function Buttons
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            // Inset the row first, then split what is left into four equal
-                            // slots, so the items stay off the island's edges.
-                            .padding(horizontal = BottomActionRowInset)
-                            .padding(top = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        // 1. Reading Mode Toggle
-                        val isWebtoon = readingMode == ReadingMode.WEBTOON
-                        MiuixBottomActionItem(
-                            modifier = Modifier.weight(1f),
-                            icon = if (isWebtoon) COUIIcons.Light.ListView else COUIIcons.Light.Image,
-                            label = if (isWebtoon) stringResource(R.string.default_reader_mode_webtoon) else stringResource(R.string.default_reader_mode_card),
-                            tint = COUITheme.colorScheme.onSurface,
-                            onClick = onToggleMode,
-                        )
-
-                        // 2. Slideshow
-                        MiuixBottomActionItem(
-                            modifier = Modifier.weight(1f),
-                            icon = if (isSlideshowPlaying) COUIIcons.Light.Pause else COUIIcons.Light.Play,
-                            label = if (isSlideshowPlaying) "暂停" else stringResource(R.string.slideshow),
-                            tint = if (isSlideshowPlaying) COUITheme.colorScheme.primary else COUITheme.colorScheme.onSurface,
-                            onClick = onToggleSlideshow,
-                        )
-
-                        // 3. Orientation Lock
-                        MiuixBottomActionItem(
-                            modifier = Modifier.weight(1f),
-                            icon = if (isOrientationLocked) COUIIcons.Light.Lock else COUIIcons.Light.RotateLeft,
-                            label = if (isOrientationLocked) "已锁定" else stringResource(R.string.rotation_lock),
-                            tint = if (isOrientationLocked) COUITheme.colorScheme.primary else COUITheme.colorScheme.onSurface,
-                            onClick = onToggleOrientationLock,
-                        )
-
-                        // 4. More: gesture control and save-to-album moved into one menu so the
-                        // bar keeps four equal slots without giving up either action. The inner
-                        // item needs its own fillMaxWidth to centre inside the slot: the Box is
-                        // only the popup anchor, and a wrap-content child would hug its left edge.
-                        Box(
-                            modifier = Modifier.weight(1f),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            MiuixBottomActionItem(
-                                modifier = Modifier.fillMaxWidth(),
-                                icon = COUIIcons.Light.More,
-                                label = stringResource(R.string.more),
-                                tint = COUITheme.colorScheme.onSurface,
-                                onClick = { showMoreMenu = true },
-                            )
-
-                            CouiCascadingMenuPopup(
-                                show = showMoreMenu,
-                                entries = listOf(
-                                    DropdownEntry(
-                                        items = listOf(
-                                            DropdownItem(
-                                                text = stringResource(R.string.gesture_control),
-                                                icon = { iconModifier ->
-                                                    Icon(COUIIcons.Light.Tune, null, iconModifier)
-                                                },
-                                                onClick = onOpenGestureControl,
-                                            ),
-                                            DropdownItem(
-                                                text = stringResource(R.string.save),
-                                                icon = { iconModifier ->
-                                                    Icon(COUIIcons.Light.Download, null, iconModifier)
-                                                },
-                                                onClick = onSaveImage,
-                                            ),
+                        Box(contentAlignment = Alignment.Center) {
+                            // BottomFloatingScrollToolbar paints an opaque fill of its own and
+                            // does not read LocalBackdrop, so we place the frosted glass surface
+                            // at the exact pill bounds underneath and keep the toolbar transparent.
+                            Box(
+                                modifier = Modifier
+                                    .width(pillWidth)
+                                    .height(BottomFloatingScrollToolbarDefaults.Height)
+                                    .dropShadow(
+                                        shape = toolbarShape,
+                                        shadow = Shadow(
+                                            radius = 10.dp,
+                                            color = Color.Black,
+                                            alpha = 0.18f,
+                                        ),
+                                    )
+                                    .couiGlassSurface(
+                                        backdrop = backdrop,
+                                        shape = toolbarShape,
+                                        containerColor = BottomFloatingScrollToolbarDefaults.ContainerColor,
+                                        blurRadius = BottomFloatingToolbarDefaults.BlurRadius,
+                                        blendColors = BottomFloatingToolbarDefaults.BlurColorsDark,
+                                        fallback = Modifier.background(
+                                            BottomFloatingScrollToolbarDefaults.ContainerColor,
+                                            toolbarShape,
                                         ),
                                     ),
-                                ),
-                                onDismissRequest = { showMoreMenu = false },
                             )
+
+                            BottomFloatingScrollToolbar(
+                                modifier = Modifier.width(
+                                    pillWidth + BottomFloatingScrollToolbarDefaults.MarginHorizontal * 2,
+                                ),
+                                colors = toolColors,
+                            ) {
+                                // Only AutoWorkflow output images carry a generation task; when
+                                // present, re-edit and resubmit sit at the front of the toolbar.
+                                if (canResubmit) {
+                                    BottomFloatingScrollToolbarItem(
+                                        onClick = {
+                                            tapHaptic()
+                                            onReedit()
+                                        },
+                                        icon = COUIIcons.Light.Edit,
+                                        label = stringResource(R.string.autoworkflow_resubmit_edit),
+                                    )
+                                    BottomFloatingScrollToolbarItem(
+                                        onClick = {
+                                            tapHaptic()
+                                            onResubmit()
+                                        },
+                                        icon = COUIIcons.Light.Refresh,
+                                        label = stringResource(R.string.autoworkflow_resubmit),
+                                    )
+                                }
+                                BottomFloatingScrollToolbarItem(
+                                    onClick = {
+                                        tapHaptic()
+                                        onToggleMode()
+                                    },
+                                    icon = if (readingMode == ReadingMode.WEBTOON) COUIIcons.Light.ListView else COUIIcons.Light.Image,
+                                    label = stringResource(
+                                        if (readingMode == ReadingMode.WEBTOON) {
+                                            R.string.default_reader_mode_webtoon
+                                        } else {
+                                            R.string.default_reader_mode_card
+                                        },
+                                    ),
+                                    selected = readingMode == ReadingMode.WEBTOON,
+                                )
+                                BottomFloatingScrollToolbarItem(
+                                    onClick = {
+                                        tapHaptic()
+                                        onToggleSlideshow()
+                                    },
+                                    icon = if (isSlideshowPlaying) COUIIcons.Light.Pause else COUIIcons.Light.Play,
+                                    label = stringResource(
+                                        if (isSlideshowPlaying) R.string.slideshow_pause else R.string.slideshow,
+                                    ),
+                                    selected = isSlideshowPlaying,
+                                )
+                                BottomFloatingScrollToolbarItem(
+                                    onClick = {
+                                        tapHaptic()
+                                        onToggleOrientationLock()
+                                    },
+                                    icon = if (isOrientationLocked) COUIIcons.Light.Lock else COUIIcons.Light.RotateLeft,
+                                    label = stringResource(
+                                        if (isOrientationLocked) R.string.rotation_locked else R.string.rotation_lock,
+                                    ),
+                                    selected = isOrientationLocked,
+                                )
+                                BottomFloatingScrollToolbarItem(
+                                    onClick = {
+                                        tapHaptic()
+                                        onOpenGestureControl()
+                                    },
+                                    icon = COUIIcons.Light.Tune,
+                                    label = stringResource(R.string.gesture_control),
+                                )
+                                BottomFloatingScrollToolbarItem(
+                                    onClick = {
+                                        tapHaptic()
+                                        onSaveImage()
+                                    },
+                                    icon = COUIIcons.Light.Download,
+                                    label = stringResource(R.string.save),
+                                )
+                            }
                         }
                     }
                 }
@@ -355,45 +355,74 @@ fun ReaderOverlayMiuix(
 }
 
 /**
- * One bottom-bar slot. Every item goes through this skeleton so the four read as a single
- * unit: same slot height, same icon box, same label style, same icon-to-label gap. Nothing
- * here is derived from the label, so a two-character label sits exactly like a five-character
- * one and no slot drifts off the others' baseline.
+ * The seek slider in a frosted glass capsule of its own, split off from the tool pill underneath.
+ *
+ * Keeping the two apart is what lets the tool row scroll sideways without moving the thumb, and
+ * gives the slider the full width instead of the share it used to get next to four buttons.
  */
 @Composable
-private fun MiuixBottomActionItem(
-    icon: ImageVector,
-    label: String,
-    tint: Color,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
+private fun ReaderProgressCapsule(
+    value: Float,
+    maxValue: Float,
+    enabled: Boolean,
+    onValueChange: (Float) -> Unit,
+    onValueChangeFinished: () -> Unit,
 ) {
-    Column(
-        modifier = modifier
-            .heightIn(min = BottomActionSlotHeight)
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 2.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = label,
-            modifier = Modifier.size(BottomActionIconSize),
-            tint = tint,
+    GalleryChrome {
+        val backdrop = LocalBackdrop.current
+        val squircleEnabled = isSquircleEnabled()
+        val shape = remember(squircleEnabled) {
+            SquircleShape(cornerRadius = ProgressCapsuleCorner, squircleEnabled = squircleEnabled)
+        }
+        val highlight = rememberGlassHighlight(
+            container = GlassContainer.Medium,
+            backdrop = backdrop,
         )
-        Spacer(modifier = Modifier.height(BottomActionIconLabelGap))
-        Text(
-            text = label,
-            style = COUITheme.textStyles.footnote2.copy(
-                fontSize = BottomActionLabelSize,
-                lineHeight = BottomActionLabelLineHeight,
-            ),
-            color = tint,
-            maxLines = 1,
-            softWrap = false,
-            overflow = TextOverflow.Ellipsis,
-        )
+        val fallback = remember(shape) {
+            Modifier.background(BottomFloatingScrollToolbarDefaults.ContainerColor, shape)
+        }
+        Box(
+            modifier = Modifier
+                .padding(ProgressCapsuleMargin)
+                .widthIn(max = 600.dp)
+                .fillMaxWidth()
+                .dropShadow(
+                    shape = shape,
+                    shadow = Shadow(
+                        radius = 10.dp,
+                        color = Color.Black,
+                        alpha = 0.18f,
+                    ),
+                )
+                .couiGlassSurface(
+                    backdrop = backdrop,
+                    shape = shape,
+                    containerColor = BottomFloatingScrollToolbarDefaults.ContainerColor,
+                    blurRadius = BottomFloatingToolbarDefaults.BlurRadius,
+                    blendColors = BottomFloatingToolbarDefaults.BlurColorsDark,
+                    highlight = highlight,
+                    fallback = fallback,
+                )
+                .pointerInput(Unit) {
+                    detectTapGestures { /* Consume click */ }
+                },
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Slider(
+                    value = value,
+                    onValueChange = onValueChange,
+                    onValueChangeFinished = onValueChangeFinished,
+                    valueRange = 0f..maxValue,
+                    enabled = enabled,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
     }
 }

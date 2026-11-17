@@ -40,7 +40,15 @@ object FileUtils {
             if (pathStart == -1) return url
 
             val baseUrl = url.substring(0, pathStart)
-            val rawPath = url.substring(pathStart)
+            // Query and fragment are already encoded by whoever minted the URL; running them
+            // through the per-segment encoder below turns `?path=` into `%3Fpath%3D`, which the
+            // server then reads as a literal path segment and answers with 404.
+            val suffixStart = listOf(url.indexOf('?', pathStart), url.indexOf('#', pathStart))
+                .filter { it != -1 }
+                .minOrNull()
+                ?: url.length
+            val rawPath = url.substring(pathStart, suffixStart)
+            val suffix = url.substring(suffixStart)
             val encodedPath = rawPath.split('/').joinToString("/") { segment ->
                 if (segment.isEmpty()) return@joinToString ""
                 val safeSegment = segment.replace("+", "%2B")
@@ -52,7 +60,7 @@ object FileUtils {
                     .replace("%5F", "_")
                     .replace("%7E", "~")
             }
-            "$baseUrl$encodedPath"
+            "$baseUrl$encodedPath$suffix"
         } catch (e: Exception) {
             Log.e(TAG, "URL encoding failed", e)
             url

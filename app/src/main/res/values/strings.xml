@@ -152,6 +152,7 @@
     <string name="cache_cleared">Cache cleared</string>
     <string name="cache_clear_failed">Failed to clear cache: %1$s</string>
     <string name="rotation_lock">Rotation Lock</string>
+    <string name="rotation_locked">Locked</string>
     <string name="refresh">Refresh</string>
     <string name="more">More</string>
     <string name="webdav_display_value" translatable="false">WEBDAV</string>

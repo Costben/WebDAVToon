@@ -8,12 +8,15 @@ import java.util.concurrent.ConcurrentHashMap
 /** Identifies the entry point that owns a reader image snapshot. */
 enum class ReaderSessionSource {
     MAIN_ACTIVITY,
-    MIXED_FOLDER
+    MIXED_FOLDER,
+    AUTOWORKFLOW
 }
 
 internal data class ReaderSessionSnapshot<T>(
     val id: String,
     val source: ReaderSessionSource,
+    /** What the reader shows as its title: the album or folder the snapshot was taken from. */
+    val title: String,
     val items: List<T>
 )
 
@@ -32,10 +35,15 @@ internal class ReaderSessionStore<T>(
 ) {
     private val sessions = ConcurrentHashMap<String, ReaderSessionSnapshot<T>>()
 
-    fun create(source: ReaderSessionSource, items: List<T>): ReaderSessionSnapshot<T> {
+    fun create(
+        source: ReaderSessionSource,
+        items: List<T>,
+        title: String = ""
+    ): ReaderSessionSnapshot<T> {
         val snapshot = ReaderSessionSnapshot(
             id = idFactory(),
             source = source,
+            title = title,
             items = items.toList()
         )
         sessions[snapshot.id] = snapshot
@@ -75,8 +83,11 @@ internal object ReaderSessions {
 
     private val store = ReaderSessionStore<Photo>()
 
-    fun create(source: ReaderSessionSource, photos: List<Photo>): ReaderSessionSnapshot<Photo> =
-        store.create(source, photos)
+    fun create(
+        source: ReaderSessionSource,
+        photos: List<Photo>,
+        title: String = ""
+    ): ReaderSessionSnapshot<Photo> = store.create(source, photos, title)
 
     fun resolve(
         requestedSessionId: String?,

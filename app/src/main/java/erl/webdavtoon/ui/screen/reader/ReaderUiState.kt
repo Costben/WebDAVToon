@@ -22,6 +22,8 @@ data class ReaderUiState(
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val sessionId: String? = null,
+    /** Album/folder name the reader was opened from; blank falls back to the image name. */
+    val sessionTitle: String = "",
     val gestureControl: ReaderGestureControlConfig = ReaderGestureControlConfig.defaultConfig(),
     val isGesturePanelVisible: Boolean = false,
     val isPhotoInfoVisible: Boolean = false

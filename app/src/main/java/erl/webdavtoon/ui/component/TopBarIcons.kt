@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.dp
 import io.github.suqi8.coui.kmp.basic.HighlightedIconButton
 import io.github.suqi8.coui.kmp.basic.Icon
 import io.github.suqi8.coui.kmp.basic.couiTopAppBarActionItem
+import io.github.suqi8.coui.kmp.blur.Backdrop
 import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.extended.Filter
 import io.github.suqi8.coui.kmp.icon.extended.Layers
@@ -74,6 +75,10 @@ fun TopBarActionIcon(
  * [iconTint] is resolved inside the button, because that is where [HighlightedIconButton]
  * publishes the colour the glyph is meant to wear (`onBackground` lightened toward white while
  * pressed). Reading it at the call site would only ever see the colour outside the halo.
+ *
+ * [backdrop] opts the halo into ColorOS 17's glass disc: the same circle, but its fill samples the
+ * page behind it. Only pages that record a backdrop pass one — the immersive reader, where the
+ * photo is what the disc catches — so the rest of the app keeps the plain halo.
  */
 @Composable
 fun HighlightedTopBarAction(
@@ -82,10 +87,12 @@ fun HighlightedTopBarAction(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     iconTint: Color? = null,
+    backdrop: Backdrop? = null,
 ) {
     HighlightedIconButton(
         onClick = onClick,
         modifier = modifier.couiTopAppBarActionItem(),
+        backdrop = backdrop,
     ) {
         TopBarActionIcon(icon, contentDescription, tint = iconTint ?: LocalContentColor.current)
     }

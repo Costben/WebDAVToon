@@ -110,6 +110,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
             sessionId == null -> PhotoCache.getPhotos()
             else -> PhotoCache.getPhotos().ifEmpty { emptyList() }
         }
+        val sessionTitle = resolvedSession?.snapshot?.title.orEmpty()
 
         if (loadedPhotos.isEmpty()) {
             _uiState.update {
@@ -118,6 +119,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                     currentIndex = 0,
                     isLoading = false,
                     isFavorite = false,
+                    sessionTitle = sessionTitle,
                     errorMessage = if (sessionId != null && resolvedSession == null) {
                         "Session expired or not found"
                     } else {
@@ -145,7 +147,8 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                 isFavorite = isFav,
                 isLoading = false,
                 errorMessage = null,
-                sessionId = resolvedSession?.snapshot?.id ?: sessionId
+                sessionId = resolvedSession?.snapshot?.id ?: sessionId,
+                sessionTitle = sessionTitle
             )
         }
 

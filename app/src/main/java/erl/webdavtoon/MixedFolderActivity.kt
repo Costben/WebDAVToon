@@ -153,7 +153,8 @@ class MixedFolderActivity : ComponentActivity() {
                                         if (imageIndex != -1) {
                                             val session = ReaderSessions.create(
                                                 ReaderSessionSource.MIXED_FOLDER,
-                                                photos = imageOnly
+                                                photos = imageOnly,
+                                                title = state.title
                                             )
                                             startActivity(Intent(this@MixedFolderActivity, PhotoViewActivity::class.java).apply {
                                                 putExtra(ReaderSessions.EXTRA_SESSION_ID, session.id)

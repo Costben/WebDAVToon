@@ -343,6 +343,7 @@ class MainActivity : FragmentActivity() {
         val session = ReaderSessions.create(
             source = ReaderSessionSource.MAIN_ACTIVITY,
             photos = imageOnly,
+            title = getString(R.string.app_name),
         )
         startActivity(Intent(this, PhotoViewActivity::class.java).apply {
             putExtra(ReaderSessions.EXTRA_SESSION_ID, session.id)
