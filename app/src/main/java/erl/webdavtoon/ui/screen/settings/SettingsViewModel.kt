@@ -61,6 +61,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         observe(appSettings.observeString(AppSettingsStore.DEFAULT_READER_MODE, SettingsManager.DEFAULT_READER_MODE_WEBTOON)) { copy(defaultReaderMode = it) }
         observe(appSettings.observeString(AppSettingsStore.VIDEO_EXTERNAL_PLAYER_MODE, SettingsManager.VIDEO_EXTERNAL_PLAYER_MODE_SYSTEM_DEFAULT)) { copy(videoExternalPlayerMode = it) }
         observe(appSettings.observeString(AppSettingsStore.AUTO_WORKFLOW_URL, "")) { copy(autoWorkflowUrl = it) }
+        observe(appSettings.observeString(AppSettingsStore.TERMINAL_HUB_URL, "")) { copy(terminalHubUrl = it) }
         observe(appSettings.observeBoolean(AppSettingsStore.ROTATION_LOCKED, false)) { copy(rotationLocked = it) }
         observe(appSettings.observeBoolean(AppSettingsStore.LOCAL_MODE_ENABLED, false)) { copy(localModeEnabled = it) }
         observe(appSettings.observeString(AppSettingsStore.LOCAL_HOME_FOLDER_PATH, "")) { copy(localHomeFolderPath = it) }
@@ -114,6 +115,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
                 defaultReaderMode = settingsManager.getDefaultReaderMode(),
                 videoExternalPlayerMode = settingsManager.getVideoExternalPlayerMode(),
                 autoWorkflowUrl = settingsManager.getAutoWorkflowUrl(),
+                terminalHubUrl = settingsManager.getTerminalHubUrl(),
                 privacyExitPolicy = PrivacyModeState.exitPolicy,
                 isPrivacyMode = PrivacyModeState.isPrivacyMode,
                 rotationLocked = settingsManager.isRotationLocked(),
@@ -176,7 +178,8 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setReaderMaxZoomPercent(p: Int) = io { settingsManager.setReaderMaxZoomPercent(p); _uiState.update { it.copy(readerMaxZoomPercent = p) } }
     fun setDefaultReaderMode(m: String) = io { settingsManager.setDefaultReaderMode(m); _uiState.update { it.copy(defaultReaderMode = settingsManager.getDefaultReaderMode()) } }
     fun setVideoExternalPlayerMode(m: String) = io { settingsManager.setVideoExternalPlayerMode(m); _uiState.update { it.copy(videoExternalPlayerMode = settingsManager.getVideoExternalPlayerMode()) } }
-    fun setAutoWorkflowUrl(url: String) = io { settingsManager.setAutoWorkflowUrl(url.trim().trimEnd('/')); _uiState.update { it.copy(autoWorkflowUrl = settingsManager.getAutoWorkflowUrl()) } }
+    fun setAutoWorkflowUrl(url: String) = io { settingsManager.setAutoWorkflowUrl(url); _uiState.update { it.copy(autoWorkflowUrl = settingsManager.getAutoWorkflowUrl()) } }
+    fun setTerminalHubUrl(url: String) = io { settingsManager.setTerminalHubUrl(url); _uiState.update { it.copy(terminalHubUrl = settingsManager.getTerminalHubUrl()) } }
     fun setPrivacyExitPolicy(policy: PrivacyModeState.ExitPolicy) = io { PrivacyModeState.setExitPolicy(context, policy); _uiState.update { it.copy(privacyExitPolicy = policy) } }
     fun setRotationLocked(b: Boolean) = io { settingsManager.setRotationLocked(b); _uiState.update { it.copy(rotationLocked = b) }; eventChannel.send(SettingsEvent.ResultChanged) }
     fun setLocalModeEnabled(enabled: Boolean) = io {

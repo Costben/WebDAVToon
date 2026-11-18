@@ -48,6 +48,7 @@ class AppSettingsStore(context: Context) {
         val DEFAULT_READER_MODE = stringPreferencesKey("default_reader_mode")
         val VIDEO_EXTERNAL_PLAYER_MODE = stringPreferencesKey("video_external_player_mode")
         val AUTO_WORKFLOW_URL = stringPreferencesKey("auto_workflow_url")
+        val TERMINAL_HUB_URL = stringPreferencesKey("terminal_hub_url")
         val AUTO_WORKFLOW_SORT_ORDER = intPreferencesKey("auto_workflow_sort_order")
         val AUTO_WORKFLOW_RESUBMIT_FLOW = stringPreferencesKey("auto_workflow_resubmit_flow")
         val AUTO_WORKFLOW_RESUBMIT_DELETE_OLD = booleanPreferencesKey("auto_workflow_resubmit_delete_old")

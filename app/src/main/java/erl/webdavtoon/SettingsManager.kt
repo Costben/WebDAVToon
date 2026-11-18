@@ -50,6 +50,7 @@ class SettingsManager(context: Context) {
         const val KEY_DEFAULT_READER_MODE = "default_reader_mode"
         const val KEY_VIDEO_EXTERNAL_PLAYER_MODE = "video_external_player_mode"
         const val KEY_AUTO_WORKFLOW_URL = "auto_workflow_url"
+        const val KEY_TERMINAL_HUB_URL = "terminal_hub_url"
         const val KEY_READER_GESTURE_CONTROL_JSON = "reader_gesture_control_json"
         const val KEY_ROTATION_LOCKED = "rotation_locked"
 
@@ -247,7 +248,13 @@ class SettingsManager(context: Context) {
         appSettings.getOrDefaultString(AppSettingsStore.AUTO_WORKFLOW_URL, "")
 
     fun setAutoWorkflowUrl(url: String) =
-        appSettings.putString(AppSettingsStore.AUTO_WORKFLOW_URL, url.trim().trimEnd('/'))
+        appSettings.putString(AppSettingsStore.AUTO_WORKFLOW_URL, AutoWorkflowClient.normalizeBaseUrl(url))
+
+    fun getTerminalHubUrl(): String =
+        appSettings.getOrDefaultString(AppSettingsStore.TERMINAL_HUB_URL, "")
+
+    fun setTerminalHubUrl(url: String) =
+        appSettings.putString(AppSettingsStore.TERMINAL_HUB_URL, AutoWorkflowClient.normalizeBaseUrl(url))
 
     fun getAutoWorkflowSortOrder(): Int =
         appSettings.getOrDefaultInt(AppSettingsStore.AUTO_WORKFLOW_SORT_ORDER, SORT_DATE_DESC)

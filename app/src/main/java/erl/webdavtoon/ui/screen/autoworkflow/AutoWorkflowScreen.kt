@@ -124,6 +124,7 @@ import io.github.suqi8.coui.kmp.icon.extended.Refresh
 import io.github.suqi8.coui.kmp.icon.extended.SelectAll
 import io.github.suqi8.coui.kmp.icon.extended.Settings
 import io.github.suqi8.coui.kmp.icon.extended.Sort
+import io.github.suqi8.coui.kmp.icon.extended.Tune
 import io.github.suqi8.coui.kmp.layout.DialogButtonBar
 import io.github.suqi8.coui.kmp.layout.DialogButtonBarAction
 import io.github.suqi8.coui.kmp.layout.DialogDefaults
@@ -140,6 +141,7 @@ data class AutoWorkflowActions(
     val onOpenFolder: (relPath: String) -> Unit,
     val onLoadMore: () -> Unit,
     val onOpenSettings: () -> Unit,
+    val onOpenTerminalHub: () -> Unit = {},
     val onSetSortOrder: (Int) -> Unit,
     val getScrollOffset: (relPath: String) -> Int = { 0 },
     val onScrollOffsetChanged: (relPath: String, offset: Int) -> Unit = { _, _ -> },
@@ -167,11 +169,14 @@ data class AutoWorkflowActions(
 fun AutoWorkflowScreen(
     state: AutoWorkflowUiState,
     actions: AutoWorkflowActions,
+    terminalHubState: TerminalHubUiState = TerminalHubUiState(),
+    terminalHubActions: TerminalHubActions? = null,
     modifier: Modifier = Modifier,
 ) {
     var reeditRequest by remember { mutableStateOf<List<Long>?>(null) }
     var resubmitRequest by remember { mutableStateOf<List<Long>?>(null) }
     var deleteRequest by remember { mutableStateOf<List<Long>?>(null) }
+    var showTerminalHubSheet by remember { mutableStateOf(false) }
     var searchExpanded by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     val context = LocalContext.current
@@ -203,6 +208,9 @@ fun AutoWorkflowScreen(
     }
     BackHandler {
         when {
+            showTerminalHubSheet && terminalHubState.logTargetName != null ->
+                terminalHubActions?.onCloseLog?.invoke()
+            showTerminalHubSheet -> showTerminalHubSheet = false
             state.isSelectionMode -> actions.onClearSelection()
             searchExpanded -> {
                 searchQuery = ""
@@ -256,6 +264,10 @@ fun AutoWorkflowScreen(
                                 columns = columns,
                                 onColumnsChanged = onColumnsChanged,
                                 onRefresh = actions.onRefresh,
+                                onOpenTerminalHub = {
+                                    actions.onOpenTerminalHub()
+                                    showTerminalHubSheet = true
+                                },
                                 onOpenSettings = actions.onOpenSettings,
                             )
                         }
@@ -346,6 +358,15 @@ fun AutoWorkflowScreen(
                 onDismiss = { deleteRequest = null },
             )
         }
+
+        if (terminalHubActions != null) {
+            TerminalHubBottomSheet(
+                show = showTerminalHubSheet,
+                state = terminalHubState,
+                actions = terminalHubActions,
+                onDismiss = { showTerminalHubSheet = false },
+            )
+        }
     }
 }
 
@@ -406,6 +427,7 @@ private fun AutoWorkflowMoreMenuButton(
     columns: Int,
     onColumnsChanged: (Int) -> Unit,
     onRefresh: () -> Unit,
+    onOpenTerminalHub: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -448,6 +470,11 @@ private fun AutoWorkflowMoreMenuButton(
                             text = stringResource(R.string.refresh),
                             icon = { modifier -> Icon(COUIIcons.Light.Refresh, null, modifier) },
                             onClick = onRefresh,
+                        ),
+                        DropdownItem(
+                            text = stringResource(R.string.autoworkflow_terminal_hub_control),
+                            icon = { modifier -> Icon(COUIIcons.Light.Tune, null, modifier) },
+                            onClick = onOpenTerminalHub,
                         ),
                         DropdownItem(
                             text = stringResource(R.string.settings),

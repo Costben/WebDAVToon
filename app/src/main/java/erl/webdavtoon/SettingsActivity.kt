@@ -104,6 +104,7 @@ class SettingsActivity : ComponentActivity() {
     private var showDefaultReaderModePicker by mutableStateOf(false)
     private var showVideoExternalPlayerModePicker by mutableStateOf(false)
     private var showAutoWorkflowUrlDialog by mutableStateOf(false)
+    private var showTerminalHubUrlDialog by mutableStateOf(false)
     private var showPrivacyExitPolicyPicker by mutableStateOf(false)
     private var showHomeFolderPicker by mutableStateOf(false)
 
@@ -237,6 +238,15 @@ class SettingsActivity : ComponentActivity() {
                             onDismiss = { showAutoWorkflowUrlDialog = false },
                         )
                     }
+                    if (showTerminalHubUrlDialog) {
+                        InputDialog(
+                            title = stringResource(R.string.terminal_hub_server),
+                            initialValue = uiState.terminalHubUrl,
+                            hint = stringResource(R.string.terminal_hub_server_url_hint),
+                            onConfirm = { viewModel.setTerminalHubUrl(it) },
+                            onDismiss = { showTerminalHubUrlDialog = false },
+                        )
+                    }
                     if (showPrivacyExitPolicyPicker) {
                         PrivacyExitPolicyDialog(
                             currentPolicy = uiState.privacyExitPolicy,
@@ -361,6 +371,7 @@ class SettingsActivity : ComponentActivity() {
         onPickDefaultReaderMode = { showDefaultReaderModePicker = true },
         onPickVideoExternalPlayerMode = { showVideoExternalPlayerModePicker = true },
         onEditAutoWorkflowUrl = { showAutoWorkflowUrlDialog = true },
+        onEditTerminalHubUrl = { showTerminalHubUrlDialog = true },
         onPickPrivacyExitPolicy = { showPrivacyExitPolicyPicker = true },
         onSetRotationLocked = { locked ->
             viewModel.setRotationLocked(locked)

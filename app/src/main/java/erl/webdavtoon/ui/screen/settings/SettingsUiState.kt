@@ -41,6 +41,7 @@ data class SettingsUiState(
     val defaultReaderMode: String = SettingsManager.DEFAULT_READER_MODE_WEBTOON,
     val videoExternalPlayerMode: String = SettingsManager.VIDEO_EXTERNAL_PLAYER_MODE_SYSTEM_DEFAULT,
     val autoWorkflowUrl: String = "",
+    val terminalHubUrl: String = "",
     val privacyExitPolicy: PrivacyModeState.ExitPolicy = PrivacyModeState.ExitPolicy.ON_BACKGROUND,
     val isPrivacyMode: Boolean = false,
     val rotationLocked: Boolean = false,

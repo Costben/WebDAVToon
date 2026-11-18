@@ -75,6 +75,7 @@ data class SettingsActions(
     val onPickDefaultReaderMode: () -> Unit,
     val onPickVideoExternalPlayerMode: () -> Unit,
     val onEditAutoWorkflowUrl: () -> Unit,
+    val onEditTerminalHubUrl: () -> Unit,
     val onPickPrivacyExitPolicy: () -> Unit,
     val onSetRotationLocked: (Boolean) -> Unit,
     val onSetLocalModeEnabled: (Boolean) -> Unit,
@@ -257,6 +258,22 @@ private fun SettingsContent(
             }
         }
 
+        item(key = "localExternalServices") {
+            SettingsGroup(stringResource(R.string.local_external_services)) {
+                ArrowPreference(
+                    title = stringResource(R.string.comfyui_server),
+                    summary = uiState.autoWorkflowUrl.ifBlank { stringResource(R.string.not_configured) },
+                    onClick = actions.onEditAutoWorkflowUrl,
+                )
+                SettingsRowDivider()
+                ArrowPreference(
+                    title = stringResource(R.string.terminal_hub_server),
+                    summary = uiState.terminalHubUrl.ifBlank { stringResource(R.string.not_configured) },
+                    onClick = actions.onEditTerminalHubUrl,
+                )
+            }
+        }
+
         item(key = "display") {
             SettingsGroup(stringResource(R.string.display)) {
                 ArrowPreference(
@@ -376,8 +393,6 @@ private fun SettingsContent(
                 ArrowPreference(title = stringResource(R.string.default_reader_mode), summary = stringResource(defaultReaderModeRes(uiState.defaultReaderMode)), onClick = actions.onPickDefaultReaderMode)
                 SettingsRowDivider()
                 ArrowPreference(title = stringResource(R.string.video_external_player_mode), summary = videoPlayerModeName(uiState.videoExternalPlayerMode), onClick = actions.onPickVideoExternalPlayerMode)
-                SettingsRowDivider()
-                ArrowPreference(title = stringResource(R.string.comfyui_server), summary = uiState.autoWorkflowUrl.ifBlank { stringResource(R.string.not_configured) }, onClick = actions.onEditAutoWorkflowUrl)
             }
         }
 

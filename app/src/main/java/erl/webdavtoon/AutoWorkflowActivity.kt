@@ -17,6 +17,8 @@ import androidx.navigationevent.compose.rememberNavigationEventDispatcherOwner
 import erl.webdavtoon.ui.screen.autoworkflow.AutoWorkflowActions
 import erl.webdavtoon.ui.screen.autoworkflow.AutoWorkflowScreen
 import erl.webdavtoon.ui.screen.autoworkflow.AutoWorkflowViewModel
+import erl.webdavtoon.ui.screen.autoworkflow.TerminalHubActions
+import erl.webdavtoon.ui.screen.autoworkflow.TerminalHubViewModel
 import erl.webdavtoon.ui.theme.WebDAVToonTheme
 
 /**
@@ -29,6 +31,7 @@ import erl.webdavtoon.ui.theme.WebDAVToonTheme
 class AutoWorkflowActivity : ComponentActivity() {
 
     private val viewModel: AutoWorkflowViewModel by viewModels()
+    private val terminalHubViewModel: TerminalHubViewModel by viewModels()
     private var hasResumed = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -40,6 +43,7 @@ class AutoWorkflowActivity : ComponentActivity() {
             val navOwner = rememberNavigationEventDispatcherOwner(parent = null)
             CompositionLocalProvider(LocalNavigationEventDispatcherOwner provides navOwner) {
                 val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+                val terminalHubState by terminalHubViewModel.uiState.collectAsStateWithLifecycle()
                 val settings = SettingsManager(this)
                 WebDAVToonTheme(
                     themeId = settings.getThemeId(),
@@ -48,6 +52,25 @@ class AutoWorkflowActivity : ComponentActivity() {
                     LaunchedEffect(Unit) { viewModel.ensureLoaded() }
                     AutoWorkflowScreen(
                         state = uiState,
+                        terminalHubState = terminalHubState,
+                        terminalHubActions = TerminalHubActions(
+                            onRefresh = { terminalHubViewModel.loadStatus() },
+                            onOpenSettings = {
+                                startActivity(
+                                    Intent(
+                                        this@AutoWorkflowActivity,
+                                        SettingsActivity::class.java,
+                                    ),
+                                )
+                            },
+                            onServiceAction = terminalHubViewModel::performServiceAction,
+                            onGroupAction = terminalHubViewModel::performGroupAction,
+                            onOpenLog = terminalHubViewModel::openLog,
+                            onSetLogLines = terminalHubViewModel::setLogLines,
+                            onRefreshLog = terminalHubViewModel::refreshLog,
+                            onCloseLog = terminalHubViewModel::closeLog,
+                            onMessageShown = terminalHubViewModel::consumeMessage,
+                        ),
                         actions = AutoWorkflowActions(
                             onBack = { finish() },
                             onRefresh = { viewModel.refresh() },
@@ -79,6 +102,11 @@ class AutoWorkflowActivity : ComponentActivity() {
                             onDismissPendingAction = viewModel::dismissPendingAction,
                             onDeleteTasks = viewModel::deleteTasks,
                             onMessageShown = viewModel::consumeActionMessage,
+                            onOpenTerminalHub = {
+                                terminalHubViewModel.loadStatus(
+                                    showSpinner = terminalHubViewModel.uiState.value.status == null,
+                                )
+                            },
                             onOpenSettings = {
                                 startActivity(
                                     Intent(
@@ -98,6 +126,11 @@ class AutoWorkflowActivity : ComponentActivity() {
         super.onResume()
         // Only reload when returning from Settings with a changed server address, or apply
         // any deleted tasks from the reader locally without resetting list position.
-        if (hasResumed) viewModel.onHostResumed() else hasResumed = true
+        if (hasResumed) {
+            viewModel.onHostResumed()
+            terminalHubViewModel.refreshIfServerChanged()
+        } else {
+            hasResumed = true
+        }
     }
 }

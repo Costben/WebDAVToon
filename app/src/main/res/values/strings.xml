@@ -244,4 +244,7 @@
     <string name="set_as_home_folder_confirm_message">Set \"%1$s\" as the home folder?</string>
     <string name="home_folder_set_toast">Home folder set to: %1$s</string>
     <string name="confirm">Confirm</string>
+    <string name="local_external_services">Local external services</string>
+    <string name="terminal_hub_server">Terminal Hub address</string>
+    <string name="terminal_hub_server_url_hint">http://192.168.1.x:8105 or http://127.0.0.1:7801</string>
 </resources>

@@ -236,4 +236,7 @@
     <string name="set_as_home_folder_confirm_message">确定要将「%1$s」设置为首页吗？</string>
     <string name="home_folder_set_toast">已将「%1$s」设置为首页</string>
     <string name="confirm">确定</string>
+    <string name="local_external_services">本地外部服务</string>
+    <string name="terminal_hub_server">Terminal Hub 地址</string>
+    <string name="terminal_hub_server_url_hint">http://192.168.1.x:8105 或 http://127.0.0.1:7801</string>
 </resources>

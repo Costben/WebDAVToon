@@ -99,6 +99,49 @@ data class AutoWorkflowPage(
     val taskCount: Int,
 )
 
+data class TerminalHubManagerInfo(
+    val modeKey: String,
+    val modeLabel: String,
+    val apiPort: Int,
+    val logDir: String,
+    val managerLog: String,
+)
+
+data class TerminalHubServiceStatus(
+    val name: String,
+    val running: Boolean,
+    val healthy: Boolean,
+    val statusState: String,
+    val healthDetail: String,
+    val pid: Int?,
+    val logFile: String,
+    val isAutoWorkflow: Boolean,
+    val isProtected: Boolean,
+)
+
+data class TerminalHubStatus(
+    val hubReachable: Boolean,
+    val hubUrl: String?,
+    val manager: TerminalHubManagerInfo?,
+    val autoWorkflowServices: List<String>,
+    val protectedServices: List<String>,
+    val services: List<TerminalHubServiceStatus>,
+)
+
+data class TerminalHubActionResult(
+    val status: String,
+    val message: String,
+    val name: String? = null,
+    val action: String? = null,
+)
+
+data class TerminalHubLogResult(
+    val name: String,
+    val logFile: String,
+    val lines: Int,
+    val content: String,
+)
+
 /**
  * Client for the AutoWorkflow backend output explorer.
  *
@@ -108,7 +151,10 @@ data class AutoWorkflowPage(
  */
 class AutoWorkflowClient(baseUrl: String) {
 
-    private val normalizedBaseUrl = baseUrl.trim().trimEnd('/')
+    private val normalizedBaseUrl = normalizeBaseUrl(baseUrl)
+
+    @Volatile
+    private var directHubMode: Boolean? = null
 
     private val httpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -236,6 +282,175 @@ class AutoWorkflowClient(baseUrl: String) {
         }
     }
 
+    private fun executeGet(pathAndQuery: String): Pair<Int, String> {
+        val request = Request.Builder()
+            .url("$normalizedBaseUrl$pathAndQuery")
+            .get()
+            .build()
+        return httpClient.newCall(request).execute().use { response ->
+            response.code to response.body?.string().orEmpty()
+        }
+    }
+
+    private fun executePost(path: String, payload: JsonObject): Pair<Int, String> {
+        val request = Request.Builder()
+            .url("$normalizedBaseUrl$path")
+            .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE))
+            .build()
+        return httpClient.newCall(request).execute().use { response ->
+            response.code to response.body?.string().orEmpty()
+        }
+    }
+
+    private fun ensureConfigured() {
+        if (normalizedBaseUrl.isEmpty()) {
+            throw IOException("AutoWorkflow server is not configured")
+        }
+    }
+
+    private fun throwIfFailed(code: Int, body: String) {
+        if (code !in 200..299) {
+            throw IOException("HTTP $code: ${extractDetail(body) ?: "Request failed"}")
+        }
+    }
+
+    /**
+     * Queries Terminal Hub reachability, manager metadata, and all registered services.
+     * Supports both the AutoWorkflow proxy (`/api/terminal-hub/status`) and direct TerminalHub.WinUI (`/api/status`).
+     */
+    suspend fun fetchTerminalHubStatus(): Result<TerminalHubStatus> = withContext(Dispatchers.IO) {
+        runCatching {
+            ensureConfigured()
+            if (directHubMode == true) {
+                val (code, body) = executeGet("/api/status")
+                throwIfFailed(code, body)
+                return@runCatching parseTerminalHubStatus(body, normalizedBaseUrl)
+            }
+            val (proxyCode, proxyBody) = executeGet("/api/terminal-hub/status")
+            if (proxyCode == 404 || proxyCode == 405) {
+                val (directCode, directBody) = executeGet("/api/status")
+                throwIfFailed(directCode, directBody)
+                directHubMode = true
+                return@runCatching parseTerminalHubStatus(directBody, normalizedBaseUrl)
+            }
+            throwIfFailed(proxyCode, proxyBody)
+            directHubMode = false
+            parseTerminalHubStatus(proxyBody, normalizedBaseUrl)
+        }.onFailure { error ->
+            Log.e(TAG, "fetchTerminalHubStatus failed", error)
+        }
+    }
+
+    /** Sends start/stop/restart to a single service registered in Terminal Hub. */
+    suspend fun controlTerminalHubService(
+        name: String,
+        action: String,
+    ): Result<TerminalHubActionResult> = withContext(Dispatchers.IO) {
+        runCatching {
+            ensureConfigured()
+            val directPath = "/api/${action.lowercase()}"
+            if (directHubMode == true) {
+                val (code, body) = executePost(directPath, JsonObject().apply { addProperty("name", name) })
+                throwIfFailed(code, body)
+                return@runCatching parseTerminalHubActionResult(body, name, action)
+            }
+            val proxyPayload = JsonObject().apply {
+                addProperty("name", name)
+                addProperty("action", action)
+            }
+            val (proxyCode, proxyBody) = executePost("/api/terminal-hub/actions", proxyPayload)
+            if (proxyCode == 404 || proxyCode == 405) {
+                val (directCode, directBody) = executePost(directPath, JsonObject().apply { addProperty("name", name) })
+                throwIfFailed(directCode, directBody)
+                directHubMode = true
+                return@runCatching parseTerminalHubActionResult(directBody, name, action)
+            }
+            throwIfFailed(proxyCode, proxyBody)
+            directHubMode = false
+            parseTerminalHubActionResult(proxyBody, name, action)
+        }.onFailure { error ->
+            Log.e(TAG, "controlTerminalHubService failed name=$name action=$action", error)
+        }
+    }
+
+    /** Sends start/stop/restart to the AutoWorkflow service group. */
+    suspend fun controlAutoWorkflowGroup(
+        action: String,
+        names: List<String>? = null,
+    ): Result<TerminalHubActionResult> = withContext(Dispatchers.IO) {
+        runCatching {
+            ensureConfigured()
+            if (directHubMode == true) {
+                return@runCatching controlDirectGroup(action, names)
+            }
+            val payload = JsonObject().apply {
+                addProperty("action", action)
+                if (!names.isNullOrEmpty()) {
+                    add(
+                        "names",
+                        com.google.gson.JsonArray().apply { names.forEach { add(it) } },
+                    )
+                }
+            }
+            val (proxyCode, proxyBody) = executePost("/api/terminal-hub/group-actions", payload)
+            if (proxyCode == 404 || proxyCode == 405) {
+                directHubMode = true
+                return@runCatching controlDirectGroup(action, names)
+            }
+            throwIfFailed(proxyCode, proxyBody)
+            directHubMode = false
+            parseTerminalHubActionResult(proxyBody, fallbackAction = action)
+        }.onFailure { error ->
+            Log.e(TAG, "controlAutoWorkflowGroup failed action=$action", error)
+        }
+    }
+
+    private fun controlDirectGroup(action: String, names: List<String>?): TerminalHubActionResult {
+        val targets = names?.takeIf { it.isNotEmpty() } ?: AUTOWORKFLOW_GROUP_NAMES
+        val directPath = "/api/${action.lowercase()}"
+        val messages = mutableListOf<String>()
+        for (target in targets) {
+            val (code, body) = executePost(directPath, JsonObject().apply { addProperty("name", target) })
+            throwIfFailed(code, body)
+            val parsed = parseTerminalHubActionResult(body, target, action)
+            messages += parsed.message.ifBlank { "$target: $action" }
+        }
+        return TerminalHubActionResult(
+            status = "success",
+            message = messages.joinToString("; "),
+            action = action,
+        )
+    }
+
+    /** Reads the tail lines of a Terminal Hub service log or the manager log (`_manager`). */
+    suspend fun fetchTerminalHubLog(
+        name: String,
+        lines: Int = 200,
+    ): Result<TerminalHubLogResult> = withContext(Dispatchers.IO) {
+        runCatching {
+            ensureConfigured()
+            val encodedName = URLEncoder.encode(name, "UTF-8").replace("+", "%20")
+            val clampedLines = lines.coerceIn(1, 2000)
+            if (directHubMode == true) {
+                val (code, body) = executeGet("/api/logs?name=$encodedName&lines=$clampedLines")
+                throwIfFailed(code, body)
+                return@runCatching parseTerminalHubLogResult(body, clampedLines)
+            }
+            val (proxyCode, proxyBody) = executeGet("/api/terminal-hub/logs?name=$encodedName&lines=$clampedLines")
+            if (proxyCode == 404 || proxyCode == 405) {
+                val (directCode, directBody) = executeGet("/api/logs?name=$encodedName&lines=$clampedLines")
+                throwIfFailed(directCode, directBody)
+                directHubMode = true
+                return@runCatching parseTerminalHubLogResult(directBody, clampedLines)
+            }
+            throwIfFailed(proxyCode, proxyBody)
+            directHubMode = false
+            parseTerminalHubLogResult(proxyBody, clampedLines)
+        }.onFailure { error ->
+            Log.e(TAG, "fetchTerminalHubLog failed name=$name", error)
+        }
+    }
+
     companion object {
         private const val TAG = "AutoWorkflowClient"
         const val PAGE_SIZE = 120
@@ -274,6 +489,23 @@ class AutoWorkflowClient(baseUrl: String) {
         const val FLOW_UPSCALE = "upscale"
         const val DELETE_MODE_OUTPUT_AND_RELATIONS = "output_and_relations"
         const val DELETE_MODE_INPUT_AND_OUTPUT = "input_and_output"
+        const val HUB_ACTION_START = "start"
+        const val HUB_ACTION_STOP = "stop"
+        const val HUB_ACTION_RESTART = "restart"
+        const val HUB_MANAGER_LOG_NAME = "_manager"
+        val AUTOWORKFLOW_GROUP_NAMES = listOf("ComfyUI", "AWF Worker", "AWF Frontend")
+
+        internal fun normalizeBaseUrl(raw: String): String {
+            val trimmed = raw.trim().trimEnd('/')
+            if (trimmed.isEmpty()) return ""
+            return if (trimmed.startsWith("http://", ignoreCase = true) ||
+                trimmed.startsWith("https://", ignoreCase = true)
+            ) {
+                trimmed
+            } else {
+                "http://$trimmed"
+            }
+        }
 
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
 
@@ -324,7 +556,7 @@ class AutoWorkflowClient(baseUrl: String) {
 
         private fun extractDetail(body: String): String? = runCatching {
             val root = JsonParser.parseString(body).asJsonObject
-            root.stringOrNull("detail")
+            root.stringOrNull("detail") ?: root.stringOrNull("message")
         }.getOrNull()
 
         internal fun parsePage(json: String, baseUrl: String): AutoWorkflowPage {
@@ -420,6 +652,106 @@ class AutoWorkflowClient(baseUrl: String) {
             targetImageUrl = absoluteAssetUrl(baseUrl, obj.stringOrNull("target_image_url")),
             targetThumbUrl = absoluteAssetUrl(baseUrl, obj.stringOrNull("target_thumb_url")),
         )
+
+        internal fun parseTerminalHubStatus(
+            json: String,
+            fallbackHubUrl: String? = null,
+        ): TerminalHubStatus {
+            val root = JsonParser.parseString(json).asJsonObject
+            val managerObj = root.objectOrNull("manager") ?: root.objectOrNull("_manager")
+            val manager = managerObj?.let { obj ->
+                TerminalHubManagerInfo(
+                    modeKey = obj.stringOrNull("mode_key").orEmpty(),
+                    modeLabel = obj.stringOrNull("mode_label").orEmpty(),
+                    apiPort = obj.intOrZero("api_port"),
+                    logDir = obj.stringOrNull("log_dir").orEmpty(),
+                    managerLog = obj.stringOrNull("manager_log").orEmpty(),
+                )
+            }
+            if (root.has("services")) {
+                val services = root.arrayOrEmpty("services").mapNotNull { element ->
+                    val obj = element.asObjectOrNull() ?: return@mapNotNull null
+                    val name = obj.stringOrNull("name") ?: return@mapNotNull null
+                    TerminalHubServiceStatus(
+                        name = name,
+                        running = obj.boolOrFalse("running"),
+                        healthy = obj.boolOrFalse("healthy"),
+                        statusState = obj.stringOrNull("status_state").orEmpty(),
+                        healthDetail = obj.stringOrNull("health_detail").orEmpty(),
+                        pid = obj.longOrNull("pid")?.toInt(),
+                        logFile = obj.stringOrNull("log_file").orEmpty(),
+                        isAutoWorkflow = obj.boolOrFalse("is_autoworkflow"),
+                        isProtected = obj.boolOrFalse("is_protected"),
+                    )
+                }
+                return TerminalHubStatus(
+                    hubReachable = root.boolOrFalse("hub_reachable"),
+                    hubUrl = root.stringOrNull("hub_url") ?: fallbackHubUrl,
+                    manager = manager,
+                    autoWorkflowServices = root.arrayOrEmpty("autoworkflow_services")
+                        .mapNotNull { it.asStringOrNull() },
+                    protectedServices = root.arrayOrEmpty("protected_services")
+                        .mapNotNull { it.asStringOrNull() },
+                    services = services,
+                )
+            }
+
+            // Direct TerminalHub.WinUI `/api/status` shape: `{ "_manager": {...}, "<Service>": {...} }`.
+            val awfGroupLower = AUTOWORKFLOW_GROUP_NAMES.map { it.lowercase() }.toSet()
+            val directServices = root.entrySet().mapNotNull { (key, element) ->
+                if (key == "_manager") return@mapNotNull null
+                val obj = element.asObjectOrNull() ?: return@mapNotNull null
+                TerminalHubServiceStatus(
+                    name = key,
+                    running = obj.boolOrFalse("running"),
+                    healthy = obj.boolOrFalse("healthy"),
+                    statusState = obj.stringOrNull("status_state").orEmpty(),
+                    healthDetail = obj.stringOrNull("health_detail").orEmpty(),
+                    pid = obj.longOrNull("pid")?.toInt(),
+                    logFile = obj.stringOrNull("log_file").orEmpty(),
+                    isAutoWorkflow = key.lowercase() in awfGroupLower || key.equals("AWF Backend", ignoreCase = true),
+                    isProtected = false,
+                )
+            }
+            return TerminalHubStatus(
+                hubReachable = manager != null || directServices.isNotEmpty(),
+                hubUrl = fallbackHubUrl,
+                manager = manager,
+                autoWorkflowServices = AUTOWORKFLOW_GROUP_NAMES.filter { target ->
+                    directServices.any { it.name.equals(target, ignoreCase = true) }
+                },
+                protectedServices = emptyList(),
+                services = directServices,
+            )
+        }
+
+        internal fun parseTerminalHubActionResult(
+            json: String,
+            fallbackName: String? = null,
+            fallbackAction: String? = null,
+        ): TerminalHubActionResult {
+            val root = JsonParser.parseString(json).asJsonObject
+            return TerminalHubActionResult(
+                status = root.stringOrNull("status").orEmpty(),
+                message = root.stringOrNull("message").orEmpty(),
+                name = root.stringOrNull("name") ?: fallbackName,
+                action = root.stringOrNull("action") ?: fallbackAction,
+            )
+        }
+
+        internal fun parseTerminalHubLogResult(
+            json: String,
+            fallbackLines: Int = 0,
+        ): TerminalHubLogResult {
+            val root = JsonParser.parseString(json).asJsonObject
+            return TerminalHubLogResult(
+                name = root.stringOrNull("name").orEmpty(),
+                logFile = root.stringOrNull("log_file").orEmpty(),
+                lines = root.intOrZero("lines").let { if (it > 0) it else fallbackLines },
+                content = root.get("content")?.takeIf { !it.isJsonNull }
+                    ?.let { runCatching { it.asString }.getOrNull() }.orEmpty(),
+            )
+        }
     }
 }
 

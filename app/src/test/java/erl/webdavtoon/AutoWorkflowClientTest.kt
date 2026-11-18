@@ -380,4 +380,137 @@ class AutoWorkflowClientTest {
         state.clampScroll()
         assertEquals(800, state.scrollOffset)
     }
+
+    @Test
+    fun `parses terminal hub status, actions and logs`() {
+        val status = AutoWorkflowClient.parseTerminalHubStatus(
+            """
+            {
+              "hub_reachable": true,
+              "hub_url": "http://127.0.0.1:7801",
+              "manager": {
+                "mode_key": "live",
+                "mode_label": "Production Live Write",
+                "api_port": 7801,
+                "log_dir": "C:/Ai/AutoWorkflow/logs/terminal_hub_winui",
+                "manager_log": "C:/Ai/AutoWorkflow/logs/terminal_hub_winui/terminal_hub_winui_manager.log"
+              },
+              "autoworkflow_services": ["ComfyUI", "AWF Worker", "AWF Frontend"],
+              "protected_services": ["AWF Backend"],
+              "services": [
+                {
+                  "name": "AWF Backend",
+                  "running": true,
+                  "healthy": true,
+                  "status_state": "ONLINE",
+                  "health_detail": "pid=1234",
+                  "pid": 1234,
+                  "log_file": "C:/logs/AWF Backend.log",
+                  "is_autoworkflow": true,
+                  "is_protected": true
+                },
+                {
+                  "name": "ComfyUI",
+                  "running": false,
+                  "healthy": false,
+                  "status_state": "OFFLINE",
+                  "health_detail": "未运行",
+                  "pid": null,
+                  "log_file": "C:/logs/ComfyUI.log",
+                  "is_autoworkflow": true,
+                  "is_protected": false
+                }
+              ]
+            }
+            """.trimIndent(),
+        )
+
+        assertTrue(status.hubReachable)
+        assertEquals("http://127.0.0.1:7801", status.hubUrl)
+        assertEquals("Production Live Write", status.manager?.modeLabel)
+        assertEquals(listOf("ComfyUI", "AWF Worker", "AWF Frontend"), status.autoWorkflowServices)
+        assertEquals(listOf("AWF Backend"), status.protectedServices)
+        assertEquals(2, status.services.size)
+        assertTrue(status.services[0].isProtected)
+        assertEquals(1234, status.services[0].pid)
+        assertFalse(status.services[1].running)
+        assertNull(status.services[1].pid)
+
+        val actionResult = AutoWorkflowClient.parseTerminalHubActionResult(
+            """
+            {
+              "status": "success",
+              "name": "ComfyUI",
+              "action": "start",
+              "message": "ComfyUI started pid=5678"
+            }
+            """.trimIndent(),
+        )
+        assertEquals("success", actionResult.status)
+        assertEquals("ComfyUI", actionResult.name)
+        assertEquals("ComfyUI started pid=5678", actionResult.message)
+
+        val logResult = AutoWorkflowClient.parseTerminalHubLogResult(
+            """
+            {
+              "status": "success",
+              "name": "ComfyUI",
+              "log_file": "C:/logs/ComfyUI.log",
+              "lines": 200,
+              "content": "line-1\nline-2"
+            }
+            """.trimIndent(),
+        )
+        assertEquals("ComfyUI", logResult.name)
+        assertEquals(200, logResult.lines)
+        assertEquals("line-1\nline-2", logResult.content)
+    }
+
+    @Test
+    fun `parses direct terminal hub status and normalizes bare host`() {
+        assertEquals("http://192.168.31.199:7801", AutoWorkflowClient.normalizeBaseUrl(" 192.168.31.199:7801/ "))
+        assertEquals("", AutoWorkflowClient.normalizeBaseUrl("   "))
+
+        val directStatus = AutoWorkflowClient.parseTerminalHubStatus(
+            """
+            {
+              "_manager": {
+                "mode_key": "live",
+                "mode_label": "Production Live Write",
+                "api_port": 7801
+              },
+              "AWF Backend": {
+                "running": true,
+                "healthy": true,
+                "status_state": "ONLINE",
+                "health_detail": "running",
+                "pid": 20000,
+                "log_file": "C:/logs/AWF Backend.log"
+              },
+              "ComfyUI": {
+                "running": false,
+                "healthy": false,
+                "status_state": "OFFLINE",
+                "health_detail": "stopped",
+                "pid": null,
+                "log_file": "C:/logs/ComfyUI.log"
+              },
+              "Openlist": {
+                "running": true,
+                "healthy": true,
+                "status_state": "ONLINE",
+                "health_detail": "running",
+                "pid": 43888,
+                "log_file": "C:/logs/Openlist.log"
+              }
+            }
+            """.trimIndent(),
+            fallbackHubUrl = "http://127.0.0.1:7801",
+        )
+        assertTrue(directStatus.hubReachable)
+        assertEquals("http://127.0.0.1:7801", directStatus.hubUrl)
+        assertEquals(3, directStatus.services.size)
+        assertEquals(listOf("ComfyUI"), directStatus.autoWorkflowServices)
+        assertFalse(directStatus.services.first { it.name == "AWF Backend" }.isProtected)
+    }
 }
