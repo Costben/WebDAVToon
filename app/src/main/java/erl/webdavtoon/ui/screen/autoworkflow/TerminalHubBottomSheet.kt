@@ -186,6 +186,7 @@ fun TerminalHubBottomSheet(
         }
 
         state.logTargetName?.let { targetName ->
+            val copiedMessage = stringResource(R.string.terminal_hub_copied)
             TerminalHubLogDialog(
                 targetName = targetName,
                 lines = state.logLines,
@@ -198,7 +199,7 @@ fun TerminalHubBottomSheet(
                 onCopy = { text ->
                     val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
                     cm?.setPrimaryClip(ClipData.newPlainText("terminal_hub_log", text))
-                    Toast.makeText(context, context.getString(R.string.terminal_hub_copied), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
                 },
                 onDismiss = actions.onCloseLog,
             )
