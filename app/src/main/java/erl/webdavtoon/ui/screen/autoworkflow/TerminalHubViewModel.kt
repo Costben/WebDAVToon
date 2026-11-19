@@ -149,9 +149,10 @@ class TerminalHubViewModel(app: Application) : AndroidViewModel(app) {
         val baseUrl = settingsManager.getTerminalHubUrl()
         if (baseUrl.isBlank()) return
 
+        val targetNames = state.status?.autoWorkflowServices?.takeIf { it.isNotEmpty() }
         _uiState.update { it.copy(groupActionRunning = true, actionMessage = null) }
         viewModelScope.launch {
-            clientFor(baseUrl).controlAutoWorkflowGroup(action).fold(
+            clientFor(baseUrl).controlAutoWorkflowGroup(action, targetNames).fold(
                 onSuccess = { result ->
                     _uiState.update {
                         it.copy(
@@ -159,7 +160,10 @@ class TerminalHubViewModel(app: Application) : AndroidViewModel(app) {
                             actionMessage = result.message.ifBlank { action },
                         )
                     }
-                    delay(400L)
+                    val backendRestartedViaProxy = state.status?.protectedServices?.isNotEmpty() == true &&
+                        targetNames.orEmpty().any { it.equals("AWF Backend", ignoreCase = true) } &&
+                        action == AutoWorkflowClient.HUB_ACTION_RESTART
+                    delay(if (backendRestartedViaProxy) 2500L else 500L)
                     loadStatus(showSpinner = false)
                 },
                 onFailure = { error ->

@@ -55,7 +55,8 @@
     <string name="terminal_hub_status_offline">Terminal Hub offline or unreachable</string>
     <string name="terminal_hub_mode_prefix">Mode: %1$s</string>
     <string name="terminal_hub_autoworkflow_group">AutoWorkflow terminals</string>
-    <string name="terminal_hub_autoworkflow_summary">%1$d / %2$d running (AWF Backend stays online)</string>
+    <string name="terminal_hub_autoworkflow_summary">%1$d / %2$d running</string>
+    <string name="terminal_hub_autoworkflow_summary_protected">%1$d / %2$d running (AWF Backend stays online)</string>
     <string name="terminal_hub_start_group">Start all</string>
     <string name="terminal_hub_stop_group">Stop all</string>
     <string name="terminal_hub_restart_group">Restart all</string>
@@ -73,7 +74,8 @@
     <string name="terminal_hub_copy_log">Copy</string>
     <string name="terminal_hub_copied">Log copied</string>
     <string name="terminal_hub_stop_group_title">Stop AutoWorkflow terminals</string>
-    <string name="terminal_hub_stop_group_confirm">Stop these AutoWorkflow terminals?\n%1$s\n\nAWF Backend stays running so you can start them again remotely.</string>
+    <string name="terminal_hub_stop_group_confirm">Stop these AutoWorkflow terminals?\n%1$s</string>
+    <string name="terminal_hub_stop_group_confirm_protected">Stop these AutoWorkflow terminals?\n%1$s\n\nAWF Backend stays running so you can start them again remotely.</string>
     <string name="terminal_hub_restart_backend_title">Restart AWF Backend</string>
     <string name="terminal_hub_restart_backend_confirm">Restart AWF Backend? The connection will briefly drop for a few seconds.</string>
     <string name="terminal_hub_empty_services">No services registered in Terminal Hub.</string>

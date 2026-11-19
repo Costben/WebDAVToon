@@ -2,6 +2,11 @@
 // Copyright (C) 2026 Rin Shibuya
 package erl.webdavtoon
 
+import com.google.gson.JsonParser
+import com.sun.net.httpserver.HttpServer
+import java.net.InetSocketAddress
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -510,7 +515,181 @@ class AutoWorkflowClientTest {
         assertTrue(directStatus.hubReachable)
         assertEquals("http://127.0.0.1:7801", directStatus.hubUrl)
         assertEquals(3, directStatus.services.size)
-        assertEquals(listOf("ComfyUI"), directStatus.autoWorkflowServices)
-        assertFalse(directStatus.services.first { it.name == "AWF Backend" }.isProtected)
+        assertEquals(listOf("AWF Backend", "ComfyUI"), directStatus.autoWorkflowServices)
+        val backendService = directStatus.services.first { it.name == "AWF Backend" }
+        assertTrue(backendService.isAutoWorkflow)
+        assertFalse(backendService.isProtected)
+    }
+
+    @Test
+    fun `direct status includes all four autoworkflow services and excludes unrelated ones`() {
+        val status = AutoWorkflowClient.parseTerminalHubStatus(
+            """
+            {
+              "_manager": {
+                "mode_key": "live",
+                "mode_label": "Production Live Write",
+                "api_port": 7801
+              },
+              "ComfyUI": { "running": false, "healthy": false, "status_state": "OFFLINE" },
+              "Openlist": { "running": true, "healthy": true, "status_state": "ONLINE" },
+              "AWF Worker": { "running": false, "healthy": false, "status_state": "OFFLINE" },
+              "AWF Frontend": { "running": false, "healthy": false, "status_state": "OFFLINE" },
+              "AWF Backend": { "running": false, "healthy": false, "status_state": "OFFLINE" }
+            }
+            """.trimIndent(),
+            fallbackHubUrl = "http://192.168.31.199:7801",
+        )
+
+        assertEquals(
+            listOf("AWF Backend", "AWF Frontend", "AWF Worker", "ComfyUI"),
+            status.autoWorkflowServices,
+        )
+        assertTrue(status.protectedServices.isEmpty())
+        assertFalse(status.services.first { it.name == "Openlist" }.isAutoWorkflow)
+        assertTrue(status.services.filter { it.name != "Openlist" }.all { it.isAutoWorkflow && !it.isProtected })
+    }
+
+    @Test
+    fun `orders group targets for start, stop and restart`() {
+        assertEquals(
+            listOf("AWF Backend", "AWF Frontend", "AWF Worker", "ComfyUI"),
+            AutoWorkflowClient.orderedGroupTargets(AutoWorkflowClient.HUB_ACTION_START, null),
+        )
+        assertEquals(
+            listOf("ComfyUI", "AWF Worker", "AWF Frontend", "AWF Backend"),
+            AutoWorkflowClient.orderedGroupTargets(AutoWorkflowClient.HUB_ACTION_STOP, null),
+        )
+        assertEquals(
+            listOf("AWF Backend", "AWF Frontend", "AWF Worker", "ComfyUI"),
+            AutoWorkflowClient.orderedGroupTargets(AutoWorkflowClient.HUB_ACTION_RESTART, null),
+        )
+    }
+
+    @Test
+    fun `direct group actions control all four services in order including partial failures`() = runBlocking {
+        val recordedCalls = mutableListOf<Pair<String, String>>()
+        val failWorkerOnStart = AtomicBoolean(false)
+
+        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server.createContext("/") { exchange ->
+            val path = exchange.requestURI.path
+            val body = exchange.requestBody.bufferedReader().readText()
+            when {
+                path.startsWith("/api/terminal-hub/") -> {
+                    val bytes = """{"detail":"Not Found"}""".toByteArray()
+                    exchange.sendResponseHeaders(404, bytes.size.toLong())
+                    exchange.responseBody.use { it.write(bytes) }
+                }
+                path == "/api/status" -> {
+                    val json = """
+                        {
+                          "_manager": { "mode_key": "live", "mode_label": "Production Live Write", "api_port": 7801 },
+                          "AWF Backend": { "running": false, "healthy": false, "status_state": "OFFLINE" },
+                          "AWF Frontend": { "running": false, "healthy": false, "status_state": "OFFLINE" },
+                          "AWF Worker": { "running": false, "healthy": false, "status_state": "OFFLINE" },
+                          "ComfyUI": { "running": false, "healthy": false, "status_state": "OFFLINE" },
+                          "Openlist": { "running": true, "healthy": true, "status_state": "ONLINE" }
+                        }
+                    """.trimIndent().toByteArray()
+                    exchange.sendResponseHeaders(200, json.size.toLong())
+                    exchange.responseBody.use { it.write(json) }
+                }
+                path in setOf("/api/start", "/api/stop", "/api/restart") -> {
+                    val name = JsonParser.parseString(body).asJsonObject.get("name").asString
+                    recordedCalls += path to name
+                    if (failWorkerOnStart.get() && path == "/api/start" && name == "AWF Worker") {
+                        val err = """{"status":"error","message":"worker failed"}""".toByteArray()
+                        exchange.sendResponseHeaders(500, err.size.toLong())
+                        exchange.responseBody.use { it.write(err) }
+                    } else {
+                        val ok = """{"status":"success","message":"$name ok"}""".toByteArray()
+                        exchange.sendResponseHeaders(200, ok.size.toLong())
+                        exchange.responseBody.use { it.write(ok) }
+                    }
+                }
+                else -> {
+                    val err = """{"detail":"unexpected"}""".toByteArray()
+                    exchange.sendResponseHeaders(404, err.size.toLong())
+                    exchange.responseBody.use { it.write(err) }
+                }
+            }
+        }
+        server.start()
+        try {
+            val client = AutoWorkflowClient("http://127.0.0.1:${server.address.port}")
+            val status = client.fetchTerminalHubStatus().getOrThrow()
+            assertEquals(
+                listOf("AWF Backend", "AWF Frontend", "AWF Worker", "ComfyUI"),
+                status.autoWorkflowServices,
+            )
+
+            recordedCalls.clear()
+            val startResult = client.controlAutoWorkflowGroup(
+                AutoWorkflowClient.HUB_ACTION_START,
+                status.autoWorkflowServices,
+            ).getOrThrow()
+            assertEquals("success", startResult.status)
+            assertEquals(
+                listOf(
+                    "/api/start" to "AWF Backend",
+                    "/api/start" to "AWF Frontend",
+                    "/api/start" to "AWF Worker",
+                    "/api/start" to "ComfyUI",
+                ),
+                recordedCalls,
+            )
+
+            recordedCalls.clear()
+            val stopResult = client.controlAutoWorkflowGroup(
+                AutoWorkflowClient.HUB_ACTION_STOP,
+                status.autoWorkflowServices,
+            ).getOrThrow()
+            assertEquals("success", stopResult.status)
+            assertEquals(
+                listOf(
+                    "/api/stop" to "ComfyUI",
+                    "/api/stop" to "AWF Worker",
+                    "/api/stop" to "AWF Frontend",
+                    "/api/stop" to "AWF Backend",
+                ),
+                recordedCalls,
+            )
+
+            recordedCalls.clear()
+            val restartResult = client.controlAutoWorkflowGroup(
+                AutoWorkflowClient.HUB_ACTION_RESTART,
+                status.autoWorkflowServices,
+            ).getOrThrow()
+            assertEquals("success", restartResult.status)
+            assertEquals(
+                listOf(
+                    "/api/restart" to "AWF Backend",
+                    "/api/restart" to "AWF Frontend",
+                    "/api/restart" to "AWF Worker",
+                    "/api/restart" to "ComfyUI",
+                ),
+                recordedCalls,
+            )
+
+            recordedCalls.clear()
+            failWorkerOnStart.set(true)
+            val partialResult = client.controlAutoWorkflowGroup(
+                AutoWorkflowClient.HUB_ACTION_START,
+                status.autoWorkflowServices,
+            ).getOrThrow()
+            assertEquals("partial", partialResult.status)
+            assertEquals(
+                listOf(
+                    "/api/start" to "AWF Backend",
+                    "/api/start" to "AWF Frontend",
+                    "/api/start" to "AWF Worker",
+                    "/api/start" to "ComfyUI",
+                ),
+                recordedCalls,
+            )
+        } finally {
+            server.stop(0)
+        }
     }
 }

@@ -55,7 +55,8 @@
     <string name="terminal_hub_status_offline">Terminal Hub 未运行或不可达</string>
     <string name="terminal_hub_mode_prefix">当前模式：%1$s</string>
     <string name="terminal_hub_autoworkflow_group">AutoWorkflow 关联终端</string>
-    <string name="terminal_hub_autoworkflow_summary">运行中 %1$d / %2$d（AWF Backend 保持常驻）</string>
+    <string name="terminal_hub_autoworkflow_summary">运行中 %1$d / %2$d</string>
+    <string name="terminal_hub_autoworkflow_summary_protected">运行中 %1$d / %2$d（AWF Backend 保持常驻）</string>
     <string name="terminal_hub_start_group">一键开启</string>
     <string name="terminal_hub_stop_group">一键关闭</string>
     <string name="terminal_hub_restart_group">全部重启</string>
@@ -73,7 +74,8 @@
     <string name="terminal_hub_copy_log">复制</string>
     <string name="terminal_hub_copied">已复制日志</string>
     <string name="terminal_hub_stop_group_title">关闭 AutoWorkflow 关联终端</string>
-    <string name="terminal_hub_stop_group_confirm">确定关闭以下 AutoWorkflow 关联终端吗？\n%1$s\n\nAWF Backend 会保持运行，方便之后再次远程开启。</string>
+    <string name="terminal_hub_stop_group_confirm">确定关闭以下 AutoWorkflow 关联终端吗？\n%1$s</string>
+    <string name="terminal_hub_stop_group_confirm_protected">确定关闭以下 AutoWorkflow 关联终端吗？\n%1$s\n\nAWF Backend 会保持运行，方便之后再次远程开启。</string>
     <string name="terminal_hub_restart_backend_title">重启 AWF Backend</string>
     <string name="terminal_hub_restart_backend_confirm">确定重启 AWF Backend 吗？重启期间连接会短暂断开几秒。</string>
     <string name="terminal_hub_empty_services">Terminal Hub 中暂无已注册终端</string>

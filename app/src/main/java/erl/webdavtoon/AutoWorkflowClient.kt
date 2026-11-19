@@ -406,17 +406,28 @@ class AutoWorkflowClient(baseUrl: String) {
     }
 
     private fun controlDirectGroup(action: String, names: List<String>?): TerminalHubActionResult {
-        val targets = names?.takeIf { it.isNotEmpty() } ?: AUTOWORKFLOW_GROUP_NAMES
+        val targets = orderedGroupTargets(action, names)
         val directPath = "/api/${action.lowercase()}"
         val messages = mutableListOf<String>()
+        var succeeded = 0
+        var failed = 0
         for (target in targets) {
-            val (code, body) = executePost(directPath, JsonObject().apply { addProperty("name", target) })
-            throwIfFailed(code, body)
-            val parsed = parseTerminalHubActionResult(body, target, action)
-            messages += parsed.message.ifBlank { "$target: $action" }
+            try {
+                val (code, body) = executePost(directPath, JsonObject().apply { addProperty("name", target) })
+                throwIfFailed(code, body)
+                val parsed = parseTerminalHubActionResult(body, target, action)
+                messages += parsed.message.ifBlank { "$target: $action" }
+                succeeded++
+            } catch (error: Exception) {
+                failed++
+                messages += "$target: ${error.message ?: "failed"}"
+            }
+        }
+        if (succeeded == 0 && failed > 0) {
+            throw IOException(messages.joinToString("; "))
         }
         return TerminalHubActionResult(
-            status = "success",
+            status = if (failed == 0) "success" else "partial",
             message = messages.joinToString("; "),
             action = action,
         )
@@ -493,7 +504,17 @@ class AutoWorkflowClient(baseUrl: String) {
         const val HUB_ACTION_STOP = "stop"
         const val HUB_ACTION_RESTART = "restart"
         const val HUB_MANAGER_LOG_NAME = "_manager"
-        val AUTOWORKFLOW_GROUP_NAMES = listOf("ComfyUI", "AWF Worker", "AWF Frontend")
+        val AUTOWORKFLOW_GROUP_NAMES = listOf("AWF Backend", "AWF Frontend", "AWF Worker", "ComfyUI")
+
+        internal fun orderedGroupTargets(action: String, names: List<String>?): List<String> {
+            val raw = names?.filter { it.isNotBlank() }?.takeIf { it.isNotEmpty() } ?: AUTOWORKFLOW_GROUP_NAMES
+            val deduplicated = raw.distinctBy { it.lowercase() }
+            return if (action.equals(HUB_ACTION_STOP, ignoreCase = true)) {
+                deduplicated.reversed()
+            } else {
+                deduplicated
+            }
+        }
 
         internal fun normalizeBaseUrl(raw: String): String {
             val trimmed = raw.trim().trimEnd('/')
@@ -709,7 +730,7 @@ class AutoWorkflowClient(baseUrl: String) {
                     healthDetail = obj.stringOrNull("health_detail").orEmpty(),
                     pid = obj.longOrNull("pid")?.toInt(),
                     logFile = obj.stringOrNull("log_file").orEmpty(),
-                    isAutoWorkflow = key.lowercase() in awfGroupLower || key.equals("AWF Backend", ignoreCase = true),
+                    isAutoWorkflow = key.lowercase() in awfGroupLower,
                     isProtected = false,
                 )
             }
@@ -717,8 +738,8 @@ class AutoWorkflowClient(baseUrl: String) {
                 hubReachable = manager != null || directServices.isNotEmpty(),
                 hubUrl = fallbackHubUrl,
                 manager = manager,
-                autoWorkflowServices = AUTOWORKFLOW_GROUP_NAMES.filter { target ->
-                    directServices.any { it.name.equals(target, ignoreCase = true) }
+                autoWorkflowServices = AUTOWORKFLOW_GROUP_NAMES.mapNotNull { target ->
+                    directServices.firstOrNull { it.name.equals(target, ignoreCase = true) }?.name
                 },
                 protectedServices = emptyList(),
                 services = directServices,

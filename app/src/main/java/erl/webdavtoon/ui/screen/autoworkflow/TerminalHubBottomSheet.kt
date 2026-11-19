@@ -135,10 +135,16 @@ fun TerminalHubBottomSheet(
 
     if (show && showStopGroupConfirm) {
         val groupNames = state.status?.autoWorkflowServices.orEmpty().joinToString("、")
+        val hasProtected = state.status?.protectedServices?.isNotEmpty() == true
+        val confirmMessage = if (hasProtected) {
+            stringResource(R.string.terminal_hub_stop_group_confirm_protected, groupNames)
+        } else {
+            stringResource(R.string.terminal_hub_stop_group_confirm, groupNames)
+        }
         OverlayDialog(
             show = true,
             title = stringResource(R.string.terminal_hub_stop_group_title),
-            summary = stringResource(R.string.terminal_hub_stop_group_confirm, groupNames),
+            summary = confirmMessage,
             onDismissRequest = { showStopGroupConfirm = false },
         ) {
             DialogButtonBar(
@@ -580,14 +586,17 @@ private fun AutoWorkflowGroupCard(
     onStopAll: () -> Unit,
     onRestartAll: () -> Unit,
 ) {
-    val groupSet = remember(status.autoWorkflowServices) {
-        status.autoWorkflowServices.map { it.lowercase() }.toSet()
-    }
-    val groupServices = remember(status.services, groupSet) {
-        status.services.filter { it.name.lowercase() in groupSet }
+    val groupServices = remember(status.services, status.autoWorkflowServices) {
+        val byLower = status.services.associateBy { it.name.lowercase() }
+        status.autoWorkflowServices.mapNotNull { byLower[it.lowercase()] }
     }
     val runningCount = groupServices.count { it.running }
     val totalCount = groupServices.size
+    val summaryRes = if (status.protectedServices.isNotEmpty()) {
+        R.string.terminal_hub_autoworkflow_summary_protected
+    } else {
+        R.string.terminal_hub_autoworkflow_summary
+    }
 
     SmallTitle(
         text = stringResource(R.string.terminal_hub_autoworkflow_group),
@@ -599,7 +608,7 @@ private fun AutoWorkflowGroupCard(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text = stringResource(R.string.terminal_hub_autoworkflow_summary, runningCount, totalCount),
+                text = stringResource(summaryRes, runningCount, totalCount),
                 style = COUITheme.textStyles.body2,
                 color = COUITheme.colorScheme.onSurface,
             )
