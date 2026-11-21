@@ -35,6 +35,7 @@ import erl.webdavtoon.ui.component.GalleryTopAppBar
 import erl.webdavtoon.ui.component.GlassTopBarScaffold
 import erl.webdavtoon.ui.component.HighlightedTopBarAction
 import io.github.suqi8.coui.kmp.basic.BasicComponent
+import io.github.suqi8.coui.kmp.basic.BindScrollToTop
 import io.github.suqi8.coui.kmp.basic.Card
 import io.github.suqi8.coui.kmp.basic.CircularProgressIndicator
 import io.github.suqi8.coui.kmp.basic.Icon
@@ -59,6 +60,7 @@ fun LicensesScreen(
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
+    BindScrollToTop(listState)
     GlassTopBarScaffold(
         modifier = modifier,
         topBar = {

@@ -32,6 +32,7 @@ import io.github.suqi8.coui.kmp.basic.DropdownItem
 import io.github.suqi8.coui.kmp.basic.Icon
 import io.github.suqi8.coui.kmp.basic.Text as MiuixText
 import io.github.suqi8.coui.kmp.basic.couiGlassHeader
+import io.github.suqi8.coui.kmp.basic.scrollToTopOnTap
 import io.github.suqi8.coui.kmp.blur.LocalBackdrop
 import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.extended.Close
@@ -76,6 +77,7 @@ fun FolderTopBarMiuix(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .scrollToTopOnTap()
                     .statusBarsPadding()
                     .padding(horizontal = 8.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,

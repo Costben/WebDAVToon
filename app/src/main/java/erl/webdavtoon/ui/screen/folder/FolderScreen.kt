@@ -35,6 +35,7 @@ import io.github.suqi8.coui.kmp.basic.BottomFloatingNavigationBarDefaults
 import io.github.suqi8.coui.kmp.basic.CircularProgressIndicator as MiuixCircularProgressIndicator
 import io.github.suqi8.coui.kmp.basic.Icon as MiuixIcon
 import io.github.suqi8.coui.kmp.basic.PullToRefresh
+import io.github.suqi8.coui.kmp.basic.ScrollToTopBlocker
 import io.github.suqi8.coui.kmp.basic.Text as MiuixText
 import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.extended.Add
@@ -125,6 +126,7 @@ fun FolderScreen(
                 )
             },
         ) { padding ->
+            ScrollToTopBlocker(active = showServerSheet)
             Box(modifier = Modifier.fillMaxSize()) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     uiState.remoteError?.let { message ->

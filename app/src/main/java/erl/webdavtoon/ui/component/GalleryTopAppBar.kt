@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import io.github.suqi8.coui.kmp.basic.SmallTopAppBar
 import io.github.suqi8.coui.kmp.basic.Text
 import io.github.suqi8.coui.kmp.basic.couiGlassHeader
+import io.github.suqi8.coui.kmp.basic.scrollToTopOnTap
 import io.github.suqi8.coui.kmp.blur.LocalBackdrop
 import io.github.suqi8.coui.kmp.theme.COUITheme
 
@@ -49,12 +50,18 @@ fun GalleryTopAppBar(
     title: String,
     modifier: Modifier = Modifier,
     largeTitle: Boolean = false,
+    scrollToTopOnClick: Boolean = true,
     navigationIcon: @Composable () -> Unit = {},
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     GalleryChrome {
         if (largeTitle) {
-            LargeTitleRow(title = title, modifier = modifier, navigationIcon = navigationIcon, actions = actions)
+            LargeTitleRow(
+                title = title,
+                modifier = modifier.scrollToTopOnTap(enabled = scrollToTopOnClick),
+                navigationIcon = navigationIcon,
+                actions = actions,
+            )
         } else {
             SmallTopAppBar(
                 title = title,

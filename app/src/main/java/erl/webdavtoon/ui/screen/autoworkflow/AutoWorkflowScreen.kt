@@ -103,6 +103,7 @@ import io.github.suqi8.coui.kmp.basic.BottomFloatingScrollToolbarItem
 import io.github.suqi8.coui.kmp.basic.Button
 import io.github.suqi8.coui.kmp.basic.CircularProgressIndicator
 import io.github.suqi8.coui.kmp.basic.DropdownEntry
+import io.github.suqi8.coui.kmp.basic.ScrollToTopBlocker
 import io.github.suqi8.coui.kmp.basic.DropdownItem
 import io.github.suqi8.coui.kmp.basic.HorizontalDivider
 import io.github.suqi8.coui.kmp.basic.Icon
@@ -302,6 +303,9 @@ fun AutoWorkflowScreen(
             )
         },
     ) { paddingValues ->
+        ScrollToTopBlocker(
+            active = showTerminalHubSheet || reeditRequest != null || resubmitRequest != null || deleteRequest != null,
+        )
         AutoWorkflowLevels(
             state = state,
             columns = columns,

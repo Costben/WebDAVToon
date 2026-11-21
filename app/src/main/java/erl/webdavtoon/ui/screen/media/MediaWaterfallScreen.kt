@@ -39,6 +39,7 @@ import erl.webdavtoon.ui.screen.waterfall.SelectionBottomBar
 import erl.webdavtoon.ui.screen.waterfall.rememberFollowZoomGridState
 import io.github.suqi8.coui.kmp.basic.CircularProgressIndicator as MiuixCircularProgressIndicator
 import io.github.suqi8.coui.kmp.basic.PullToRefresh
+import io.github.suqi8.coui.kmp.basic.ScrollToTopBlocker
 import io.github.suqi8.coui.kmp.basic.DropdownEntry
 import io.github.suqi8.coui.kmp.basic.DropdownItem
 import io.github.suqi8.coui.kmp.basic.Icon as MiuixIcon
@@ -164,6 +165,7 @@ fun MediaWaterfallScreen(
                 )
             },
         ) { padding ->
+            ScrollToTopBlocker(active = showServerSheet)
             Box(modifier = Modifier.fillMaxSize()) {
                 PullToRefresh(
                     isRefreshing = uiState.isRefreshing,

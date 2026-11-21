@@ -7,6 +7,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.ScrollableDefaults
+import androidx.compose.foundation.gestures.ScrollableState
 import androidx.compose.foundation.gestures.rememberScrollableState
 import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.layout.PaddingValues
@@ -39,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import erl.webdavtoon.FollowZoomWaterfallLayoutEngine
 import erl.webdavtoon.WaterfallItemFrame
 import erl.webdavtoon.WaterfallLayoutResult
+import io.github.suqi8.coui.kmp.basic.RegisterScrollToTop
 import io.github.suqi8.coui.kmp.utils.overScrollVertical
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.abs
@@ -144,6 +146,7 @@ class FollowZoomGridState(
     private var gestureScale = 1f
     private var settleJob: Job? = null
     private var scope: CoroutineScope? = null
+    internal var scrollableState: ScrollableState? = null
 
     internal fun attachScope(scope: CoroutineScope) {
         this.scope = scope
@@ -259,6 +262,35 @@ class FollowZoomGridState(
 
     private fun scrollRange(): Int =
         (itemsContentHeight + topPadding + bottomPadding - viewportHeight).coerceAtLeast(0)
+
+    /** Smoothly scrolls back to offset 0 while cancelling any active fling via [ScrollableState]. */
+    suspend fun animateScrollToTop() {
+        if (scrollOffset <= 0 || isZooming || isSettling) return
+        val runAnimation: suspend () -> Unit = {
+            val maxAnimatedDistance = if (viewportHeight > 0) viewportHeight * 4 else Int.MAX_VALUE
+            if (scrollOffset > maxAnimatedDistance && viewportHeight > 0) {
+                scrollOffset = viewportHeight * 3
+            }
+            val start = scrollOffset
+            if (start > 0) {
+                val screens = if (viewportHeight > 0) start.toFloat() / viewportHeight else 1f
+                val durationMs = (260 + (screens * 40f).roundToInt()).coerceIn(260, 400)
+                Animatable(start.toFloat()).animateTo(
+                    targetValue = 0f,
+                    animationSpec = tween(durationMillis = durationMs, easing = FastOutSlowInEasing),
+                ) {
+                    scrollOffset = value.roundToInt().coerceAtLeast(0)
+                }
+                scrollOffset = 0
+            }
+        }
+        val activeScrollable = scrollableState
+        if (activeScrollable != null) {
+            activeScrollable.scroll { runAnimation() }
+        } else {
+            runAnimation()
+        }
+    }
 
     internal fun onPinchStart(centroid: Offset) {
         settleJob?.cancel()
@@ -419,6 +451,7 @@ fun FollowZoomWaterfallLayout(
     itemExtraHeight: Dp = 0.dp,
     itemExtraHeights: List<Dp>? = null,
     itemHorizontalPadding: Dp = 0.dp,
+    bindScrollToTop: Boolean = true,
     itemContent: @Composable (index: Int, widthPx: Int, heightPx: Int) -> Unit,
 ) {
     val density = LocalDensity.current
@@ -455,6 +488,14 @@ fun FollowZoomWaterfallLayout(
         }
     }
 
+    val scrollableState = rememberScrollableState { delta -> state.scrollBy(delta) }
+    SideEffect {
+        state.scrollableState = scrollableState
+    }
+    RegisterScrollToTop(enabled = bindScrollToTop) {
+        state.animateScrollToTop()
+    }
+
     SubcomposeLayout(
         modifier = modifier
             // Outside the `scrollable` so the scroll and fling left over at either end stretch the
@@ -470,7 +511,7 @@ fun FollowZoomWaterfallLayout(
                 )
             }
             .scrollable(
-                state = rememberScrollableState { delta -> state.scrollBy(delta) },
+                state = scrollableState,
                 orientation = Orientation.Vertical,
                 flingBehavior = ScrollableDefaults.flingBehavior(),
             ),
