@@ -87,7 +87,7 @@ fun GestureControlOverlay(
                 .widthIn(max = 560.dp)
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(24.dp))
-                .background(COUITheme.colorScheme.surface)
+                .background(COUITheme.colorScheme.background)
                 .clickable(
                     interactionSource = noRipple,
                     indication = null,

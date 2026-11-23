@@ -37,6 +37,7 @@ import erl.webdavtoon.ui.screen.waterfall.MediaCardImageMargin
 import erl.webdavtoon.ui.screen.waterfall.FollowZoomWaterfallLayout
 import erl.webdavtoon.ui.screen.waterfall.SelectionBottomBar
 import erl.webdavtoon.ui.screen.waterfall.rememberFollowZoomGridState
+import io.github.suqi8.coui.kmp.basic.AppBarBlurOverlayDefaults
 import io.github.suqi8.coui.kmp.basic.CircularProgressIndicator as MiuixCircularProgressIndicator
 import io.github.suqi8.coui.kmp.basic.PullToRefresh
 import io.github.suqi8.coui.kmp.basic.ScrollToTopBlocker
@@ -312,7 +313,7 @@ private fun MediaTopBarMiuix(
             },
         )
         // The expanded search band wears the same glass as the bar above it.
-        Column(modifier = Modifier.couiGlassHeader(LocalBackdrop.current, COUITheme.colorScheme.surface)) {
+        Column(modifier = Modifier.couiGlassHeader(LocalBackdrop.current, AppBarBlurOverlayDefaults.containerColor())) {
             AnimatedSearchField(
                 value = uiState.searchKeyword,
                 onValueChange = actions.onSearchQueryChange,

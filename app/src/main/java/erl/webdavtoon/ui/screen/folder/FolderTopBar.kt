@@ -27,6 +27,7 @@ import erl.webdavtoon.ui.component.rememberStrongHaptic
 import erl.webdavtoon.ui.component.rememberTapHaptic
 import erl.webdavtoon.R
 import erl.webdavtoon.SettingsManager
+import io.github.suqi8.coui.kmp.basic.AppBarBlurOverlayDefaults
 import io.github.suqi8.coui.kmp.basic.DropdownEntry
 import io.github.suqi8.coui.kmp.basic.DropdownItem
 import io.github.suqi8.coui.kmp.basic.Icon
@@ -143,7 +144,7 @@ fun FolderTopBarMiuix(
         }
         // The expanded search band is part of the bar, so it wears the same glass instead of
         // letting the list show through the gap around the field.
-        Column(modifier = Modifier.couiGlassHeader(LocalBackdrop.current, COUITheme.colorScheme.surface)) {
+        Column(modifier = Modifier.couiGlassHeader(LocalBackdrop.current, AppBarBlurOverlayDefaults.containerColor())) {
             AnimatedSearchField(
                 value = uiState.searchKeyword,
                 onValueChange = actions.onSearchQueryChange,

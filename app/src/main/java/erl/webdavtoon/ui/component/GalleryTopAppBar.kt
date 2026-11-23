@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.github.suqi8.coui.kmp.basic.AppBarBlurOverlayDefaults
 import io.github.suqi8.coui.kmp.basic.SmallTopAppBar
 import io.github.suqi8.coui.kmp.basic.Text
 import io.github.suqi8.coui.kmp.basic.couiGlassHeader
@@ -66,6 +67,7 @@ fun GalleryTopAppBar(
             SmallTopAppBar(
                 title = title,
                 modifier = modifier,
+                color = AppBarBlurOverlayDefaults.containerColor(),
                 navigationIcon = navigationIcon,
                 actions = actions,
                 gradientGlass = true,
@@ -92,7 +94,7 @@ private fun LargeTitleRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .couiGlassHeader(LocalBackdrop.current, COUITheme.colorScheme.surface)
+            .couiGlassHeader(LocalBackdrop.current, AppBarBlurOverlayDefaults.containerColor())
             .statusBarsPadding()
             .heightIn(min = 60.dp)
             .padding(start = 16.dp, end = 16.dp),

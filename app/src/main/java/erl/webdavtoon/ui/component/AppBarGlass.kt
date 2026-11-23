@@ -9,11 +9,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import io.github.suqi8.coui.kmp.basic.AppBarBlurOverlayDefaults
 import io.github.suqi8.coui.kmp.basic.Scaffold
 import io.github.suqi8.coui.kmp.blur.LocalBackdrop
 import io.github.suqi8.coui.kmp.blur.layerBackdrop
 import io.github.suqi8.coui.kmp.blur.rememberLayerBackdrop
-import io.github.suqi8.coui.kmp.theme.COUITheme
 
 /**
  * A [Scaffold] whose top bar wears the ColorOS 17 gradient glass.
@@ -31,7 +31,8 @@ import io.github.suqi8.coui.kmp.theme.COUITheme
  * @param bottomBar a bar pinned to the bottom edge. Like [topBar] it sits outside the backdrop
  *   layer, so it can read [LocalBackdrop] to blur the content scrolling under it.
  * @param containerColor the page colour. It is also the material's base colour, so the bar never
- *   reads as a band of its own over the page.
+ *   reads as a band of its own over the page. Defaults to [AppBarBlurOverlayDefaults.containerColor]
+ *   (`#303030` in dark mode, `COUITheme.colorScheme.surface` in light mode).
  * @param content the page body. Apply the received top padding to the scrollable's content
  *   padding, not to the root, or nothing will scroll under the bar.
  */
@@ -40,7 +41,7 @@ fun GlassTopBarScaffold(
     topBar: @Composable () -> Unit,
     modifier: Modifier = Modifier,
     bottomBar: @Composable () -> Unit = {},
-    containerColor: Color = COUITheme.colorScheme.surface,
+    containerColor: Color = AppBarBlurOverlayDefaults.containerColor(),
     content: @Composable (PaddingValues) -> Unit,
 ) {
     // An opaque base keeps the blur from reading the layer's clear colour, which washes a dark

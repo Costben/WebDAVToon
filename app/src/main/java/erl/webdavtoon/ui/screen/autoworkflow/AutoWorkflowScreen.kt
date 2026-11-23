@@ -96,6 +96,7 @@ import erl.webdavtoon.ui.screen.waterfall.MixedWaterfallItemUi
 import erl.webdavtoon.ui.screen.waterfall.rememberFollowZoomGridState
 import io.github.suqi8.coui.kmp.anim.COUIInEase
 import io.github.suqi8.coui.kmp.anim.COUIOutEase
+import io.github.suqi8.coui.kmp.basic.AppBarBlurOverlayDefaults
 import io.github.suqi8.coui.kmp.basic.BottomFloatingNavigationBarDefaults
 import io.github.suqi8.coui.kmp.basic.BottomFloatingScrollToolbar
 import io.github.suqi8.coui.kmp.basic.BottomFloatingScrollToolbarDefaults
@@ -274,7 +275,7 @@ fun AutoWorkflowScreen(
                         }
                     },
                 )
-                Column(modifier = Modifier.couiGlassHeader(LocalBackdrop.current, COUITheme.colorScheme.surface)) {
+                Column(modifier = Modifier.couiGlassHeader(LocalBackdrop.current, AppBarBlurOverlayDefaults.containerColor())) {
                     AnimatedSearchField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },

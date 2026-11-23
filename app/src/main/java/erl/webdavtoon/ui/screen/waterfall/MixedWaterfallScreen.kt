@@ -25,6 +25,7 @@ import erl.webdavtoon.Folder
 import erl.webdavtoon.R
 import erl.webdavtoon.SettingsManager
 import erl.webdavtoon.ui.component.AnimatedSearchField
+import io.github.suqi8.coui.kmp.basic.AppBarBlurOverlayDefaults
 import io.github.suqi8.coui.kmp.basic.BottomFloatingNavigationBarDefaults
 import io.github.suqi8.coui.kmp.basic.CircularProgressIndicator as MiuixCircularProgressIndicator
 import io.github.suqi8.coui.kmp.basic.Icon as MiuixIcon
@@ -315,7 +316,7 @@ private fun MixedWaterfallTopBarMiuix(
             },
         )
         // The expanded search band wears the same glass as the bar above it.
-        Column(modifier = Modifier.couiGlassHeader(LocalBackdrop.current, COUITheme.colorScheme.surface)) {
+        Column(modifier = Modifier.couiGlassHeader(LocalBackdrop.current, AppBarBlurOverlayDefaults.containerColor())) {
             AnimatedSearchField(
                 value = uiState.searchKeyword,
                 onValueChange = actions.onSearchQueryChange,

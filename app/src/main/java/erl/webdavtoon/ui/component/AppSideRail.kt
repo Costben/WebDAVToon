@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import erl.webdavtoon.R
 import erl.webdavtoon.ui.screen.settings.WebDavSlotUi
+import io.github.suqi8.coui.kmp.basic.AppBarBlurOverlayDefaults
 import io.github.suqi8.coui.kmp.basic.NavigationRail
 import io.github.suqi8.coui.kmp.basic.NavigationRailItem
 import io.github.suqi8.coui.kmp.basic.Text as MiuixText
@@ -34,6 +35,7 @@ fun AppSideRail(
 ) {
     NavigationRail(
         modifier = modifier,
+        color = AppBarBlurOverlayDefaults.containerColor(),
         header = {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 MiuixText("WebDAVToon", style = COUITheme.textStyles.footnote2)

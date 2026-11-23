@@ -29,6 +29,7 @@ import io.github.suqi8.coui.kmp.basic.Button as MiuixButton
 import io.github.suqi8.coui.kmp.basic.Card as MiuixCard
 import io.github.suqi8.coui.kmp.basic.Switch as MiuixSwitch
 import io.github.suqi8.coui.kmp.basic.Text as MiuixText
+import io.github.suqi8.coui.kmp.basic.AppBarBlurOverlayDefaults
 import io.github.suqi8.coui.kmp.theme.COUITheme
 
 /**
@@ -56,7 +57,7 @@ fun SmokeTestContent() {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(COUITheme.colorScheme.surface)
+            .background(AppBarBlurOverlayDefaults.containerColor())
             .padding(16.dp)
     ) {
         Column(
