@@ -15,20 +15,15 @@ import io.github.suqi8.coui.kmp.blur.Backdrop
 import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.extended.Filter
 import io.github.suqi8.coui.kmp.icon.extended.Layers
-import io.github.suqi8.coui.kmp.icon.extended.MoreCircle
+import io.github.suqi8.coui.kmp.icon.extended.More
 import io.github.suqi8.coui.kmp.theme.LocalContentColor
 
 /**
  * The single row of top-bar action icons shared by every screen.
  *
- * COUI icons all declare a 24dp intrinsic size, but their glyphs fill that box very
- * unevenly: `Sidebar` covered 709px on the reference device while `More` covered 156px,
- * so the group read as three unrelated icons at three different sizes. The trio below was
- * picked by rendering candidates at real 24dp size and keeping the three whose glyph
- * coverage matches (`trio.png` in `.artifacts/adb/2026-09-21/icons-and-corners/`).
- *
  * `Layers` is the drawer metaphor for the server panel, which slides up from the bottom
- * rather than in from the side.
+ * rather than in from the side. `More` uses the vertical three-dot glyph shared with
+ * AutoWorkflow and ColorOS 17 app bars.
  */
 object TopBarIcons {
     /**
@@ -45,8 +40,8 @@ object TopBarIcons {
     /** Expands the filter/search field. */
     val Filter = COUIIcons.Light.Filter
 
-    /** Opens the overflow menu. */
-    val More = COUIIcons.Light.MoreCircle
+    /** Opens the overflow menu (vertical three dots). */
+    val More = COUIIcons.Light.More
 }
 
 @Composable

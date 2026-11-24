@@ -119,7 +119,6 @@ import io.github.suqi8.coui.kmp.icon.extended.Close
 import io.github.suqi8.coui.kmp.icon.extended.Delete
 import io.github.suqi8.coui.kmp.icon.extended.Edit
 import io.github.suqi8.coui.kmp.icon.extended.GridView
-import io.github.suqi8.coui.kmp.icon.extended.More
 import io.github.suqi8.coui.kmp.icon.extended.Refresh
 import io.github.suqi8.coui.kmp.icon.extended.SelectAll
 import io.github.suqi8.coui.kmp.icon.extended.Settings
@@ -445,7 +444,7 @@ private fun AutoWorkflowMoreMenuButton(
     }
     Box {
         HighlightedTopBarAction(
-            icon = COUIIcons.Light.More,
+            icon = TopBarIcons.More,
             contentDescription = stringResource(R.string.more),
             onClick = { showMenu = true },
         )
