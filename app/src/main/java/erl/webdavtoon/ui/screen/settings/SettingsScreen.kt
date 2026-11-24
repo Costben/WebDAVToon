@@ -3,6 +3,7 @@
 package erl.webdavtoon.ui.screen.settings
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -18,6 +20,14 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import io.github.suqi8.coui.kmp.basic.CircularProgressIndicator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -35,23 +45,27 @@ import erl.webdavtoon.ui.component.HighlightedTopBarAction
 import io.github.suqi8.coui.kmp.basic.BasicComponent
 import io.github.suqi8.coui.kmp.basic.BindScrollToTop
 import io.github.suqi8.coui.kmp.basic.Card
+import io.github.suqi8.coui.kmp.basic.CardDefaults
 import io.github.suqi8.coui.kmp.basic.DropdownItem
 import io.github.suqi8.coui.kmp.basic.HorizontalDivider
 import io.github.suqi8.coui.kmp.basic.Icon
-import io.github.suqi8.coui.kmp.basic.IconButton
-import io.github.suqi8.coui.kmp.basic.Scaffold
+import io.github.suqi8.coui.kmp.basic.NotificationSwipeAction
+import io.github.suqi8.coui.kmp.basic.NotificationSwipeBox
 import io.github.suqi8.coui.kmp.basic.SmallTitle
+import io.github.suqi8.coui.kmp.basic.rememberNotificationSwipeState
+import io.github.suqi8.coui.kmp.blur.LocalBackdrop
+import io.github.suqi8.coui.kmp.core.ExperimentalCOUIApi
 import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.extended.AddCircle
 import io.github.suqi8.coui.kmp.icon.extended.Back
 import io.github.suqi8.coui.kmp.icon.extended.CloudFill
-import io.github.suqi8.coui.kmp.icon.extended.Delete
 import io.github.suqi8.coui.kmp.icon.extended.Edit
 import io.github.suqi8.coui.kmp.preference.ArrowPreference
 import io.github.suqi8.coui.kmp.preference.OverlaySpinnerPreference
 import io.github.suqi8.coui.kmp.preference.SliderPreference
 import io.github.suqi8.coui.kmp.preference.SwitchPreference
 import io.github.suqi8.coui.kmp.theme.COUITheme
+import kotlinx.coroutines.launch
 
 /** Shared settings actions for the COUI settings screen. */
 data class SettingsActions(
@@ -206,57 +220,13 @@ private fun SettingsContent(
 
         if (!uiState.localModeEnabled) {
             item(key = "server") {
-                SettingsGroup(stringResource(R.string.webdav_server)) {
-                    uiState.slots.forEachIndexed { index, slot ->
-                        if (index > 0) SettingsRowDivider()
-                        val currentServerDescription = stringResource(R.string.current_server)
-                        BasicComponent(
-                            title = slot.alias.ifBlank { stringResource(R.string.slot_name, slot.slot) },
-                            summary = if (slot.url.isBlank()) stringResource(R.string.not_configured)
-                            else stringResource(R.string.server_endpoint_format, slot.protocol, slot.url, slot.port),
-                            startAction = {
-                                SettingsIcon(
-                                    icon = COUIIcons.Light.CloudFill,
-                                    descriptionRes = R.string.webdav_server,
-                                    modifier = Modifier.padding(end = 4.dp),
-                                )
-                            },
-                            endActions = {
-                                // The marker slot is always laid out (even when empty) so the summary
-                                // column keeps a constant width; otherwise selecting a row would shrink
-                                // it and re-wrap the server address.
-                                Box(
-                                    modifier = Modifier
-                                        .padding(end = 10.dp)
-                                        .size(10.dp)
-                                        .then(
-                                            if (slot.isCurrent) {
-                                                Modifier
-                                                    .background(CurrentServerDotColor, CircleShape)
-                                                    .semantics { contentDescription = currentServerDescription }
-                                            } else {
-                                                Modifier
-                                            },
-                                        ),
-                                )
-                                IconButton(onClick = { actions.onEditSlot(slot.slot) }) {
-                                    Icon(COUIIcons.Light.Edit, contentDescription = stringResource(R.string.edit_server))
-                                }
-                                IconButton(onClick = { actions.onDeleteSlot(slot.slot) }) {
-                                    Icon(COUIIcons.Light.Delete, contentDescription = stringResource(R.string.delete))
-                                }
-                            },
-                            onClick = { actions.onSelectSlot(slot.slot) },
-                            insideMargin = SlotRowInsideMargin,
-                        )
-                    }
-                    if (uiState.slots.isNotEmpty()) SettingsRowDivider()
-                    ArrowPreference(
-                        title = stringResource(R.string.add_webdav_server),
-                        startAction = { SettingsIcon(COUIIcons.Light.AddCircle, R.string.add_webdav_server) },
-                        onClick = actions.onAddSlot,
-                    )
-                }
+                ServerSwipeSection(
+                    slots = uiState.slots,
+                    onSelectSlot = actions.onSelectSlot,
+                    onEditSlot = actions.onEditSlot,
+                    onDeleteSlot = actions.onDeleteSlot,
+                    onAddSlot = actions.onAddSlot,
+                )
             }
         }
 
@@ -449,15 +419,147 @@ private fun SettingsIcon(icon: ImageVector, descriptionRes: Int, modifier: Modif
     Icon(icon, contentDescription = stringResource(descriptionRes), modifier = modifier)
 }
 
+/**
+ * Renders the WebDAV server slots as standalone ColorOS 17 [NotificationSwipeBox] cards:
+ * swipe left to reveal the Edit and Delete actions, swipe right to collapse them, with only one
+ * slot open at a time. The "Add WebDAV server" row stays in its own card directly underneath.
+ */
+@OptIn(ExperimentalCOUIApi::class)
+@Composable
+private fun ServerSwipeSection(
+    slots: List<WebDavSlotUi>,
+    onSelectSlot: (Int) -> Unit,
+    onEditSlot: (Int) -> Unit,
+    onDeleteSlot: (Int) -> Unit,
+    onAddSlot: () -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    var revealedSlot by remember { mutableStateOf<Int?>(null) }
+    val cardColor = CardDefaults.defaultColors().color
+    val deleteTint = COUITheme.colorScheme.error
+    val currentServerDescription = stringResource(R.string.current_server)
+    val editDescription = stringResource(R.string.edit_server)
+    val deleteDescription = stringResource(R.string.delete)
+
+    SmallTitle(text = stringResource(R.string.webdav_server))
+    if (slots.isNotEmpty()) {
+        // SettingsContent sits inside GlassTopBarScaffold's `.layerBackdrop(backdrop)`, so clear
+        // LocalBackdrop here to prevent the MetaBall surface from self-sampling its own layer
+        // while keeping the full AGSL metaball melt and material edge highlight on `cardColor`.
+        CompositionLocalProvider(LocalBackdrop provides null) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                slots.forEach { slot ->
+                    key(slot.slot) {
+                        val swipeState = rememberNotificationSwipeState()
+                        LaunchedEffect(swipeState.isRevealed) {
+                            if (swipeState.isRevealed) {
+                                revealedSlot = slot.slot
+                            } else if (revealedSlot == slot.slot) {
+                                revealedSlot = null
+                            }
+                        }
+                        LaunchedEffect(revealedSlot) {
+                            if (revealedSlot != null && revealedSlot != slot.slot && swipeState.isRevealed) {
+                                swipeState.close()
+                            }
+                        }
+
+                        val swipeActions = remember(
+                            slot.slot,
+                            editDescription,
+                            deleteDescription,
+                            deleteTint,
+                            onEditSlot,
+                            onDeleteSlot,
+                        ) {
+                            listOf(
+                                NotificationSwipeAction(
+                                    icon = COUIIcons.Light.Edit,
+                                    description = editDescription,
+                                    onClick = { onEditSlot(slot.slot) },
+                                ),
+                                NotificationSwipeAction(
+                                    icon = null,
+                                    description = deleteDescription,
+                                    onClick = { onDeleteSlot(slot.slot) },
+                                    color = deleteTint,
+                                ),
+                            )
+                        }
+
+                        NotificationSwipeBox(
+                            actions = swipeActions,
+                            state = swipeState,
+                            minHeight = ServerSwipeCardMinHeight,
+                            containerColor = cardColor,
+                            rimColor = Color.Transparent,
+                            dismissOnFullSwipe = false,
+                        ) {
+                            BasicComponent(
+                                title = slot.alias.ifBlank { stringResource(R.string.slot_name, slot.slot) },
+                                summary = if (slot.url.isBlank()) stringResource(R.string.not_configured)
+                                else stringResource(R.string.server_endpoint_format, slot.protocol, slot.url, slot.port),
+                                modifier = Modifier.align(Alignment.Center),
+                                startAction = {
+                                    SettingsIcon(
+                                        icon = COUIIcons.Light.CloudFill,
+                                        descriptionRes = R.string.webdav_server,
+                                        modifier = Modifier.padding(end = 4.dp),
+                                    )
+                                },
+                                endActions = {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(10.dp)
+                                            .then(
+                                                if (slot.isCurrent) {
+                                                    Modifier
+                                                        .background(CurrentServerDotColor, CircleShape)
+                                                        .semantics { contentDescription = currentServerDescription }
+                                                } else {
+                                                    Modifier
+                                                },
+                                            ),
+                                    )
+                                },
+                                onClick = {
+                                    if (swipeState.isRevealed) {
+                                        scope.launch { swipeState.close() }
+                                    } else {
+                                        onSelectSlot(slot.slot)
+                                    }
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .padding(top = if (slots.isNotEmpty()) 8.dp else 0.dp, bottom = 16.dp),
+    ) {
+        ArrowPreference(
+            title = stringResource(R.string.add_webdav_server),
+            startAction = { SettingsIcon(COUIIcons.Light.AddCircle, R.string.add_webdav_server) },
+            onClick = onAddSlot,
+        )
+    }
+}
+
 /** Marker for the slot the app is currently connected to. */
 private val CurrentServerDotColor = Color(0xFF34C759)
 
-/**
- * Slot rows keep COUI's standard 16dp leading / 10dp vertical inside margin (matching
- * `BasicComponentDefaults.InsideMargin`) but trim the trailing inset so the Delete action button
- * lines up with the trailing chevron column used by arrow preferences.
- */
-private val SlotRowInsideMargin = PaddingValues(start = 16.dp, top = 10.dp, end = 1.dp, bottom = 10.dp)
+/** Keeps swipe action pills tall enough to feel substantial even on single-line server cards. */
+private val ServerSwipeCardMinHeight = 72.dp
 
 /**
  * Slider rows stack a 36dp touch target and the component's 10dp vertical inside margin above the
