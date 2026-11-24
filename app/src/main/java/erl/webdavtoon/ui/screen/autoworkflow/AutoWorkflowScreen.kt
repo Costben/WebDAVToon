@@ -76,10 +76,10 @@ import erl.webdavtoon.ReaderSessions
 import erl.webdavtoon.SettingsManager
 import erl.webdavtoon.WebDavImageLoader
 import erl.webdavtoon.autoWorkflowFileName
-import erl.webdavtoon.ui.component.AnimatedSearchField
 import erl.webdavtoon.ui.component.CouiCascadingMenuPopup
 import erl.webdavtoon.ui.component.CouiFlatMenu
 import erl.webdavtoon.ui.component.GalleryChrome
+import erl.webdavtoon.ui.component.GallerySearchTopAppBar
 import erl.webdavtoon.ui.component.GalleryTopAppBar
 import erl.webdavtoon.ui.component.GlassTopBarScaffold
 import erl.webdavtoon.ui.component.HighlightedTopBarAction
@@ -96,7 +96,6 @@ import erl.webdavtoon.ui.screen.waterfall.MixedWaterfallItemUi
 import erl.webdavtoon.ui.screen.waterfall.rememberFollowZoomGridState
 import io.github.suqi8.coui.kmp.anim.COUIInEase
 import io.github.suqi8.coui.kmp.anim.COUIOutEase
-import io.github.suqi8.coui.kmp.basic.AppBarBlurOverlayDefaults
 import io.github.suqi8.coui.kmp.basic.BottomFloatingNavigationBarDefaults
 import io.github.suqi8.coui.kmp.basic.BottomFloatingScrollToolbar
 import io.github.suqi8.coui.kmp.basic.BottomFloatingScrollToolbarDefaults
@@ -113,7 +112,6 @@ import io.github.suqi8.coui.kmp.basic.NavigationBarMotion
 import io.github.suqi8.coui.kmp.basic.PullToRefresh
 import io.github.suqi8.coui.kmp.basic.Text
 import io.github.suqi8.coui.kmp.basic.TextField
-import io.github.suqi8.coui.kmp.basic.couiGlassHeader
 import io.github.suqi8.coui.kmp.blur.LocalBackdrop
 import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.extended.Back
@@ -199,6 +197,12 @@ fun AutoWorkflowScreen(
         searchExpanded = false
     }
 
+    LaunchedEffect(state.isSelectionMode) {
+        if (state.isSelectionMode) {
+            searchExpanded = false
+        }
+    }
+
     LaunchedEffect(state.actionMessage) {
         val message = state.actionMessage ?: return@LaunchedEffect
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
@@ -231,62 +235,51 @@ fun AutoWorkflowScreen(
     GlassTopBarScaffold(
         modifier = modifier,
         topBar = {
-            Column {
+            if (state.isSelectionMode) {
                 GalleryTopAppBar(
-                    title = if (state.isSelectionMode) {
-                        stringResource(R.string.autoworkflow_selected_count, state.selectedCount)
-                    } else {
-                        title
-                    },
+                    title = stringResource(R.string.autoworkflow_selected_count, state.selectedCount),
                     navigationIcon = {
-                        if (state.isSelectionMode) {
-                            HighlightedTopBarAction(
-                                icon = COUIIcons.Light.Close,
-                                contentDescription = stringResource(R.string.cancel),
-                                onClick = actions.onClearSelection,
-                            )
-                        } else {
-                            HighlightedTopBarAction(
-                                icon = COUIIcons.Light.Back,
-                                contentDescription = stringResource(R.string.back),
-                                onClick = goUpOrBack,
-                            )
-                        }
-                    },
-                    actions = {
-                        if (!state.isSelectionMode) {
-                            HighlightedTopBarAction(
-                                icon = TopBarIcons.Filter,
-                                contentDescription = stringResource(R.string.filter),
-                                onClick = { searchExpanded = true },
-                            )
-                            AutoWorkflowMoreMenuButton(
-                                sortOrder = state.sortOrder,
-                                onSetSortOrder = actions.onSetSortOrder,
-                                columns = columns,
-                                onColumnsChanged = onColumnsChanged,
-                                onRefresh = actions.onRefresh,
-                                onOpenTerminalHub = {
-                                    actions.onOpenTerminalHub()
-                                    showTerminalHubSheet = true
-                                },
-                                onOpenSettings = actions.onOpenSettings,
-                            )
-                        }
+                        HighlightedTopBarAction(
+                            icon = COUIIcons.Light.Close,
+                            contentDescription = stringResource(R.string.cancel),
+                            onClick = actions.onClearSelection,
+                        )
                     },
                 )
-                Column(modifier = Modifier.couiGlassHeader(LocalBackdrop.current, AppBarBlurOverlayDefaults.containerColor())) {
-                    AnimatedSearchField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        placeholder = stringResource(R.string.autoworkflow_search_hint),
-                        visible = !state.isSelectionMode && searchExpanded,
-                        onClose = {
-                            searchQuery = ""
-                            searchExpanded = false
-                        },
-                    )
-                }
+            } else {
+                GallerySearchTopAppBar(
+                    title = title,
+                    searchQuery = searchQuery,
+                    onSearchQueryChange = { searchQuery = it },
+                    searchExpanded = searchExpanded,
+                    onSearchExpandedChange = { searchExpanded = it },
+                    searchPlaceholder = stringResource(R.string.autoworkflow_search_hint),
+                    onClearSearch = {
+                        searchQuery = ""
+                        searchExpanded = false
+                    },
+                    navigationIcon = {
+                        HighlightedTopBarAction(
+                            icon = COUIIcons.Light.Back,
+                            contentDescription = stringResource(R.string.back),
+                            onClick = goUpOrBack,
+                        )
+                    },
+                    extraActions = {
+                        AutoWorkflowMoreMenuButton(
+                            sortOrder = state.sortOrder,
+                            onSetSortOrder = actions.onSetSortOrder,
+                            columns = columns,
+                            onColumnsChanged = onColumnsChanged,
+                            onRefresh = actions.onRefresh,
+                            onOpenTerminalHub = {
+                                actions.onOpenTerminalHub()
+                                showTerminalHubSheet = true
+                            },
+                            onOpenSettings = actions.onOpenSettings,
+                        )
+                    },
+                )
             }
         },
         bottomBar = {

@@ -2,23 +2,41 @@
 // Copyright (C) 2026 Rin Shibuya
 package erl.webdavtoon.ui.component
 
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import erl.webdavtoon.R
 import io.github.suqi8.coui.kmp.basic.AppBarBlurOverlayDefaults
 import io.github.suqi8.coui.kmp.basic.SmallTopAppBar
 import io.github.suqi8.coui.kmp.basic.Text
+import io.github.suqi8.coui.kmp.basic.TopAppBarDefaults
+import io.github.suqi8.coui.kmp.basic.TopAppBarSearchBar
+import io.github.suqi8.coui.kmp.basic.TwoRowTopAppBar
+import io.github.suqi8.coui.kmp.basic.TwoRowTopAppBarDefaults
 import io.github.suqi8.coui.kmp.basic.couiGlassHeader
 import io.github.suqi8.coui.kmp.basic.scrollToTopOnTap
 import io.github.suqi8.coui.kmp.blur.LocalBackdrop
@@ -120,3 +138,118 @@ private fun LargeTitleRow(
 }
 
 private val LargeTitleSize = 28.dp
+
+/**
+ * Gallery top app bar with inline expanding search ([TopAppBarSearchBar]).
+ *
+ * Tapping the trailing circular search button expands it leftward across the toolbar into a glass
+ * input capsule and splits off a trailing Cancel capsule to the right.
+ */
+@Composable
+fun GallerySearchTopAppBar(
+    title: String,
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
+    searchExpanded: Boolean,
+    onSearchExpandedChange: (Boolean) -> Unit,
+    searchPlaceholder: String,
+    modifier: Modifier = Modifier,
+    largeTitle: Boolean = false,
+    showSearchButton: Boolean = true,
+    onClearSearch: () -> Unit = {
+        onSearchQueryChange("")
+        onSearchExpandedChange(false)
+    },
+    navigationIcon: (@Composable () -> Unit)? = null,
+    extraActions: (@Composable RowScope.() -> Unit)? = null,
+) {
+    val firstRowHeight = if (largeTitle) 60.dp else TwoRowTopAppBarDefaults.FirstRowHeight
+    val titleFontSize = with(LocalDensity.current) {
+        (if (largeTitle) LargeTitleSize else TopAppBarDefaults.ToolbarTitleTextSize).toSp()
+    }
+    GalleryChrome {
+        TwoRowTopAppBar(
+            modifier = modifier,
+            secondRow = null,
+            firstRowHeight = firstRowHeight,
+            containerColor = AppBarBlurOverlayDefaults.containerColor(),
+            backdrop = LocalBackdrop.current,
+        ) {
+            TopAppBarSearchBar(
+                query = searchQuery,
+                onQueryChange = onSearchQueryChange,
+                expanded = searchExpanded,
+                onExpandedChange = onSearchExpandedChange,
+                modifier = Modifier.fillMaxWidth(),
+                title = title,
+                placeholder = searchPlaceholder,
+                cancelText = stringResource(R.string.cancel),
+                onCancel = onClearSearch,
+                showSearchButton = showSearchButton,
+                searchButtonContentDescription = stringResource(R.string.filter),
+                gradientColor = Color.Transparent,
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        SearchClearButton(onClick = { onSearchQueryChange("") })
+                    }
+                },
+                extraActions = extraActions,
+                titleContent = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(TopAppBarDefaults.NavigationIconGap),
+                    ) {
+                        navigationIcon?.invoke()
+                        Text(
+                            text = title,
+                            color = COUITheme.colorScheme.onSurface,
+                            fontSize = titleFontSize,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            softWrap = false,
+                        )
+                    }
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun SearchClearButton(onClick: () -> Unit) {
+    val clearTint = COUITheme.colorScheme.onSurface.copy(alpha = 0.28f)
+    val clearLabel = stringResource(R.string.clear)
+    Canvas(
+        modifier = Modifier
+            .size(36.dp)
+            .semantics { contentDescription = clearLabel }
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Button,
+                onClick = onClick,
+            ),
+    ) {
+        val unit = size.width / 36f
+        drawCircle(clearTint, radius = 9f * unit)
+        val path = Path().apply {
+            moveTo(18f, 16.868f)
+            lineTo(15.031f, 13.898f)
+            lineTo(13.899f, 15.03f)
+            lineTo(16.869f, 18f)
+            lineTo(13.898f, 20.97f)
+            lineTo(15.03f, 22.101f)
+            lineTo(18f, 19.131f)
+            lineTo(20.97f, 22.101f)
+            lineTo(22.102f, 20.969f)
+            lineTo(19.132f, 18f)
+            lineTo(22.101f, 15.03f)
+            lineTo(20.969f, 13.899f)
+            close()
+        }
+        withTransform({ scale(unit, unit, Offset.Zero) }) {
+            drawPath(path, Color.White)
+        }
+    }
+}

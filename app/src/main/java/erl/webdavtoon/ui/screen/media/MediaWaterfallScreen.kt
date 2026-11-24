@@ -25,8 +25,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import erl.webdavtoon.R
 import erl.webdavtoon.SettingsManager
-import erl.webdavtoon.ui.component.AnimatedSearchField
 import erl.webdavtoon.ui.component.AppAdaptiveNavigationScaffold
+import erl.webdavtoon.ui.component.GallerySearchTopAppBar
 import erl.webdavtoon.ui.component.GalleryTopAppBar
 import erl.webdavtoon.ui.component.GlassTopBarScaffold
 import erl.webdavtoon.ui.component.HighlightedTopBarAction
@@ -37,7 +37,6 @@ import erl.webdavtoon.ui.screen.waterfall.MediaCardImageMargin
 import erl.webdavtoon.ui.screen.waterfall.FollowZoomWaterfallLayout
 import erl.webdavtoon.ui.screen.waterfall.SelectionBottomBar
 import erl.webdavtoon.ui.screen.waterfall.rememberFollowZoomGridState
-import io.github.suqi8.coui.kmp.basic.AppBarBlurOverlayDefaults
 import io.github.suqi8.coui.kmp.basic.CircularProgressIndicator as MiuixCircularProgressIndicator
 import io.github.suqi8.coui.kmp.basic.PullToRefresh
 import io.github.suqi8.coui.kmp.basic.ScrollToTopBlocker
@@ -45,8 +44,6 @@ import io.github.suqi8.coui.kmp.basic.DropdownEntry
 import io.github.suqi8.coui.kmp.basic.DropdownItem
 import io.github.suqi8.coui.kmp.basic.Icon as MiuixIcon
 import io.github.suqi8.coui.kmp.basic.Text as MiuixText
-import io.github.suqi8.coui.kmp.basic.couiGlassHeader
-import io.github.suqi8.coui.kmp.blur.LocalBackdrop
 import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.extended.ChevronBackward
 import io.github.suqi8.coui.kmp.icon.extended.ChevronForward
@@ -266,65 +263,53 @@ private fun MediaTopBarMiuix(
         uiState.title.ifEmpty { stringResource(R.string.app_name) }
     }
 
-    Column {
+    if (uiState.isSelectionMode) {
         GalleryTopAppBar(
             title = titleText,
             navigationIcon = {
-                // Selection mode's "close" is a cancel/back action, and COUI reserves the top-left
-                // slot for exactly that. Outside selection mode the slot stays empty.
-                if (uiState.isSelectionMode) {
-                    HighlightedTopBarAction(
-                        icon = COUIIcons.Light.Close,
-                        contentDescription = stringResource(R.string.cancel),
-                        onClick = {
-                            tapHaptic()
-                            actions.onExitSelectionMode()
-                        },
-                    )
-                }
+                HighlightedTopBarAction(
+                    icon = COUIIcons.Light.Close,
+                    contentDescription = stringResource(R.string.cancel),
+                    onClick = {
+                        tapHaptic()
+                        actions.onExitSelectionMode()
+                    },
+                )
             },
             actions = {
-                if (uiState.isSelectionMode) {
-                    HighlightedTopBarAction(
-                        icon = COUIIcons.Light.Info,
-                        contentDescription = stringResource(R.string.photo_details),
-                        onClick = actions.onInfoClick,
-                    )
-                    HighlightedTopBarAction(
-                        icon = COUIIcons.Light.Edit,
-                        contentDescription = stringResource(R.string.edit),
-                        onClick = actions.onEditClick,
-                    )
-                } else {
-                    // COUI keeps the top-left slot for back/cancel only; root pages put every action
-                    // in the top-right group (see the COUI example app's Home page).
-                    HighlightedTopBarAction(
-                        icon = TopBarIcons.Panel,
-                        contentDescription = stringResource(R.string.navigation_drawer_open),
-                        onClick = onOpenDrawer,
-                    )
-                    HighlightedTopBarAction(
-                        icon = TopBarIcons.Filter,
-                        contentDescription = stringResource(R.string.filter),
-                        onClick = { searchExpanded = true },
-                    )
-                    MediaMiuixMenuButton(uiState = uiState, actions = actions)
-                }
+                HighlightedTopBarAction(
+                    icon = COUIIcons.Light.Info,
+                    contentDescription = stringResource(R.string.photo_details),
+                    onClick = actions.onInfoClick,
+                )
+                HighlightedTopBarAction(
+                    icon = COUIIcons.Light.Edit,
+                    contentDescription = stringResource(R.string.edit),
+                    onClick = actions.onEditClick,
+                )
             },
         )
-        // The expanded search band wears the same glass as the bar above it.
-        Column(modifier = Modifier.couiGlassHeader(LocalBackdrop.current, AppBarBlurOverlayDefaults.containerColor())) {
-            AnimatedSearchField(
-                value = uiState.searchKeyword,
-                onValueChange = actions.onSearchQueryChange,
-                placeholder = stringResource(R.string.search_photos),
-                visible = !uiState.isSelectionMode && searchExpanded,
-                onClose = {
-                    actions.onClearSearch()
-                    searchExpanded = false
-                },
-            )
-        }
+    } else {
+        GallerySearchTopAppBar(
+            title = titleText,
+            searchQuery = uiState.searchKeyword,
+            onSearchQueryChange = actions.onSearchQueryChange,
+            searchExpanded = searchExpanded,
+            onSearchExpandedChange = { searchExpanded = it },
+            searchPlaceholder = stringResource(R.string.search_photos),
+            onClearSearch = {
+                actions.onClearSearch()
+                searchExpanded = false
+            },
+            extraActions = {
+                HighlightedTopBarAction(
+                    icon = TopBarIcons.Panel,
+                    contentDescription = stringResource(R.string.navigation_drawer_open),
+                    onClick = onOpenDrawer,
+                )
+                MediaMiuixMenuButton(uiState = uiState, actions = actions)
+            },
+        )
     }
 }
 

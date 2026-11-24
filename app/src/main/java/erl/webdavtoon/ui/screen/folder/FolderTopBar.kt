@@ -3,7 +3,6 @@
 package erl.webdavtoon.ui.screen.folder
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -18,23 +17,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import erl.webdavtoon.ui.component.AnimatedSearchField
 import erl.webdavtoon.ui.component.CouiCascadingMenuPopup
-import erl.webdavtoon.ui.component.GalleryTopAppBar
+import erl.webdavtoon.ui.component.GallerySearchTopAppBar
 import erl.webdavtoon.ui.component.HighlightedTopBarAction
 import erl.webdavtoon.ui.component.TopBarIcons
 import erl.webdavtoon.ui.component.rememberStrongHaptic
 import erl.webdavtoon.ui.component.rememberTapHaptic
 import erl.webdavtoon.R
 import erl.webdavtoon.SettingsManager
-import io.github.suqi8.coui.kmp.basic.AppBarBlurOverlayDefaults
 import io.github.suqi8.coui.kmp.basic.DropdownEntry
 import io.github.suqi8.coui.kmp.basic.DropdownItem
 import io.github.suqi8.coui.kmp.basic.Icon
 import io.github.suqi8.coui.kmp.basic.Text as MiuixText
-import io.github.suqi8.coui.kmp.basic.couiGlassHeader
 import io.github.suqi8.coui.kmp.basic.scrollToTopOnTap
-import io.github.suqi8.coui.kmp.blur.LocalBackdrop
 import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.extended.Close
 import io.github.suqi8.coui.kmp.icon.extended.Delete
@@ -73,90 +68,73 @@ fun FolderTopBarMiuix(
     val tapHaptic = rememberTapHaptic()
     val strongHaptic = rememberStrongHaptic()
 
-    Column(modifier = modifier) {
-        if (uiState.isSelectionMode) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .scrollToTopOnTap()
-                    .statusBarsPadding()
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                HighlightedTopBarAction(
-                    icon = COUIIcons.Light.Close,
-                    contentDescription = stringResource(R.string.cancel),
-                    onClick = {
-                        tapHaptic()
-                        actions.onClearSelection()
-                    },
-                )
-                MiuixText(
-                    text = stringResource(R.string.selected_count, uiState.selectedCount),
-                    modifier = Modifier.weight(1f),
-                    style = COUITheme.textStyles.title2,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    softWrap = false,
-                )
-                HighlightedTopBarAction(
-                    icon = COUIIcons.Light.SelectAll,
-                    contentDescription = "Select all",
-                    onClick = {
-                        tapHaptic()
-                        actions.onSelectAll()
-                    },
-                )
-                HighlightedTopBarAction(
-                    icon = COUIIcons.Light.Delete,
-                    contentDescription = stringResource(R.string.delete),
-                    onClick = {
-                        strongHaptic()
-                        actions.onDeleteSelected()
-                    },
-                    iconTint = COUITheme.colorScheme.error,
-                )
-            }
-        } else {
-            GalleryTopAppBar(
-                title = stringResource(R.string.app_name),
-                largeTitle = true,
-                actions = {
-                    // COUI keeps the top-left slot for back/cancel only; a root page leaves it empty
-                    // and puts every action in the top-right group (see the COUI example app's
-                    // Home page). The server-panel switcher is an action, so it lives here.
-                    HighlightedTopBarAction(
-                        icon = TopBarIcons.Panel,
-                        contentDescription = stringResource(R.string.navigation_drawer_open),
-                        onClick = actions.onOpenDrawer,
-                    )
-                    HighlightedTopBarAction(
-                        icon = TopBarIcons.Filter,
-                        contentDescription = stringResource(R.string.filter),
-                        onClick = {
-                            searchExpanded = true
-                            actions.onToggleSearch()
-                        },
-                    )
-                    FolderMiuixMenuButton(uiState = uiState, actions = actions)
+    if (uiState.isSelectionMode) {
+        Row(
+            modifier = modifier
+                .fillMaxWidth()
+                .scrollToTopOnTap()
+                .statusBarsPadding()
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            HighlightedTopBarAction(
+                icon = COUIIcons.Light.Close,
+                contentDescription = stringResource(R.string.cancel),
+                onClick = {
+                    tapHaptic()
+                    actions.onClearSelection()
                 },
             )
-        }
-        // The expanded search band is part of the bar, so it wears the same glass instead of
-        // letting the list show through the gap around the field.
-        Column(modifier = Modifier.couiGlassHeader(LocalBackdrop.current, AppBarBlurOverlayDefaults.containerColor())) {
-            AnimatedSearchField(
-                value = uiState.searchKeyword,
-                onValueChange = actions.onSearchQueryChange,
-                placeholder = stringResource(R.string.search_folders),
-                visible = !uiState.isSelectionMode && searchExpanded,
-                onClose = {
-                    actions.onClearSearch()
-                    actions.onSearchQueryChange("")
-                    searchExpanded = false
+            MiuixText(
+                text = stringResource(R.string.selected_count, uiState.selectedCount),
+                modifier = Modifier.weight(1f),
+                style = COUITheme.textStyles.title2,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                softWrap = false,
+            )
+            HighlightedTopBarAction(
+                icon = COUIIcons.Light.SelectAll,
+                contentDescription = "Select all",
+                onClick = {
+                    tapHaptic()
+                    actions.onSelectAll()
                 },
             )
+            HighlightedTopBarAction(
+                icon = COUIIcons.Light.Delete,
+                contentDescription = stringResource(R.string.delete),
+                onClick = {
+                    strongHaptic()
+                    actions.onDeleteSelected()
+                },
+                iconTint = COUITheme.colorScheme.error,
+            )
         }
+    } else {
+        GallerySearchTopAppBar(
+            title = stringResource(R.string.app_name),
+            searchQuery = uiState.searchKeyword,
+            onSearchQueryChange = actions.onSearchQueryChange,
+            searchExpanded = searchExpanded,
+            onSearchExpandedChange = { searchExpanded = it },
+            searchPlaceholder = stringResource(R.string.search_folders),
+            modifier = modifier,
+            largeTitle = true,
+            onClearSearch = {
+                actions.onClearSearch()
+                actions.onSearchQueryChange("")
+                searchExpanded = false
+            },
+            extraActions = {
+                HighlightedTopBarAction(
+                    icon = TopBarIcons.Panel,
+                    contentDescription = stringResource(R.string.navigation_drawer_open),
+                    onClick = actions.onOpenDrawer,
+                )
+                FolderMiuixMenuButton(uiState = uiState, actions = actions)
+            },
+        )
     }
 }
 

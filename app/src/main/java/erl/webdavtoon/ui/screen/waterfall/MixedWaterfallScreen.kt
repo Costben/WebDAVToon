@@ -24,17 +24,13 @@ import androidx.compose.ui.unit.dp
 import erl.webdavtoon.Folder
 import erl.webdavtoon.R
 import erl.webdavtoon.SettingsManager
-import erl.webdavtoon.ui.component.AnimatedSearchField
-import io.github.suqi8.coui.kmp.basic.AppBarBlurOverlayDefaults
 import io.github.suqi8.coui.kmp.basic.BottomFloatingNavigationBarDefaults
 import io.github.suqi8.coui.kmp.basic.CircularProgressIndicator as MiuixCircularProgressIndicator
 import io.github.suqi8.coui.kmp.basic.Icon as MiuixIcon
 import io.github.suqi8.coui.kmp.basic.PullToRefresh
 import io.github.suqi8.coui.kmp.basic.Text as MiuixText
-import io.github.suqi8.coui.kmp.basic.couiGlassHeader
 import io.github.suqi8.coui.kmp.basic.DropdownEntry
 import io.github.suqi8.coui.kmp.basic.DropdownItem
-import io.github.suqi8.coui.kmp.blur.LocalBackdrop
 import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.extended.Add
 import io.github.suqi8.coui.kmp.icon.extended.Back
@@ -50,6 +46,7 @@ import io.github.suqi8.coui.kmp.icon.extended.Sort
 import erl.webdavtoon.ui.component.CouiCascadingMenuPopup
 import erl.webdavtoon.ui.component.CouiFloatingBall
 import erl.webdavtoon.ui.component.GalleryChrome
+import erl.webdavtoon.ui.component.GallerySearchTopAppBar
 import erl.webdavtoon.ui.component.GalleryTopAppBar
 import erl.webdavtoon.ui.component.GlassTopBarScaffold
 import erl.webdavtoon.ui.component.HighlightedTopBarAction
@@ -285,49 +282,50 @@ private fun MixedWaterfallTopBarMiuix(
         }
     }
 
-    Column(modifier = modifier) {
+    if (uiState.isSelectionMode) {
         GalleryTopAppBar(
             title = titleText,
+            modifier = modifier,
             navigationIcon = {
                 HighlightedTopBarAction(
-                    icon = when {
-                        uiState.isSelectionMode -> COUIIcons.Light.Close
-                        uiState.isRootPage && actions.onOpenDrawer != null -> TopBarIcons.Panel
-                        else -> COUIIcons.Light.Back
+                    icon = COUIIcons.Light.Close,
+                    contentDescription = stringResource(R.string.cancel),
+                    onClick = onNavClick,
+                )
+            },
+        )
+    } else {
+        GallerySearchTopAppBar(
+            title = titleText,
+            searchQuery = uiState.searchKeyword,
+            onSearchQueryChange = actions.onSearchQueryChange,
+            searchExpanded = searchExpanded,
+            onSearchExpandedChange = { searchExpanded = it },
+            searchPlaceholder = stringResource(R.string.search_photos),
+            modifier = modifier,
+            onClearSearch = {
+                actions.onClearSearch()
+                searchExpanded = false
+            },
+            navigationIcon = {
+                HighlightedTopBarAction(
+                    icon = if (uiState.isRootPage && actions.onOpenDrawer != null) {
+                        TopBarIcons.Panel
+                    } else {
+                        COUIIcons.Light.Back
                     },
-                    contentDescription = when {
-                        uiState.isSelectionMode -> stringResource(R.string.cancel)
-                        uiState.isRootPage && actions.onOpenDrawer != null ->
-                            stringResource(R.string.navigation_drawer_open)
-                        else -> stringResource(R.string.back)
+                    contentDescription = if (uiState.isRootPage && actions.onOpenDrawer != null) {
+                        stringResource(R.string.navigation_drawer_open)
+                    } else {
+                        stringResource(R.string.back)
                     },
                     onClick = onNavClick,
                 )
             },
-            actions = {
-                if (!uiState.isSelectionMode) {
-                    HighlightedTopBarAction(
-                        icon = TopBarIcons.Filter,
-                        contentDescription = stringResource(R.string.filter),
-                        onClick = { searchExpanded = true },
-                    )
-                    MixedWaterfallMiuixMenuButton(uiState = uiState, actions = actions)
-                }
+            extraActions = {
+                MixedWaterfallMiuixMenuButton(uiState = uiState, actions = actions)
             },
         )
-        // The expanded search band wears the same glass as the bar above it.
-        Column(modifier = Modifier.couiGlassHeader(LocalBackdrop.current, AppBarBlurOverlayDefaults.containerColor())) {
-            AnimatedSearchField(
-                value = uiState.searchKeyword,
-                onValueChange = actions.onSearchQueryChange,
-                placeholder = stringResource(R.string.search_photos),
-                visible = !uiState.isSelectionMode && searchExpanded,
-                onClose = {
-                    actions.onClearSearch()
-                    searchExpanded = false
-                },
-            )
-        }
     }
 }
 
