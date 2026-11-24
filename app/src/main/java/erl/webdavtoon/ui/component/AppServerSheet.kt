@@ -2,7 +2,6 @@
 // Copyright (C) 2026 Rin Shibuya
 package erl.webdavtoon.ui.component
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,13 +12,10 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.captionBar
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -27,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -74,9 +71,8 @@ data class ServerSheetActions(
  * [OverlayBottomSheet] - the closest COUI-native surface for a transient list of servers.
  * The sheet opens from the top bar button only.
  *
- * It wears the ColorOS 17 panel: no drag handle, the circled header action of
- * [SheetActionButton], and a 28sp title with a status line inside the content instead of the
- * sheet's centred title row.
+ * It wears the ColorOS 17 frosted panel with no drag handle and a single pinned header row
+ * placing the current server title on the left and the circled close action on the right.
  */
 @Composable
 fun AppServerSheet(
@@ -89,28 +85,27 @@ fun AppServerSheet(
 ) {
     OverlayBottomSheet(
         show = show,
-        // The panel carries its own toolbar and header, so the sheet draws neither a handle nor a
-        // title row; it still reserves the handle strip so the header keeps the native offset.
+        // The sheet draws its own single-row header (current server title on the left, close button
+        // on the right), so `title` / `startAction` / `endAction` stay null to avoid COUI's default
+        // top-left close capsule.
         showDragHandle = false,
         insideMargin = DpSize(16.dp, 40.dp),
         onDismissRequest = onDismiss,
-        startAction = {
-            SheetActionButton(
-                onClick = onDismiss,
-                // The sheet's title row adds its own 16dp padding on top of the panel's inset, so
-                // the button would sit 16dp inside the cards. Pull it back onto their edge.
-                modifier = Modifier.offset(x = -BottomSheetDefaults.HeaderHorizontalPadding),
-            ) {
-                MiuixIcon(
-                    imageVector = COUIIcons.Close,
-                    contentDescription = stringResource(R.string.cancel),
-                    tint = COUITheme.colorScheme.onBackground,
-                    modifier = Modifier.size(24.dp),
-                )
-            }
-        },
     ) {
-        ServerSheetContent(slots, isPrivacyMode, actions, onDismiss, isLocalMode = isLocalMode)
+        Column(modifier = Modifier.fillMaxWidth()) {
+            ServerSheetTopBar(
+                title = serverStatusText(slots, isLocalMode),
+                onDismiss = onDismiss,
+            )
+            ServerSheetContent(
+                slots = slots,
+                isPrivacyMode = isPrivacyMode,
+                actions = actions,
+                onDismiss = onDismiss,
+                modifier = Modifier.weight(1f, fill = false),
+                isLocalMode = isLocalMode,
+            )
+        }
     }
 }
 
@@ -133,12 +128,6 @@ fun ServerSheetContent(
             .scrollEndHaptic()
             .overScrollVertical(),
     ) {
-        item(key = "header") {
-            ServerSheetHeader(
-                title = stringResource(R.string.app_name),
-                statusText = serverStatusText(slots, isLocalMode),
-            )
-        }
         if (!isLocalMode) {
             item(key = "servers") {
                 SmallTitle(
@@ -250,48 +239,45 @@ fun ServerSheetContent(
 }
 
 /**
- * The top of the panel: the 28sp title over the `● status` line, as the ColorOS 17 panel opens.
+ * Single-row header pinned at the top of the panel: current server title on the left and the
+ * circled close button on the right.
  */
 @Composable
-private fun ServerSheetHeader(title: String, statusText: String) {
-    val dotColor = COUITheme.colorScheme.onSurfaceVariantActions
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Spacer(Modifier.height(3.dp))
-        // The 28sp line box is taller than its ink, so the text is centred inside a pinned-height
-        // box the way the native panel positions it.
-        Box(
+private fun ServerSheetTopBar(
+    title: String,
+    onDismiss: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = BottomSheetDefaults.HeaderHeight)
+            .padding(bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = title,
             modifier = Modifier
-                .fillMaxWidth()
-                .height(27.dp),
-            contentAlignment = Alignment.CenterStart,
-        ) {
-            Text(
-                text = title,
-                modifier = Modifier.wrapContentHeight(unbounded = true),
-                fontSize = 28.sp,
-                lineHeight = 28.sp,
-                fontWeight = FontWeight.Bold,
-                color = COUITheme.colorScheme.onBackground,
+                .weight(1f)
+                .padding(end = 12.dp),
+            fontSize = 22.sp,
+            lineHeight = 28.sp,
+            fontWeight = FontWeight.Bold,
+            color = COUITheme.colorScheme.onBackground,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        SheetActionButton(onClick = onDismiss) {
+            MiuixIcon(
+                imageVector = COUIIcons.Close,
+                contentDescription = stringResource(R.string.cancel),
+                tint = COUITheme.colorScheme.onBackground,
+                modifier = Modifier.size(24.dp),
             )
         }
-        Spacer(Modifier.height(12.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Canvas(modifier = Modifier.size(6.dp)) {
-                drawCircle(color = dotColor)
-            }
-            Spacer(Modifier.width(5.dp))
-            Text(
-                text = statusText,
-                fontSize = 12.sp,
-                lineHeight = 12.sp,
-                color = COUITheme.colorScheme.onBackground,
-            )
-        }
-        Spacer(Modifier.height(16.dp))
     }
 }
 
-/** `● 当前：FN`, `● 未选择服务器`, or the local-mode label when no server can be connected. */
+/** `当前：FN`, `未选择服务器`, or the local-mode label when no server can be connected. */
 @Composable
 private fun serverStatusText(slots: List<WebDavSlotUi>, isLocalMode: Boolean): String {
     if (isLocalMode) return stringResource(R.string.local_photos)

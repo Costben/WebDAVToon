@@ -5,9 +5,11 @@ package erl.webdavtoon.ui.component
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
@@ -17,13 +19,18 @@ import erl.webdavtoon.ui.screen.settings.WebDavSlotUi
 import io.github.suqi8.coui.kmp.basic.AppBarBlurOverlayDefaults
 import io.github.suqi8.coui.kmp.basic.NavigationRail
 import io.github.suqi8.coui.kmp.basic.NavigationRailItem
+import io.github.suqi8.coui.kmp.basic.Scaffold
 import io.github.suqi8.coui.kmp.basic.Text as MiuixText
+import io.github.suqi8.coui.kmp.blur.LocalBackdrop
+import io.github.suqi8.coui.kmp.blur.layerBackdrop
+import io.github.suqi8.coui.kmp.blur.rememberLayerBackdrop
 import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.extended.Add
 import io.github.suqi8.coui.kmp.icon.extended.Favorites
 import io.github.suqi8.coui.kmp.icon.extended.Folder
 import io.github.suqi8.coui.kmp.icon.extended.Settings
 import io.github.suqi8.coui.kmp.theme.COUITheme
+import io.github.suqi8.coui.kmp.utils.COUIPopupUtils.Companion.COUIPopupHost
 
 @Composable
 fun AppSideRail(
@@ -98,8 +105,27 @@ fun AppAdaptiveNavigationScaffold(
             Box(Modifier.weight(1f).fillMaxHeight()) { content() }
         }
     } else {
-        Box(modifier.fillMaxSize()) {
-            Box(Modifier.fillMaxSize()) { content() }
+        // Record the full underlying screen (page + glass app bar) into a backdrop layer and host
+        // the bottom sheet in a sibling popup host that reads it, so ColorOS 17's panel blur
+        // samples the visible page without ever sampling itself.
+        val containerColor = AppBarBlurOverlayDefaults.containerColor()
+        val screenBackdrop = rememberLayerBackdrop {
+            drawRect(containerColor)
+            drawContent()
+        }
+        Scaffold(
+            modifier = modifier.fillMaxSize(),
+            containerColor = containerColor,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
+            popupHost = {
+                CompositionLocalProvider(LocalBackdrop provides screenBackdrop) {
+                    COUIPopupHost()
+                }
+            },
+        ) {
+            Box(Modifier.fillMaxSize().layerBackdrop(screenBackdrop)) {
+                content()
+            }
             AppServerSheet(
                 show = showServerSheet,
                 slots = slots,
