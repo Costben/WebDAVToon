@@ -270,8 +270,8 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 
     // COUI (ColorOS-style UI, fork of Miuix). 1.2.0 carries the ColorOS 17 app-bar glass,
-    // the toolbar icon halo and the material edge/spot-light primitives; it resolves from the
-    // coui17 rolling snapshot (see settings.gradle.kts), not Maven Central.
+    // the toolbar icon halo and the material edge/spot-light primitives; it resolves from
+    // Costben/coui17's public `maven-repo` branch (see settings.gradle.kts), not Maven Central.
     implementation("io.github.suqi8.coui.kmp:coui-ui:1.2.0-SNAPSHOT")
     implementation("io.github.suqi8.coui.kmp:coui-icons:1.2.0-SNAPSHOT")
     implementation("io.github.suqi8.coui.kmp:coui-preference:1.2.0-SNAPSHOT")

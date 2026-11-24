@@ -17,28 +17,28 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
-        // COUI 1.2.0 is not on Maven Central. The fork (Costben/coui17) publishes a rolling
-        // `1.2.0-SNAPSHOT` to its own build/repository/local via .githooks/publish-rolling-snapshot.sh;
-        // other machines resolve the same coordinate from GitHub Packages, which needs a token.
+        // COUI 1.2.0-SNAPSHOT is hosted on Costben/coui17's public `maven-repo` branch (no token
+        // required). Local overrides are opt-in only via `-PcouiLocalRepo=` or `COUI_LOCAL_REPO`.
         val couiLocalRepo = providers.gradleProperty("couiLocalRepo").orNull
             ?: System.getenv("COUI_LOCAL_REPO")
-            ?: rootDir.parentFile.resolve("coui17/build/repository/local")
-                .takeIf { it.isDirectory }
-                ?.absolutePath
-        if (couiLocalRepo != null) {
-            maven {
-                name = "couiLocal"
-                url = uri(couiLocalRepo)
+        exclusiveContent {
+            if (couiLocalRepo != null) {
+                forRepository {
+                    maven {
+                        name = "couiLocal"
+                        url = uri(couiLocalRepo)
+                    }
+                }
             }
-        }
-        maven {
-            name = "couiGitHubPackages"
-            url = uri("https://maven.pkg.github.com/Costben/coui17")
-            credentials {
-                username = providers.gradleProperty("gpr.user").orNull ?: System.getenv("GITHUB_ACTOR") ?: "Costben"
-                password = providers.gradleProperty("gpr.key").orNull ?: System.getenv("GITHUB_TOKEN")
+            forRepository {
+                maven {
+                    name = "couiRemote"
+                    url = uri("https://raw.githubusercontent.com/Costben/coui17/maven-repo/coui-repo")
+                }
             }
-            content { includeGroup("io.github.suqi8.coui.kmp") }
+            filter {
+                includeGroup("io.github.suqi8.coui.kmp")
+            }
         }
         if (System.getenv("CI") != "true") {
             maven { url = uri("https://maven.aliyun.com/repository/google") }
