@@ -71,6 +71,7 @@ import erl.webdavtoon.Photo
 import erl.webdavtoon.PhotoViewActivity
 import erl.webdavtoon.PromptPreset
 import erl.webdavtoon.R
+import erl.webdavtoon.ReaderSessionPage
 import erl.webdavtoon.ReaderSessionSource
 import erl.webdavtoon.ReaderSessions
 import erl.webdavtoon.SettingsManager
@@ -139,6 +140,7 @@ data class AutoWorkflowActions(
     val onUp: () -> Unit,
     val onOpenFolder: (relPath: String) -> Unit,
     val onLoadMore: () -> Unit,
+    val onLoadMoreForReader: suspend (relPath: String) -> Pair<List<AutoWorkflowImage>, Boolean>? = { null },
     val onOpenSettings: () -> Unit,
     val onOpenTerminalHub: () -> Unit = {},
     val onSetSortOrder: (Int) -> Unit,
@@ -311,7 +313,34 @@ fun AutoWorkflowScreen(
                 val visibleImages = state.images.filter {
                     it.isLinked && (query.isEmpty() || it.name.contains(query, ignoreCase = true))
                 }
-                openOutputReader(context, visibleImages, target.relPath, title)
+                val relPath = state.relPath
+                openOutputReader(
+                    context = context,
+                    images = visibleImages,
+                    startRelPath = target.relPath,
+                    title = title,
+                    hasMore = state.hasMore,
+                    loadMore = if (state.hasMore) {
+                        {
+                            val loaded = actions.onLoadMoreForReader(relPath)
+                            if (loaded == null) {
+                                null
+                            } else {
+                                val (added, nextHasMore) = loaded
+                                val filtered = added.filter {
+                                    it.isLinked && (query.isEmpty() || it.name.contains(query, ignoreCase = true))
+                                }
+                                registerAutoWorkflowCompareEntries(filtered)
+                                ReaderSessionPage(
+                                    items = filtered.map(::toReaderPhoto),
+                                    hasMore = nextHasMore,
+                                )
+                            }
+                        }
+                    } else {
+                        null
+                    },
+                )
             },
         )
 
@@ -367,30 +396,15 @@ fun AutoWorkflowScreen(
     }
 }
 
-/**
- * Opens the app's own reader on this directory's output images.
- *
- * The viewer, its page transitions and its gestures are the album reader's — this only hands over a
- * [ReaderSessions] snapshot (one [Photo] per output file, addressed by its relative path) and
- * records each output's original-image counterpart so the reader can draw its compare inset.
- */
-private fun openOutputReader(
-    context: Context,
-    images: List<AutoWorkflowImage>,
-    startRelPath: String,
-    title: String,
-) {
-    if (images.isEmpty()) return
-    val photos = images.map { image ->
-        Photo(
-            id = image.relPath,
-            imageUri = Uri.parse(image.imageUrl ?: image.thumbUrl ?: image.absPath),
-            title = image.name,
-            size = image.size,
-            isLocal = false,
-        )
-    }
-    val startIndex = photos.indexOfFirst { it.id == startRelPath }.coerceAtLeast(0)
+private fun toReaderPhoto(image: AutoWorkflowImage): Photo = Photo(
+    id = image.relPath,
+    imageUri = Uri.parse(image.imageUrl ?: image.thumbUrl ?: image.absPath),
+    title = image.name,
+    size = image.size,
+    isLocal = false,
+)
+
+private fun registerAutoWorkflowCompareEntries(images: List<AutoWorkflowImage>) {
     AutoWorkflowCompareStore.putAll(
         images.mapNotNull { image ->
             val task = image.task ?: return@mapNotNull null
@@ -404,7 +418,34 @@ private fun openOutputReader(
             )
         }.toMap(),
     )
-    val session = ReaderSessions.create(ReaderSessionSource.AUTOWORKFLOW, photos, title)
+}
+
+/**
+ * Opens the app's own reader on this directory's output images.
+ *
+ * The viewer, its page transitions and its gestures are the album reader's — this only hands over a
+ * [ReaderSessions] snapshot (one [Photo] per output file, addressed by its relative path) and
+ * records each output's original-image counterpart so the reader can draw its compare inset.
+ */
+private fun openOutputReader(
+    context: Context,
+    images: List<AutoWorkflowImage>,
+    startRelPath: String,
+    title: String,
+    hasMore: Boolean = false,
+    loadMore: (suspend () -> ReaderSessionPage<Photo>?)? = null,
+) {
+    if (images.isEmpty()) return
+    val photos = images.map(::toReaderPhoto)
+    val startIndex = photos.indexOfFirst { it.id == startRelPath }.coerceAtLeast(0)
+    registerAutoWorkflowCompareEntries(images)
+    val session = ReaderSessions.create(
+        source = ReaderSessionSource.AUTOWORKFLOW,
+        photos = photos,
+        title = title,
+        hasMore = hasMore,
+        loadMore = loadMore,
+    )
     val intent = Intent(context, PhotoViewActivity::class.java).apply {
         putExtra(ReaderSessions.EXTRA_SESSION_ID, session.id)
         putExtra("EXTRA_CURRENT_INDEX", startIndex)

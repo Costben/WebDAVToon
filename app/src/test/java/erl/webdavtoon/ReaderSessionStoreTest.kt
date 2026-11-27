@@ -39,4 +39,38 @@ class ReaderSessionStoreTest {
         assertTrue(restored.restoredFromSameSession)
         assertEquals(3, restored.index)
     }
+
+    @Test
+    fun appendItems_deduplicatesUpdatesHasMoreAndPreservesItemsAcrossResolve() {
+        val store = ReaderSessionStore<String> { "paged-session" }
+        val session = store.create(
+            source = ReaderSessionSource.AUTOWORKFLOW,
+            items = listOf("a", "b", "c"),
+            title = "Album",
+            hasMore = true,
+            loadMore = { ReaderSessionPage(listOf("d"), hasMore = false) },
+        )
+
+        assertTrue(session.hasMore)
+
+        val afterFirstAppend = store.appendItems(
+            sessionId = session.id,
+            newItems = listOf("b", "d", "e"),
+            hasMore = true,
+        )!!
+        assertEquals(listOf("a", "b", "c", "d", "e"), afterFirstAppend.items)
+        assertTrue(afterFirstAppend.hasMore)
+
+        val afterFinalAppend = store.appendItems(
+            sessionId = session.id,
+            newItems = listOf("e", "f"),
+            hasMore = false,
+        )!!
+        assertEquals(listOf("a", "b", "c", "d", "e", "f"), afterFinalAppend.items)
+        assertFalse(afterFinalAppend.hasMore)
+
+        val resolved = store.resolve(session.id, session.id, savedIndex = 5, intentIndex = 0)!!
+        assertEquals(listOf("a", "b", "c", "d", "e", "f"), resolved.snapshot.items)
+        assertEquals(5, resolved.index)
+    }
 }

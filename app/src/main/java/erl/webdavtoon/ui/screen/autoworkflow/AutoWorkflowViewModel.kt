@@ -21,6 +21,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** How many directory listings stay in memory so stepping back up paints instantly. */
 private const val LEVEL_CACHE_SIZE = 32
@@ -139,6 +141,7 @@ class AutoWorkflowViewModel(app: Application) : AndroidViewModel(app) {
     private var hasLoadedOnce = false
     private var loadJob: Job? = null
     private var persistScrollJob: Job? = null
+    private val loadMoreMutex = Mutex()
     private var client: AutoWorkflowClient? = null
     private var clientBaseUrl: String = ""
 
@@ -378,57 +381,82 @@ class AutoWorkflowViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun loadMore() {
+        val relPath = _uiState.value.relPath
+        viewModelScope.launch {
+            loadMorePageInternal(expectedRelPath = relPath, reportError = true)
+        }
+    }
+
+    /**
+     * Fetches the next backend page for [expectedRelPath] and merges it into both the grid state
+     * and [levelCache], returning the newly added images and updated `hasMore` flag for the reader.
+     */
+    suspend fun loadMorePageForReader(expectedRelPath: String): Pair<List<AutoWorkflowImage>, Boolean>? =
+        loadMorePageInternal(expectedRelPath = expectedRelPath, reportError = false)
+
+    private suspend fun loadMorePageInternal(
+        expectedRelPath: String,
+        reportError: Boolean,
+    ): Pair<List<AutoWorkflowImage>, Boolean>? = loadMoreMutex.withLock {
         val state = _uiState.value
-        if (state.loading || state.loadingMore || !state.hasMore) return
+        if (state.relPath != expectedRelPath || state.loading || !state.hasMore) {
+            return@withLock null
+        }
         val baseUrl = state.serverUrl.ifBlank { settingsManager.getAutoWorkflowUrl() }
-        if (baseUrl.isBlank()) return
+        if (baseUrl.isBlank()) return@withLock null
+
         _uiState.update { it.copy(loadingMore = true) }
         val activeSortOrder = state.sortOrder
         val backendSort = backendSortFor(activeSortOrder)
-        viewModelScope.launch {
-            fetchLinkedBatch(
-                clientFor(baseUrl),
-                state.relPath,
-                startOffset = state.rawImageOffset,
-                sort = backendSort,
-            ).fold(
-                onSuccess = { batch ->
-                    val sortedBatch = sortAutoWorkflowImages(batch.linkedImages, activeSortOrder)
-                    _uiState.update {
-                        it.copy(
-                            loadingMore = false,
-                            images = it.images + sortedBatch,
-                            rawImageOffset = batch.nextRawOffset,
-                            totalImages = batch.totalImages,
-                            hasMore = batch.hasMore,
-                            linkedLoaded = it.linkedLoaded + batch.linkedInBatch,
-                        )
-                    }
-                    val loaded = _uiState.value
-                    levelCache[loaded.relPath] = CachedLevel(
-                        absPath = loaded.absPath,
-                        rootPath = loaded.rootPath,
-                        parentRelPath = loaded.parentRelPath,
-                        breadcrumbs = loaded.breadcrumbs,
-                        folders = loaded.folders,
-                        images = loaded.images,
-                        rawImageOffset = loaded.rawImageOffset,
-                        totalImages = loaded.totalImages,
-                        hasMore = loaded.hasMore,
-                        linkedLoaded = loaded.linkedLoaded,
-                        taskCount = loaded.taskCount,
+        val result = fetchLinkedBatch(
+            clientFor(baseUrl),
+            state.relPath,
+            startOffset = state.rawImageOffset,
+            sort = backendSort,
+        )
+        return@withLock result.fold(
+            onSuccess = { batch ->
+                if (_uiState.value.relPath != expectedRelPath) {
+                    _uiState.update { it.copy(loadingMore = false) }
+                    return@fold null
+                }
+                val sortedBatch = sortAutoWorkflowImages(batch.linkedImages, activeSortOrder)
+                _uiState.update {
+                    it.copy(
+                        loadingMore = false,
+                        images = it.images + sortedBatch,
+                        rawImageOffset = batch.nextRawOffset,
+                        totalImages = batch.totalImages,
+                        hasMore = batch.hasMore,
+                        linkedLoaded = it.linkedLoaded + batch.linkedInBatch,
                     )
-                },
-                onFailure = { error ->
-                    _uiState.update {
-                        it.copy(
-                            loadingMore = false,
-                            error = error.message ?: "AutoWorkflow request failed",
-                        )
-                    }
-                },
-            )
-        }
+                }
+                val loaded = _uiState.value
+                levelCache[loaded.relPath] = CachedLevel(
+                    absPath = loaded.absPath,
+                    rootPath = loaded.rootPath,
+                    parentRelPath = loaded.parentRelPath,
+                    breadcrumbs = loaded.breadcrumbs,
+                    folders = loaded.folders,
+                    images = loaded.images,
+                    rawImageOffset = loaded.rawImageOffset,
+                    totalImages = loaded.totalImages,
+                    hasMore = loaded.hasMore,
+                    linkedLoaded = loaded.linkedLoaded,
+                    taskCount = loaded.taskCount,
+                )
+                sortedBatch to batch.hasMore
+            },
+            onFailure = { error ->
+                _uiState.update {
+                    it.copy(
+                        loadingMore = false,
+                        error = if (reportError) error.message ?: "AutoWorkflow request failed" else it.error,
+                    )
+                }
+                null
+            },
+        )
     }
 
     private data class LinkedImageBatch(

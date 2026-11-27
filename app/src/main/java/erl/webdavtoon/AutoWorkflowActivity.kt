@@ -77,6 +77,7 @@ class AutoWorkflowActivity : ComponentActivity() {
                             onUp = { viewModel.navigateUp() },
                             onOpenFolder = { relPath -> viewModel.openFolder(relPath) },
                             onLoadMore = { viewModel.loadMore() },
+                            onLoadMoreForReader = { relPath -> viewModel.loadMorePageForReader(relPath) },
                             onSetSortOrder = viewModel::setSortOrder,
                             getScrollOffset = viewModel::scrollOffsetFor,
                             onScrollOffsetChanged = viewModel::saveScrollOffset,

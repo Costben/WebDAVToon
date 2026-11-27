@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import com.bumptech.glide.Glide
 import erl.webdavtoon.AppSettingsStore
 import erl.webdavtoon.FavoriteSelectionPlanner
+import erl.webdavtoon.FolderSearchMatcher
 import erl.webdavtoon.LocalPhotoRepository
 import erl.webdavtoon.MediaManager
 import erl.webdavtoon.MediaType
@@ -213,6 +214,18 @@ class MediaWaterfallViewModel(app: Application) : AndroidViewModel(app) {
                 hasMore = loaded + next.size < orderedPhotos.size,
             )
         }
+    }
+
+    /**
+     * Returns all non-video photos in the current ordered listing (not capped to the grid's
+     * incremental [PAGE_SIZE] slice) so the reader can browse past the first 120 images directly.
+     */
+    fun readerPhotos(): List<Photo> {
+        val keyword = _uiState.value.searchKeyword
+        return orderedPhotos.asSequence()
+            .filterNot(::isVideo)
+            .filter { keyword.isBlank() || FolderSearchMatcher.matches(it.title, keyword) }
+            .toList()
     }
 
     private fun buildItems(

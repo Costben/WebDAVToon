@@ -336,7 +336,7 @@ class MainActivity : FragmentActivity() {
             return
         }
 
-        val imageOnly = state.items.filterNot { it.isVideo }.map { it.photo }
+        val imageOnly = viewModel.readerPhotos()
         val imageIndex = imageOnly.indexOfFirst { it.id == item.photo.id }
         if (imageIndex == -1) return
 

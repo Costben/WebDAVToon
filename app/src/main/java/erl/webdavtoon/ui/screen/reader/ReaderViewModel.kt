@@ -12,6 +12,7 @@ import erl.webdavtoon.GestureType
 import erl.webdavtoon.GestureZone
 import erl.webdavtoon.Photo
 import erl.webdavtoon.PhotoCache
+import erl.webdavtoon.ReaderSessionPage
 import erl.webdavtoon.ReaderSessions
 import erl.webdavtoon.SettingsManager
 import erl.webdavtoon.WebDavImageLoader
@@ -44,6 +45,9 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     val uiState: StateFlow<ReaderUiState> = _uiState.asStateFlow()
 
     private var slideshowJob: Job? = null
+    private var loadMoreJob: Job? = null
+    private var sessionLoadMore: (suspend () -> ReaderSessionPage<Photo>?)? = null
+    private var sessionHasMore: Boolean = false
     private var lastSessionId: String? = null
     private var isFavoritesSource: Boolean = false
     private var explicitModeSet: Boolean = false
@@ -95,6 +99,8 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         if (targetReadingMode != ReadingMode.CARD && _uiState.value.isSlideshowPlaying) {
             stopSlideshow()
         }
+        loadMoreJob?.cancel()
+        loadMoreJob = null
 
         val resolvedSession = if (sessionId != null) {
             ReaderSessions.resolve(
@@ -104,6 +110,8 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
                 intentIndex = initialIndex
             )
         } else null
+        sessionLoadMore = resolvedSession?.snapshot?.loadMore
+        sessionHasMore = resolvedSession?.snapshot?.hasMore == true && sessionLoadMore != null
 
         val loadedPhotos = when {
             resolvedSession != null -> resolvedSession.snapshot.items
@@ -153,6 +161,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         }
 
         preloadAdjacentPhotos(targetIndex)
+        maybeLoadMore(targetIndex)
     }
 
     fun updateCurrentIndex(newIndex: Int) {
@@ -167,6 +176,7 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
             if (state.isFavorite != isFav) {
                 _uiState.update { it.copy(isFavorite = isFav) }
             }
+            maybeLoadMore(clampedIndex)
             return
         }
 
@@ -178,6 +188,54 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
         }
 
         preloadAdjacentPhotos(clampedIndex)
+        maybeLoadMore(clampedIndex)
+    }
+
+    private fun maybeLoadMore(index: Int) {
+        val loader = sessionLoadMore ?: return
+        if (!sessionHasMore || loadMoreJob?.isActive == true) return
+        val total = _uiState.value.photos.size
+        if (total == 0 || index < total - READER_PREFETCH_THRESHOLD) return
+
+        val expectedSessionId = _uiState.value.sessionId
+        loadMoreJob = viewModelScope.launch {
+            var hops = 0
+            while (sessionHasMore && hops < MAX_READER_LOAD_MORE_HOPS) {
+                val currentState = _uiState.value
+                if (currentState.sessionId != expectedSessionId) break
+                if (currentState.currentIndex < currentState.photos.size - READER_PREFETCH_THRESHOLD) break
+
+                val page = runCatching { loader() }.getOrNull() ?: break
+                if (_uiState.value.sessionId != expectedSessionId) break
+
+                sessionHasMore = page.hasMore
+                val updatedPhotos = if (expectedSessionId != null) {
+                    ReaderSessions.appendPhotos(expectedSessionId, page.items, page.hasMore)?.items
+                        ?: mergeUniquePhotos(_uiState.value.photos, page.items)
+                } else {
+                    mergeUniquePhotos(_uiState.value.photos, page.items)
+                }
+                val grew = updatedPhotos.size > _uiState.value.photos.size
+                if (grew) {
+                    _uiState.update { state ->
+                        if (state.sessionId != expectedSessionId) state
+                        else state.copy(photos = updatedPhotos)
+                    }
+                    preloadAdjacentPhotos(_uiState.value.currentIndex)
+                }
+                hops++
+                if (!page.hasMore || (!grew && page.items.isEmpty())) {
+                    break
+                }
+            }
+        }
+    }
+
+    private fun mergeUniquePhotos(existing: List<Photo>, incoming: List<Photo>): List<Photo> {
+        if (incoming.isEmpty()) return existing
+        val seen = existing.mapTo(HashSet(existing.size + incoming.size)) { it.id }
+        val unique = incoming.filter { seen.add(it.id) }
+        return if (unique.isEmpty()) existing else existing + unique
     }
 
     fun toggleReadingMode() {
@@ -445,6 +503,10 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
 
     fun resetState() {
         stopSlideshow()
+        loadMoreJob?.cancel()
+        loadMoreJob = null
+        sessionLoadMore = null
+        sessionHasMore = false
         explicitModeSet = false
         _uiState.value = ReaderUiState(
             isOrientationLocked = settingsManager.isRotationLocked(),
@@ -460,5 +522,11 @@ class ReaderViewModel(app: Application) : AndroidViewModel(app) {
     override fun onCleared() {
         super.onCleared()
         stopSlideshow()
+        loadMoreJob?.cancel()
+    }
+
+    private companion object {
+        const val READER_PREFETCH_THRESHOLD = 24
+        const val MAX_READER_LOAD_MORE_HOPS = 8
     }
 }
